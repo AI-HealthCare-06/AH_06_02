@@ -51,6 +51,12 @@ jobs:
           MYSQL_DATABASE: ai_health
         ports:
           - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -ppw1234 --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+          --health-start-period=10s
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,6 +86,12 @@ jobs:
 
       - name: Run Tests with Coverage
         if: steps.check_tests.outputs.has_tests == 'true'
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: pw1234
+          DB_NAME: ai_health
         run: |
           uv run coverage run -m pytest app
           uv run coverage report -m
