@@ -115,6 +115,8 @@ class ModelExplanationService:
     """Internal B -> D provider; callers must enforce authenticated ownership.
 
     Loaders should return durable artifacts/committed predictions, never dummy data.
+    Returns the arrays specified by the team's internal module-call contract.
+    Public HTTP metadata/envelopes belong to the route layer, not these helpers.
     This helper does not implement persistence, public routes or the worker loop.
     """
 
@@ -131,29 +133,32 @@ class ModelExplanationService:
         if disease not in DISEASES or type(limit) is not int or not 1 <= limit <= 100:
             raise ValueError("disease or limit is invalid")
 
-    def get_global_importance(self, disease: str, limit: int) -> dict[str, Any]:
+    def get_global_importance(self, disease: str, limit: int) -> list[dict[str, Any]]:
         self._validate(disease, limit)
         artifact = self.artifact_loader()
         if artifact.get("status") != "trained" or not artifact.get("model_version"):
             raise ValueError("MODEL_UNAVAILABLE")
-        return {
-            "model_version": artifact["model_version"],
-            "factor_dictionary_version": artifact["factor_dictionary_version"],
-            "disease": disease,
-            "importance_unit": "mean_abs_group_shap_probability",
-            "items": artifact["diseases"][disease]["global_importance"][:limit],
-        }
+        return [
+            {
+                "factor_key": item["factor_key"],
+                "importance": item["importance"],
+                "rank": item["rank"],
+                "model_version": artifact["model_version"],
+            }
+            for item in artifact["diseases"][disease]["global_importance"][:limit]
+        ]
 
-    def get_top_contributions(self, prediction_id: int, disease: str, limit: int) -> dict[str, Any]:
+    def get_top_contributions(self, prediction_id: int, disease: str, limit: int) -> list[dict[str, Any]]:
         self._validate(disease, limit)
         prediction = self.prediction_loader(prediction_id)
         if prediction.get("status") != "done":
             raise ValueError("PREDICTION_NOT_READY")
-        return {
-            "prediction_id": prediction_id,
-            "model_version": prediction["model_version"],
-            "factor_dictionary_version": prediction["factor_dictionary_version"],
-            "disease": disease,
-            "contribution_unit": "probability",
-            "items": sorted(prediction["contributions"][disease], key=lambda item: item["rank"])[:limit],
-        }
+        return [
+            {
+                "factor_key": item["factor_key"],
+                "contribution": item["contribution"],
+                "direction": item["direction"],
+                "rank": item["rank"],
+            }
+            for item in sorted(prediction["contributions"][disease], key=lambda item: item["rank"])[:limit]
+        ]

@@ -59,23 +59,50 @@ class ExplanationContractTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             service.get_global_importance("diabetes", 3)
 
-    def test_prediction_keeps_its_model_version_after_retraining(self):
-        service = ModelExplanationService(
-            lambda: {
-                "status": "trained",
-                "model_version": "new",
-                "factor_dictionary_version": "v1",
-                "diseases": {"diabetes": {"global_importance": [{"factor_key": "age"}]}},
-            },
-            lambda _: {
+    def test_global_contract_exposes_current_version_without_changing_artifact(self):
+        importance = global_importance([{"age": 0.3, "bmi_high": 0.1}])
+        artifact = {
+            "status": "trained",
+            "model_version": "old",
+            "factor_dictionary_version": "v0",
+            "diseases": {"diabetes": {"global_importance": importance}},
+        }
+        service = ModelExplanationService(lambda: artifact, lambda _: {})
+        old_rows = service.get_global_importance("diabetes", 1)
+        self.assertEqual(old_rows, [{"factor_key": "age", "importance": 0.3, "rank": 1, "model_version": "old"}])
+        artifact["model_version"] = "new"
+        new_rows = service.get_global_importance("diabetes", 3)
+        self.assertEqual(len(new_rows), 2)
+        self.assertTrue(all(row["model_version"] == "new" for row in new_rows))
+        self.assertEqual(old_rows[0]["model_version"], "old")
+        self.assertIn("normalized_importance", importance[0])
+        self.assertIn("modifiable", importance[0])
+        self.assertNotIn("model_version", importance[0])
+
+    def test_prediction_uses_saved_contributions_after_retraining(self):
+        def active_artifact_must_not_be_used():
+            self.fail("A saved prediction must not be reinterpreted using the current model")
+
+        loaded_prediction_ids = []
+
+        def load_prediction(prediction_id):
+            loaded_prediction_ids.append(prediction_id)
+            return {
                 "status": "done",
                 "model_version": "old",
                 "factor_dictionary_version": "v0",
-                "contributions": {"diabetes": [{"factor_key": "age", "rank": 1}]},
-            },
+                "contributions": {"diabetes": list(reversed(rank_contributions({"age": 0.3, "bmi_high": -0.1})))},
+            }
+
+        service = ModelExplanationService(
+            active_artifact_must_not_be_used,
+            load_prediction,
         )
-        self.assertEqual(service.get_global_importance("diabetes", 3)["model_version"], "new")
-        self.assertEqual(service.get_top_contributions(1, "diabetes", 3)["model_version"], "old")
+        self.assertEqual(
+            service.get_top_contributions(501, "diabetes", 1),
+            [{"factor_key": "age", "contribution": 0.3, "direction": "increase", "rank": 1}],
+        )
+        self.assertEqual(loaded_prediction_ids, [501])
 
 
 if __name__ == "__main__":

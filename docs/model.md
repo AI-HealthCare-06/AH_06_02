@@ -1,6 +1,6 @@
 # 당고킬러 모델 정의 및 B 서비스 계약
 
-작성 기준: 2026-09-28 13:44 KST까지 확인한 팀 논의. 담당: 홍서윤(B).
+작성 기준: 2026-09-28 13:44 KST까지 확인한 팀 논의와 사용자가 지정한 API 명세서의 공통 규칙·모듈 간 호출 규약. 담당: 홍서윤(B).
 
 이 문서는 9/29 제출용 모델 입력·라벨 정의, 기여도 의미와 내부 호출 계약을 정한다. **입력·출력 계약과 실제 학습 검증은 별개다.** 현재 저장소에는 학습 데이터와 학습된 모델이 없으며 성능·SHAP 안정성·HP 기준값을 아직 측정하지 않았다. 수치 예시는 모두 계약 설명용이다.
 
@@ -10,7 +10,7 @@
 - 미진단자의 HP 출처는 `contribution`, 실측 혈당의 스파이크는 `measured`, 진단자의 전역 중요도 기반 점수는 `global`이다. 개인별 출처는 `user_monsters.hp_source`에 둔다.
 - B는 예측과 기여도 저장을 커밋한 뒤 D의 `refresh_hp_from_prediction(user_id, prediction_id)`를 호출한다. B가 `user_monsters`를 직접 수정하지 않는다.
 - C는 건강정보 저장 뒤 D의 `refresh_hp_from_health_record(user_id, health_record_id)`를 호출한다. D가 스파이크와 진단자 global 경로를 처리한다.
-- B는 `get_top_contributions(prediction_id, disease, limit)`와 `get_global_importance(disease, limit)`를 제공한다. 전역 중요도 반환에는 `model_version`이 필수다.
+- B는 `get_top_contributions(prediction_id, disease, limit)`와 `get_global_importance(disease, limit)`를 제공한다. 두 내부 함수는 배열을 반환하며 전역 중요도 배열의 각 항목에 `model_version`이 필수다.
 - 진단자의 `user_challenges.source_prediction_id`는 **NULL**이다. 존재하지 않는 prediction을 만들거나 0을 넣지 않는다. 원본 ERD SQL과 진단자 예측 금지 규칙이 일치한다.
 - `factor_key=NULL`인 챌린지는 damage 0, XP·보상만 지급한다. 수면 챌린지는 MVP에서 보류한다.
 
@@ -71,7 +71,7 @@ B 제안 기본안은 확률 공간 SHAP이다. 고정된 train background와 ex
 - D의 추천은 상위 3개 설명만 읽고 끝내지 않는다. 전체 기여요인 중 수정 가능, 양의 기여도, 실제 risk_condition 충족 요인을 필터링한 다음 최대 3개를 고른다. 건강한 행동을 악화시키는 추천을 하지 않는다.
 - 저장은 DECIMAL(8,5)에 맞게 반올림하되 SHAP 가산성 검증은 저장 전 원정밀도로 한다. 0으로 반올림되는 행은 표시하지 않는다. rank는 저장·표시 규칙을 적용한 뒤 부여한다.
 
-전역 중요도는 train 기준 factor별 `mean(abs(signed_group_shap))`다. `sum(mean(abs(raw_shap)))`와 혼동하지 않는다. 모든 factor의 중요도 합을 분모로 하는 `normalized_importance`도 제공한다. D는 수정 가능 요인과 생활패턴을 결합한다. 전역 중요도만으로 개인 위험 확률을 만들어서는 안 된다.
+전역 중요도는 train 기준 factor별 `mean(abs(signed_group_shap))`다. `sum(mean(abs(raw_shap)))`와 혼동하지 않는다. 모든 factor의 중요도 합을 분모로 하는 `normalized_importance`와 수정 가능 여부는 모델 artifact에 보관한다. 공식 내부 반환에는 7절의 네 필드만 포함한다. D는 factor 사전의 수정 가능 여부와 생활패턴을 결합한다. 전역 중요도만으로 개인 위험 확률을 만들어서는 안 된다.
 
 ## 6. HP 정규화 권고안
 
@@ -93,10 +93,14 @@ HP 0~39 안정, 40~69 경계, 70~100 분노로 경계 중복을 없앤다(B 제�
 
 | 함수 | 제공 → 호출 | 계약 |
 |---|---|---|
-| get_top_contributions(prediction_id, disease, limit) | B → D | done 예측만. 저장된 model_version, 전체/상위 기여도, signed probability 단위. limit=1~100; 추천 필터를 위해 전체 조회 가능 |
-| get_global_importance(disease, limit) | B → D | 활성 모델의 고정 artifact에서 조회. model_version, factor_dictionary_version, importance_unit, items. 질환·버전별 캐시 |
+| get_top_contributions(prediction_id, disease, limit) | B → D | done 예측에 저장된 기여도만 조회. `[{factor_key, contribution, direction, rank}]` 반환. signed probability 단위. limit=1~100; 추천 필터를 위해 전체 조회 가능 |
+| get_global_importance(disease, limit) | B → D | 활성 모델의 고정 artifact에서 조회. `[{factor_key, importance, rank, model_version}]` 반환. 질환·모델 버전·limit별 캐시 |
 | refresh_hp_from_prediction(user_id, prediction_id) | D → B | 예측+기여도 커밋 뒤 호출. 같은 prediction 재호출 멱등. 예측 버전 고정. B는 D 테이블 직접 쓰지 않음 |
 | refresh_hp_from_health_record(user_id, health_record_id) | D → C | C 저장 뒤 1회 호출. measured/global 분기는 D 내부 |
+
+위 반환 형식은 지정 API 명세서의 `모듈 간 호출` 탭 F8·F9를 따른다. 개인 기여도는 요청한 prediction_id의 저장된 값을 읽으며 재학습 뒤에도 활성 모델로 다시 계산하지 않는다. 전역 중요도는 현재 활성 모델의 버전을 각 반환 항목에 담는다. 제공자는 조회마다 활성 artifact를 확인하고, 호출자가 캐시하는 경우 활성 버전 변경 시 이전 캐시를 무효화한다. 모델 교체 감지·캐시 저장소 연결 자체는 후속 구현이다.
+
+공개 HTTP 기여도 API는 별도 계층이다. 라우트는 같은 prediction_id의 저장된 메타데이터를 읽어 `success/data` 응답의 prediction_id, disease, model_version, factor_dictionary_version, contribution_unit, items를 구성한다. 내부 함수가 이 metadata 객체를 반환한다고 가정하지 않는다. 공개 응답에 수정 가능 여부를 포함할 경우 해당 예측 버전의 factor 사전에서 보강한다.
 
 호출 실패 때문에 이미 완료된 예측을 실패로 되돌리거나 삭제하지 않는다. HP 갱신 재시도 작업을 남긴다. 큐 중복 전달과 이전 예측의 늦은 완료에도 D가 최신 근거 ID를 확인하고 과거 값으로 덮어쓰지 않도록 한다. 내구성 있는 outbox/재시도 저장 위치는 A·C·D와 합의할 구현 항목이다.
 
@@ -108,6 +112,7 @@ HP 0~39 안정, 40~69 경계, 70~100 분노로 경계 중복을 없앤다(B 제�
 
 ## 근거
 
+- [지정 API 명세서 — 공통 규칙·모듈 간 호출 F8·F9](https://docs.google.com/spreadsheets/d/1KZMhGHa7s2y3XSPKfA2rcTeJgTsUVi7c/edit?gid=1571297883#gid=1571297883)
 - [최신 API·HP 경로 변경 9/28 13:38](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790570304697439)
 - [좌식 분리 결정 9/28 11:58](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790564317593679)
 - [진단자 NULL이 명시된 ERD SQL 첨부](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790239227750419)

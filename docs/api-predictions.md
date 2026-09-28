@@ -1,16 +1,16 @@
 # B 예측 API 명세
 
-9/28 최신 공통 규칙 반영안. 공통 Google Sheets의 **B · 예측·모델** 탭에 들어갈 내용이다. 별도의 팀 공식 API 파일을 만들자는 뜻이 아니다. 현재 시트는 인증이 필요해 직접 읽기·반영을 완료하지 못했다. 아래 경로와 추가 필드는 B 설계안이며 시트의 기존 열·공통 세부 규칙과 최종 대조가 필요하다.
+사용자가 지정한 API명세서_v1-1의 공통 규칙과 B · 예측·모델 탭(12열)을 확인한 반영안이다. API 3개는 기존 B 탭 6~8행에 입력한다. 원본 파일은 소유자 휴지통에 있어 현재 편집 반영은 대기 중이다. 아래 내용은 서비스 구현 완료가 아닌 API 명세다.
 
 ## 공통 계약
 
-Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 토큰에서만 얻는다. body/query/path에 user_id를 받지 않는다. 모든 응답은 `success`, `data`, `error` 세 키를 가진다. 성공은 `error:null`, 실패는 `data:null`, `error:{code,message,details}`다. `details`는 B 제안 확장 필드이며 A 공통 탭과 확인 후 확정한다. 시각은 UTC ISO 8601, 확률은 0~1, 결과 변화량은 percentage points다.
+Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 토큰에서만 얻는다. body/query/path에 user_id를 받지 않는다. 원본 공통 규칙에 따라 성공은 `{"success":true,"data":{...}}`, 실패는 `{"success":false,"error":{"code":"...","message":"..."}}`로 반환한다. 반대쪽 data/error의 null 키는 추가하지 않는다. 모든 응답 헤더에 `X-Request-Id`를 넣는다. 시각은 UTC ISO 8601, JSON 키는 snake_case, 확률은 0~1, 결과 변화량은 percentage points다. 요청 형식·필수값·범위 검증 실패는 422, 잘못된 JSON은 400이다.
 
 | ID | Method | Endpoint | 목적 | 성공 |
 |---|---|---|---|---|
-| B-PRED-001 | POST | /predictions | 예측 접수 | 202 |
-| B-PRED-002 | GET | /predictions/{prediction_id} | 작업 상태·결과·이력 조회 | 200 |
-| B-PRED-003 | GET | /predictions/{prediction_id}/contributions | 질환별 기여도 조회 | 200 |
+| B-PRED-001 | POST | /api/v1/predictions | 예측 접수 | 201 |
+| B-PRED-002 | GET | /api/v1/predictions/{prediction_id} | 작업 상태·결과·이력 조회 | 200 |
+| B-PRED-003 | GET | /api/v1/predictions/{prediction_id}/contributions | 질환별 기여도 조회 | 200 |
 
 서버가 건강기록과 예측의 소유자를 검증한다. 존재하는 타인 리소스는 요구사항 NFR-SEC-002에 따라 403, 존재하지 않는 ID는 404다. 인증 오류를 먼저 검사한다. 작업ID를 알더라도 소유권 검사를 생략하지 않는다. 인증 없는 캐시와 개인별 응답 공유를 금지한다.
 
@@ -26,29 +26,30 @@ Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 �
 
 성공 예시(설명용):
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","poll_url":"/api/v1/predictions/501","created_at":"2026-09-28T05:00:00Z"},"error":null}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","poll_url":"/api/v1/predictions/501","created_at":"2026-09-28T05:00:00Z"}}
 ```
 
-1초 내 접수를 목표로 한다. B가 predictions pending을 만들고 확정한 model_version과 입력 스냅샷을 저장한다. 큐에는 prediction_id/job_id와 최소 작업 메타데이터만 전달하고 개인정보 전체를 로그에 찍지 않는다. ai_worker가 추론·기여도 계산을 수행한다. 큐 적재가 실패하면 failed를 기록하고 503으로 응답하여 영구 pending을 만들지 않는다. DB-큐 사이의 유실 복구 전략은 아래 구현 항목에 명시한다.
+1초 내 접수를 목표로 한다. 공통 상태표의 생성 응답에 맞춰 HTTP 201을 반환한다. 이는 pending 예측 리소스 생성 성공이며 추론 완료를 뜻하지 않는다. B가 predictions pending을 만들고 확정한 model_version과 입력 스냅샷을 저장한다. 큐에는 prediction_id/job_id와 최소 작업 메타데이터만 전달하고 개인정보 전체를 로그에 찍지 않는다. ai_worker가 추론·기여도 계산을 수행한다. 큐 적재가 실패하면 failed를 기록하고 500으로 응답하여 영구 pending을 만들지 않는다. DB-큐 사이의 유실 복구 전략은 아래 구현 항목에 명시한다.
 
-선택 헤더 `Idempotency-Key`(B 제안): 사용자와 키를 묶어 동일 body 재시도에 같은 prediction/job을 반환한다. 같은 키에 다른 body면 409. 완료된 요청 재전송도 원 결과를 반환한다. 보존 기간·내구성 저장소는 A/C와 확인할 항목이다. 저장소가 아직 없으므로 이 동작이 구현됐다고 간주하지 않는다. 의미가 같은 별도 요청은 새 이력으로 허용한다.
+HTTP 요청 재시도는 별도 예측을 만들 수 있다. 클라이언트는 연속 제출을 막고, 받은 prediction_id로 상태를 조회한다. 큐의 같은 job 재전달은 아래 저장·워커 계약에 따라 멱등 처리한다. 공통 규칙에 없는 Idempotency-Key 헤더는 이번 확정 요청 계약에 넣지 않는다.
 
 | 코드 | HTTP | 조건 |
 |---|---|---|
-| AUTH_REQUIRED / TOKEN_INVALID | 401 | 토큰 없음·무효 |
-| RESOURCE_FORBIDDEN | 403 | 타인 건강기록 |
-| PREDICTION_NOT_ELIGIBLE | 403 | 진단·관련 약물 이력 있음 |
-| DIAGNOSIS_HISTORY_REQUIRED | 400 | 진단·약물 정보 미확인 |
-| HEALTH_RECORD_NOT_FOUND | 404 | 기록 없음 |
-| REQUIRED_FEATURES_MISSING | 400 | 필수 입력 누락 |
-| INVALID_FEATURE_VALUE | 400 | 값·단위 범위 오류 |
-| INVALID_REQUEST | 400 | body/path 형식 오류; 공통 validation handler 필요 |
-| IDEMPOTENCY_CONFLICT | 409 | 같은 key 다른 요청 |
-| MODEL_UNAVAILABLE / QUEUE_UNAVAILABLE | 503 | artifact·큐 사용 불가 |
+| UNAUTHORIZED | 401 | 토큰 없음·만료·무효 |
+| FORBIDDEN | 403 | 타인 건강기록·예측 |
+| PRED_NOT_ELIGIBLE | 403 | 진단·관련 약물 이력 있음 |
+| PRED_DIAGNOSIS_HISTORY_REQUIRED | 422 | 진단·약물 정보 미확인 |
+| NOT_FOUND | 404 | 기록·예측 없음 |
+| PRED_INPUT_INSUFFICIENT | 422 | 필수 모델 입력 누락; message에 누락 목록 |
+| VALIDATION_ERROR | 422 | body/path/query 필수값·형식·범위 오류 |
+| VALIDATION_ERROR | 400 | 해석할 수 없는 JSON 요청 |
+| PRED_MODEL_UNAVAILABLE / PRED_QUEUE_UNAVAILABLE | 500 | 서버 모델·큐 준비 오류 |
+| INTERNAL_ERROR | 500 | 그 외 서버 오류 |
+
 
 누락 예시:
 ```json
-{"success":false,"data":null,"error":{"code":"REQUIRED_FEATURES_MISSING","message":"예측에 필요한 항목이 누락되었습니다.","details":{"fields":["waist_cm","sitting_minutes"]}}}
+{"success":false,"error":{"code":"PRED_INPUT_INSUFFICIENT","message":"필수 입력이 누락되었습니다: 허리둘레(waist_cm), 좌식시간(sitting_minutes)."}}
 ```
 실제로 필수인 목록은 활성 모델 manifest로 고정한다. 좌식 feature 미채택 모델에서는 sitting_minutes를 모델의 필수값이라고 거절하지 않는다. C의 설문 필수 여부와 모델 필수 여부는 구분한다.
 
@@ -58,12 +59,12 @@ path: prediction_id(양의 정수). query: `include_history=true`(기본 false),
 
 pending:
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","results":null,"failure":null},"error":null}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","results":null,"failure":null}}
 ```
 
 done(모든 수치는 설명용 가상 예시):
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","health_record_id":101,"status":"done","model_version":"MODEL_VERSION","grade_policy_version":"GRADE_POLICY_VERSION","predicted_at":"2026-09-28T05:00:02Z","results":[{"disease":"diabetes","probability":0.31,"grade":"caution","previous_probability":0.34,"delta_pp":-3.0},{"disease":"hypertension","probability":0.22,"grade":"low","previous_probability":0.20,"delta_pp":2.0}],"comparison":{"previous_prediction_id":490,"comparable":true,"reason":null},"metabolic":{"status":"unavailable","count":null,"reason":"MEASUREMENTS_INCOMPLETE"},"history":[],"failure":null,"notice":"의료 진단이 아닌 참고용입니다."},"error":null}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","health_record_id":101,"status":"done","model_version":"MODEL_VERSION","grade_policy_version":"GRADE_POLICY_VERSION","predicted_at":"2026-09-28T05:00:02Z","results":[{"disease":"diabetes","probability":0.31,"grade":"caution","previous_probability":0.34,"delta_pp":-3.0},{"disease":"hypertension","probability":0.22,"grade":"low","previous_probability":0.2,"delta_pp":2.0}],"comparison":{"previous_prediction_id":490,"comparable":true,"reason":null},"metabolic":{"status":"unavailable","count":null,"reason":"MEASUREMENTS_INCOMPLETE"},"history":[],"failure":null,"notice":"의료 진단이 아닌 참고용입니다."}}
 ```
 
 예시의 probability와 grade 조합은 시험 수치이며 실제 경계값을 뜻하지 않는다. 실제 `grade_policy`는 validation 결과로 두 경계를 고정하고 model_version에 묶어야 한다. 누락된 grade 정책으로 임의 등급을 반환하지 않는다. 최초 결과는 previous_probability/delta_pp=null. 다른 모델·등급 정책 버전은 comparable=false로 표시하고 단순 호전/악화를 계산하지 않는다.
@@ -74,16 +75,16 @@ done(모든 수치는 설명용 가상 예시):
 
 failed:
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","results":null,"failure":{"code":"INFERENCE_FAILED","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}},"error":null}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","results":null,"failure":{"code":"PRED_INFERENCE_FAILED","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}}}
 ```
 조회 자체는 성공했으므로 HTTP 200/success=true이고 작업 실패는 failure로 전달한다. worker exception stack·경로·원시 건강값은 노출하지 않는다. `failure` 상세 저장 위치는 기존 ERD에 없으므로 Redis 보존 정책 또는 B 컬럼 확장을 A/C와 협의한다. 30초는 추론 목표이며 곧바로 실패로 바꾸는 하드 timeout 값은 아니다. 별도 hard timeout·복구 작업 설정을 운영 계약에 둔다.
 
 ## B-PRED-003 기여도 조회
 
-query: `disease=diabetes|hypertension` 필수, `limit` 기본 3, 1~100. done 전에 조회하면 409 PREDICTION_NOT_READY, 실패 작업이면 409 PREDICTION_FAILED. 존재/권한 오류는 위와 같다.
+query: `disease=diabetes|hypertension` 필수, `limit` 기본 3, 1~100. done 전에 조회하면 409 PRED_NOT_READY, 실패 작업이면 409 PRED_FAILED. 존재/권한 오류는 위와 같다.
 
 ```json
-{"success":true,"data":{"prediction_id":501,"disease":"diabetes","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]},"error":null}
+{"success":true,"data":{"prediction_id":501,"disease":"diabetes","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}}
 ```
 값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 model.md를 따른다. top3 합이 전체 확률과 같다고 해석하지 않는다. HP나 damage는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
 
@@ -100,10 +101,10 @@ query: `disease=diabetes|hypertension` 필수, `limit` 기본 3, 1~100. done 전
 
 | 사례 | 기대 결과 |
 |---|---|
-| 본인 정상 입력 | 202 pending, job_id + prediction_id |
+| 본인 정상 입력 | 201 pending, job_id + prediction_id |
 | 타인 record/예측 | 403, 큐·개인결과 접근 없음 |
 | 진단 또는 약물 이력 | 403, prediction 생성 없음, D global 경로 |
-| 필수 누락 | 400 누락 목록, 추론 없음 |
+| 필수 누락 | 422 누락 목록, 추론 없음 |
 | pending 조회 | 200 pending, 결과 null |
 | 같은 job 중복 소비 | 결과·기여도 한 세트 |
 | worker 오류 | failed, 이전 성공 이력 보존 |
@@ -120,8 +121,14 @@ B-PRED-002: REQ-PRED-003/004/006/009/010/011, NFR-REL-001, NFR-SCAL-001.
 B-PRED-003: REQ-PRED-005, REQ-CHLG-001, NFR-MODL-002.
 공통: REQ-COMN-001/002, NFR-COMP-001.
 
+## 원본 대조 기록
+
+- 공통 규칙 C10:C11의 응답 형식, C13의 상태 코드, C15:C17의 오류 명명, C19의 전체 경로, C26의 응답 추적 헤더를 적용했다.
+- 모듈 간 호출 F8/F9의 내부 함수 반환은 배열이다. 공개 HTTP 기여도 응답의 metadata/data wrapper와 구분한다.
+- 쓰기 권한 E10에는 옛 함수명 refresh_monster_hp가 남아 있지만, 모듈 간 호출 A6 및 최신 Slack 답변의 refresh_hp_from_prediction을 따른다. 타 담당자의 원본 탭은 임의 수정하지 않는다.
+
 ## 원본
 
-[공통 API 시트](https://docs.google.com/spreadsheets/d/1OPv1fDtEeITXqvXedyvqApl5m9ZyJARtzTvLmMxDjA0/edit)
+[공통 API 시트](https://docs.google.com/spreadsheets/d/1KZMhGHa7s2y3XSPKfA2rcTeJgTsUVi7c/edit?gid=1571297883#gid=1571297883)
 · [최신 모듈 계약 변경](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790570304697439)
 · [요구사항 v8](https://2026-ndc9438.slack.com/archives/C0C3FK3311C/p1790150890169639)
