@@ -12,3 +12,9 @@ wheels/
 .coverage
 *.coverage
 .coverage.*
+
+# KNHANES: restricted raw data and row-level derivatives must stay local.
+data/
+*.sav
+*.sas7bdat
+*.zsav
