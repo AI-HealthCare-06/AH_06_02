@@ -6,7 +6,7 @@
 
 ## 기획 이유 
 
-건강검진 결과지는 숫자를 보여주고 끝납니다. "공복혈당 108, 당뇨 전 단계입니다"까지는 말해주지만, 그래서 내일 뭘 해야 하는지는 알려주지 않습니다.
+건강검진 결과지는 숫자를 보여주고 끝납니다. "공복혈당 108, 전단계입니다"까지는 말해주지만, 그래서 내일 뭘 해야 하는지는 알려주지 않습니다.
 
 당뇨와 고혈압은 생활습관으로 상당 부분 늦출 수 있는 병인데도, 관리가 지루해서 대부분 3주를 못 넘깁니다.
 
@@ -41,7 +41,7 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 
 ---
 
-## 우리 팀의 규칙
+## 우리가 지킨 세 가지
 
 **겁주지 않습니다.** 확률은 보여주되 진단하지 않습니다. "당뇨입니다"라고 말하지 않습니다.
 
@@ -84,10 +84,6 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 | 패키지 | uv |
 | 배포 | Docker Compose + EC2 + Nginx + Certbot |
 
-추론과 SHAP 계산은 수 초가 걸리는 CPU 작업이라 API와 같은 프로세스에서 돌리면 응답 P95 3초를 지킬 수 없습니다. 그래서 `ai_worker`를 분리하고 큐로 연결했습니다.
-
-캐시·큐는 Redis에서 Valkey로 바꿨습니다. Redis가 2024년에 라이선스를 바꾸면서 갈라져 나온 포크이고, 명령어와 프로토콜이 호환돼 코드는 그대로 씁니다.
-
 ---
 
 ## 문서
@@ -101,7 +97,7 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 | 색·간격·버튼을 어떻게 쓰는가 | `docs/design.md` |
 | 어디에 띄우고 무엇으로 증명하는가 | 배포·검증 계획서 |
 
-문서는 팀 드라이브에서 비공개 관리합니다. 필요하시면 팀에 요청해주세요. 
+문서는 비공개로 팀 드라이브에서 관리합니다. 필요하시면 팀에 요청해주세요.
 
 ---
 
@@ -126,19 +122,24 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 ### 설치
 
 ```bash
-uv sync
+uv sync --group app --group dev
 ```
 
-파트별로만 받으려면 `uv sync --group app` (API) 또는 `uv sync --group ai` (워커).
+API 서버와 테스트에 필요한 것이 `app` · `dev` 그룹에 있습니다. `uv sync`만 하면 기본 의존성만 깔려서 `tortoise`나 `fastapi`를 못 찾습니다.
+
+모델 학습을 한다면 `--group ai`를 더합니다. torch가 딸려 와서 무거우니 필요할 때만 받으세요.
 
 ### 환경 변수
 
 ```bash
-cp envs/example.local.env envs/.local.env    # 로컬
-cp envs/example.prod.env envs/.prod.env      # 배포
+cp envs/example.local.env .env
 ```
 
-받은 파일 안의 값은 각자 환경에 맞게 고치세요. `.env` 파일은 커밋되지 않습니다.
+**저장소 루트에 `.env`로 둡니다.** `envs/` 안에 두면 안 읽힙니다. `app/core/config.py`, `docker-compose.yml`, `scripts/ci/run_test.sh` 셋 다 루트의 `.env`를 봅니다.
+
+배포용은 `envs/example.prod.env`를 참고해 서버에서 따로 만듭니다.
+
+받은 파일 안의 값은 각자 환경에 맞게 고치세요. `.env`는 커밋되지 않습니다.
 
 ### 전체 실행
 
@@ -200,10 +201,13 @@ uv run python -m ai_worker.main           # AI 워커
 **품질 검사**
 
 ```bash
+docker compose up -d mysql            # 테스트 전에 DB부터
 ./scripts/ci/run_test.sh              # 테스트
 ./scripts/ci/code_fommatting.sh       # 포맷 (Ruff)
 ./scripts/ci/check_mypy.sh            # 타입 (Mypy)
 ```
+
+테스트는 `pytest`를 직접 부르지 말고 `run_test.sh`로 돌립니다. 이 스크립트가 테스트용 DB를 만들 권한을 먼저 부여한 뒤 pytest를 부릅니다. 직접 부르면 권한 때문에 막힙니다.
 
 **지킬 것**
 
