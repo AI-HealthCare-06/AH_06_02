@@ -50,7 +50,7 @@ def client() -> TestClient:
     return TestClient(app, raise_server_exceptions=False)
 
 
-def test_모든_코드에_상태와_메시지가_있다() -> None:
+def test_every_code_has_status_and_message() -> None:
     assert len(list(ErrorCode)) == 27
     missing = [code for code in ErrorCode if code not in ERROR_SPEC]
     assert missing == []
@@ -59,13 +59,13 @@ def test_모든_코드에_상태와_메시지가_있다() -> None:
         assert message.strip(), code
 
 
-def test_성공응답은_success_data_형식이다(client: TestClient) -> None:
+def test_success_response_uses_envelope(client: TestClient) -> None:
     res = client.get("/ok")
     assert res.status_code == 200
     assert res.json() == {"success": True, "data": {"available": True}}
 
 
-def test_app_error는_코드와_상태를_따라간다(client: TestClient) -> None:
+def test_app_error_keeps_code_and_status(client: TestClient) -> None:
     res = client.get("/duplicated")
     assert res.status_code == 409
     body = res.json()
@@ -73,13 +73,13 @@ def test_app_error는_코드와_상태를_따라간다(client: TestClient) -> No
     assert body["error"]["code"] == "AUTH_EMAIL_DUPLICATED"
 
 
-def test_부가필드를_함께_내려준다(client: TestClient) -> None:
+def test_extra_fields_are_included(client: TestClient) -> None:
     res = client.get("/weak")
     assert res.status_code == 422
     assert res.json()["error"]["unmet"] == ["min_length"]
 
 
-def test_기존_http_exception도_봉투에_맞춘다(client: TestClient) -> None:
+def test_legacy_http_exception_is_wrapped(client: TestClient) -> None:
     res = client.get("/legacy")
     assert res.status_code == 401
     body = res.json()
@@ -87,7 +87,7 @@ def test_기존_http_exception도_봉투에_맞춘다(client: TestClient) -> Non
     assert "Authenticate Failed" not in body["error"]["message"]
 
 
-def test_검증실패는_틀린_필드를_알려준다(client: TestClient) -> None:
+def test_validation_error_reports_fields(client: TestClient) -> None:
     res = client.post("/signup", json={"email": "a", "age": "abc"})
     assert res.status_code == 400
     body = res.json()
@@ -95,13 +95,13 @@ def test_검증실패는_틀린_필드를_알려준다(client: TestClient) -> No
     assert body["error"]["fields"][0]["field"] == "age"
 
 
-def test_없는_경로도_봉투를_지킨다(client: TestClient) -> None:
-    res = client.get("/그런거없음")
+def test_unknown_path_keeps_envelope(client: TestClient) -> None:
+    res = client.get("/no-such-path")
     assert res.status_code == 404
     assert res.json()["error"]["code"] == "NOT_FOUND"
 
 
-def test_예상못한_예외는_내부사정을_숨긴다(client: TestClient) -> None:
+def test_unhandled_error_hides_internals(client: TestClient) -> None:
     res = client.get("/boom")
     assert res.status_code == 500
     body = res.json()
@@ -109,6 +109,6 @@ def test_예상못한_예외는_내부사정을_숨긴다(client: TestClient) ->
     assert "의도적인 오류" not in body["error"]["message"]
 
 
-def test_detail_키는_쓰지_않는다(client: TestClient) -> None:
-    for path in ("/duplicated", "/legacy", "/boom", "/그런거없음"):
+def test_detail_key_is_never_used(client: TestClient) -> None:
+    for path in ("/duplicated", "/legacy", "/boom", "/no-such-path"):
         assert "detail" not in client.get(path).json()

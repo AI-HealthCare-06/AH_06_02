@@ -32,4 +32,6 @@ class TestSignupAPI(TestCase):
         }
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post("/api/v1/auth/signup", json=signup_data)
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        # 공통 규칙상 요청 값 검증 실패는 VALIDATION_ERROR(400)로 내린다
+        assert response.status_code == status.HTTP_400_BAD_REQUEST
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"

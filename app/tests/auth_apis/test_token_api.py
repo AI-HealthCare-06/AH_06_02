@@ -43,4 +43,4 @@ class TestJWTTokenRefreshAPI(TestCase):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/api/v1/auth/token/refresh")
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        assert response.json()["detail"] == "Refresh token is missing."
+        assert response.json()["error"]["code"] == "UNAUTHORIZED"
