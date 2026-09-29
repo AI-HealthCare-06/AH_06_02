@@ -1,177 +1,239 @@
-# AI Healthcare Project Template
+# 당고킬러 (DangoKiller)
 
-이 프로젝트는 AI 모델 추론(Inference) 워커와 FastAPI API 서버를 통합한 서비스 템플릿입니다. 
-현대적인 Python 패키지 관리 도구인 `uv`와 컨테이너화 도구인 `Docker`를 활용하여 일관된 개발 및 배포 환경을 제공합니다.
-
----
-
-## 🚀 주요 특징
-
-- **FastAPI Framework**: 고성능 비동기 API 서버 구현.
-- **AI Worker**: 모델 추론 및 학습 작업을 API 서버와 분리하여 처리.
-- **UV Package Manager**: 매우 빠른 의존성 설치 및 가상환경 관리.
-- **Tortoise ORM**: 비동기 방식의 데이터베이스 모델링 및 쿼리 관리.
-- **Docker-Compose**: MySQL, Redis, Nginx를 포함한 전체 서비스 스택을 한 번에 실행.
-- **CI/CD Scripts**: 코드 포맷팅(Ruff), 타입 체크(Mypy), 테스트(Pytest)를 위한 자동화 스크립트 제공.
+당뇨와 고혈압 위험을 예측하고, 그 위험을 만든 생활습관을 **캐릭터로 바꿔** 하나씩 잡아나가는 서비스입니다.
 
 ---
 
-## 📂 프로젝트 구조
+## 왜 만드는가
 
-```text
-.
-├── ai_worker/          # AI 모델 추론 및 학습 관련 코드 (Worker)
-│   ├── core/           # 워커 설정 및 로거
-│   ├── models/         # AI 모델 파일 보관 (PyTorch 등)
-│   ├── tasks/          # 실제 처리할 작업 정의
-│   └── main.py         # 워커 진입점
-├── app/                # FastAPI 서버 코드
-│   ├── apis/           # API 라우터 (v1 버전 관리)
-│   ├── core/           # 서버 설정 (pydantic-settings), DB 설정, JWT, Validator 등 핵심 기능
-│   ├── dtos/           # 데이터 전송 객체 (Pydantic models)
-│   ├── models/         # DB 테이블 정의
-│   ├── services/       # 비즈니스 로직
-│   └── main.py         # FastAPI 애플리케이션 진입점
-├── envs/               # 환경 변수 설정 파일 (.env)
-├── infra/              # 인프라 설정 관련 디렉터리
-│   ├── docker/         # Docker Compose 설정 (운영용)
-│   └── nginx/          # Nginx 설정 파일 (리버스 프록시)
-├── scripts/            # 배포 및 CI용 쉘 스크립트
-├── docker-compose.yml  # 로컬 개발용 서비스 실행 설정
-└── pyproject.toml      # uv 기반 의존성 관리 설정
-```
+건강검진 결과지는 숫자를 보여주고 끝납니다. "공복혈당 108, 당뇨 전 단계입니다"까지는 말해주지만, 그래서 내일 뭘 해야 하는지는 알려주지 않습니다.
+
+당뇨와 고혈압은 생활습관으로 상당 부분 늦출 수 있는 병인데도, 관리가 지루해서 대부분 3주를 못 넘깁니다.
+
+그래서 관리를 게임으로 바꿨습니다. 다만 게임으로 만들면서 **건강 정보를 왜곡하지 않는 것**을 가장 어려운 제약으로 두었습니다.
 
 ---
 
-## ⚙️ 사전 준비 사항
+## 어떻게 동작하는가
 
-- **Python**: 3.13 이상 (로컬 개발 환경용)
-- **UV**: Python 패키지 매니저 ([설치 가이드](https://github.com/astral-sh/uv))
-- **Docker & Docker-Compose**: 전체 서비스 실행용
+**1. 건강정보를 넣으면 위험도가 나옵니다.**
+국민건강영양조사(KNHANES) 데이터로 학습한 모델이 당뇨와 고혈압 위험 확률을 각각 계산합니다.
+
+**2. 위험을 만든 요인이 캐릭터가 됩니다.**
+SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마다 캐릭터를 붙입니다.
+
+| 캐릭터 | 요인 |
+| --- | --- |
+| 스파이크 | 혈당 |
+| 비세라 | 내장지방 · 비만 |
+| 코티니 | 흡연 |
+| 알데 | 음주 |
+| 소디 | 나트륨 · 외식 |
+
+**3. 캐릭터마다 챌린지를 받습니다.**
+코티니가 날뛰고 있으면 금연 관련 챌린지가 뜹니다. 하루하루 수행하면 공략 점수가 쌓입니다.
+
+**4. 다시 측정하면 위협도가 움직입니다.**
+4주 뒤 건강정보를 다시 넣고 예측을 다시 돌립니다. 그때 캐릭터가 약해집니다.
+
+**5. 조건을 채우면 봉인됩니다.**
+최근 28일 중 그 요인 챌린지를 20일 이상 해내고 위협도가 40 아래로 내려가면 봉인. 만성질환에 완치 엔딩은 없으니 처치가 아니라 봉인입니다. 관리를 멈추면 다시 깨어납니다.
 
 ---
 
-## 🛠️ 설치 및 설정
+## 우리 팀의 규칙
 
-### 1. 가상환경 구축 및 의존성 설치
+**겁주지 않습니다.** 확률은 보여주되 진단하지 않습니다. "당뇨입니다"라고 말하지 않습니다.
 
-`uv`를 사용하여 프로젝트에 필요한 패키지를 설치합니다.
+**거짓말하지 않습니다.** 챌린지를 한 번 했다고 질환 위험이 실제로 줄지는 않습니다. 그래서 즉시 반응하는 값과 실제 위험도를 분리했습니다.
+
+| 이름 | 무엇인가 | 언제 바뀌나 |
+| --- | --- | --- |
+| 위험도 | 모델이 낸 질환 발생 확률 | 재예측할 때 |
+| 위협도 | 그 요인이 위험도를 얼마나 밀어올렸는가 (0~100) | 재예측할 때 |
+| 공략 점수 | 이번 주 챌린지를 얼마나 했는가 | 수행 즉시 |
+
+구현은 복잡해졌지만 이건 양보하지 않았습니다.
+
+**실패를 벌하지 않습니다.** 못 한 날은 아무 일도 일어나지 않습니다. 감점도 연속 기록 초기화도 없습니다.
+
+---
+
+## 팀
+
+| 파트 | 이름 | 맡은 것 |
+| --- | --- | --- |
+| A | 배수빈 | 회원·인증 · 공통 기반 · ERD · 요구사항 · 문서 총괄 |
+| B | 홍서윤 | 예측 모델 · SHAP · 전처리 · 비동기 추론 |
+| C | 최병주 | 건강정보 · 대시보드 · 배포 · 인프라 |
+| D | 김이경 | 챌린지 · 보상 · 도감 · 와이어프레임 |
+
+한 테이블은 한 사람만 씁니다. 남의 테이블이 필요하면 담당자가 제공하는 함수로 요청합니다.
+
+---
+
+## 기술 스택
+
+| 영역 | 선택 |
+| --- | --- |
+| API 서버 | FastAPI |
+| 추론 | 별도 컨테이너 (`ai_worker`)로 분리 |
+| DB | MySQL + Tortoise ORM |
+| 캐시·큐 | Valkey |
+| 프런트엔드 | React + Vite + Recharts |
+| 패키지 | uv |
+| 배포 | Docker Compose + EC2 + Nginx + Certbot |
+
+추론과 SHAP 계산은 수 초가 걸리는 CPU 작업이라 API와 같은 프로세스에서 돌리면 응답 P95 3초를 지킬 수 없습니다. 그래서 `ai_worker`를 분리하고 큐로 연결했습니다.
+
+캐시·큐는 Redis에서 Valkey로 바꿨습니다. Redis가 2024년에 라이선스를 바꾸면서 갈라져 나온 포크이고, 명령어와 프로토콜이 호환돼 코드는 그대로 씁니다.
+
+---
+
+## 문서
+
+| 찾는 것 | 보는 곳 |
+| --- | --- |
+| 제품이 어떻게 동작하는가 | 기획서 |
+| 무엇을 만들기로 했는가 | 요구사항 정의서 (67항목) |
+| 어떤 테이블에 뭐가 들어가는가 | 테이블 명세서 · ERD (12테이블 186컬럼) |
+| 어떤 API를 어떻게 부르는가 | API 명세서 (32개) |
+| 색·간격·버튼을 어떻게 쓰는가 | `docs/design.md` |
+| 어디에 띄우고 무엇으로 증명하는가 | 배포·검증 계획서 |
+
+문서는 팀 드라이브에서 비공개 관리합니다. 필요하시면 팀에 요청해주세요. 
+
+---
+
+## 데이터
+
+학습 데이터는 질병관리청 국민건강영양조사입니다.
+
+**원시자료는 저장소에 올리지 않습니다.** 보안서약 대상이라 `data/` · `*.sav` · `*.sas7bdat`을 `.gitignore`로 막아뒀습니다. 전처리 결과와 모델 파일만 공유합니다.
+
+혈압과 혈당은 모델 입력에서 뺐습니다. 이 값들이 라벨을 정의하는 데 쓰였기 때문입니다. 넣으면 정확도는 올라가지만 "혈당이 높으니 당뇨 위험이 높다"는 동어반복이 됩니다.
+
+---
+
+## 실행
+
+### 준비물
+
+- Python 3.13 이상
+- [uv](https://github.com/astral-sh/uv)
+- Docker · Docker Compose
+
+### 설치
 
 ```bash
-# 의존성 설치 (가상환경 자동 생성)
 uv sync
-
-# 특정 그룹의 의존성만 설치하려는 경우
-uv sync --group app  # API 서버용
-uv sync --group ai   # AI 워커용
 ```
 
-### 2. 환경 변수 설정
+파트별로만 받으려면 `uv sync --group app` (API) 또는 `uv sync --group ai` (워커).
 
-`envs/` 디렉토리에 있는 예시 파일을 복사하여 `.env` 파일을 생성합니다.
-- 로컬용 
-    ```bash
-    cp envs/example.local.env envs/.local.env
-    ```
-- 배포용 
-    ```bash
-    cp envs/example.prod.env envs/.prod.env
-    ```
+### 환경 변수
 
-생성된 `env` 파일 내의 환경변수들은 프로젝트 상황에 맞게 수정하세요.
+```bash
+cp envs/example.local.env envs/.local.env    # 로컬
+cp envs/example.prod.env envs/.prod.env      # 배포
+```
 
----
+받은 파일 안의 값은 각자 환경에 맞게 고치세요. `.env` 파일은 커밋되지 않습니다.
 
-## 🏃 실행 방법
-
-### 1. 로컬 및 개발 환경
-
-#### Docker Compose로 전체 스택 실행
-
-모든 서비스(API, Worker, DB, Redis, Nginx)를 한 번에 실행합니다.
+### 전체 실행
 
 ```bash
 docker-compose up -d --build
 ```
 
-실행 후 다음 주소로 접속 가능합니다:
-- **API 서버**: [http://localhost/api/docs](http://localhost/api/docs) (Swagger UI)
-- **Nginx**: 80 포트를 통해 API 서버로 요청을 전달합니다.
+띄우고 나면 [http://localhost/api/docs](http://localhost/api/docs) 에서 Swagger가 뜹니다.
 
-#### 로컬에서 개별 실행 (개발용)
+`port is already allocated`가 나오면 예전에 깔아둔 로컬 MySQL이 포트를 잡고 있는 겁니다.
 
-**FastAPI 서버 실행:**
 ```bash
-uv run uvicorn app.main:app --reload
-# or
-docker compose up -d --build app
+sudo lsof -nP -iTCP:3306 -sTCP:LISTEN
 ```
 
-**AI Worker 실행:**
+### 개별 실행
+
 ```bash
-uv run python -m ai_worker.main
-# or
-docker compose up -d --build ai_worker
+uv run uvicorn app.main:app --reload      # API 서버
+uv run python -m ai_worker.main           # AI 워커
 ```
 
-### 2. EC2 배포 환경 (Production)
+---
 
-제공된 쉘 스크립트를 사용하여 AWS EC2 환경에 이미지를 빌드, 푸시 및 배포할 수 있습니다.
+## 프로젝트 구조
 
-#### 사전 준비
-- EC2 인스턴스 (Ubuntu 권장)
-- SSH 키 페어 (`~/.ssh/` 경로에 위치)
-- 도커 허브(Docker Hub) 계정 및 Personal Access Token
-- 배포용 환경 변수 설정 (`envs/.prod.env`)
-- 도메인 구매 (Gabia, GoDaddy, AWS Route53 등)
+```text
+.
+├── ai_worker/          # 추론 워커
+│   ├── core/           # 설정·로거
+│   ├── models/         # 모델 파일
+│   ├── tasks/          # 작업 정의
+│   └── main.py
+├── app/                # FastAPI 서버
+│   ├── apis/           # 라우터 (v1)
+│   ├── core/           # 설정·DB·JWT·검증
+│   ├── dtos/           # 요청·응답 스키마
+│   ├── models/         # 테이블 정의
+│   ├── services/       # 비즈니스 로직
+│   └── main.py
+├── docs/               # 설계 문서
+├── envs/               # 환경 변수
+├── infra/              # Docker·Nginx 설정
+├── scripts/            # 배포·CI 스크립트
+├── docker-compose.yml
+└── pyproject.toml
+```
 
-#### 자동 배포 스크립트 실행
-`scripts/deployment.sh`는 도커 이미지 빌드, 레포지토리 푸시, EC2 접속 및 컨테이너 실행 과정을 자동화합니다.
+---
+
+## 개발 규칙
+
+**어디에 붙이나**
+
+- API 추가: `app/apis/v1/` 아래 라우터를 만들고 `app/apis/v1/__init__.py`에 등록
+- 테이블 추가: `app/models/`에 Tortoise 모델을 쓰고 `app/db/databases.py`의 `MODELS`에 등록
+- 추론 로직 추가: `ai_worker/tasks/`에 작성하고 `ai_worker/main.py`에서 호출
+
+**품질 검사**
+
+```bash
+./scripts/ci/run_test.sh              # 테스트
+./scripts/ci/code_fommatting.sh       # 포맷 (Ruff)
+./scripts/ci/check_mypy.sh            # 타입 (Mypy)
+```
+
+**지킬 것**
+
+- 스키마를 바꾸려면 테이블 명세서를 먼저 고치고 팀에 알립니다. ERD와 DDL은 명세서에서 자동 생성됩니다
+- UI를 만들기 전에 `docs/design.md`를 읽습니다
+- 원시자료와 `.env`는 커밋하지 않습니다
+- 커밋 메시지는 `feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`로 시작합니다
+
+---
+
+## 배포
+
+`scripts/deployment.sh`가 이미지 빌드부터 EC2 컨테이너 실행까지 처리합니다.
 
 ```bash
 chmod +x scripts/deployment.sh
 ./scripts/deployment.sh
 ```
-스크립트 실행 시 다음 정보를 입력해야 합니다:
-1. 도커 허브 계정 정보 (Username, PAT)
-2. 이미지를 업로드할 레포지토리 이름
-3. 배포할 서비스 선택 (FastAPI, AI-Worker) 및 버전(Tag)
-4. SSH 키 파일명 및 EC2 IP 주소
-5. https 사용여부
-   - 5-1. https인 경우 도메인 추가 입력  
 
-#### SSL(HTTPS) 설정 (Certbot)
-도메인을 연결하고 HTTPS를 적용하려면 `scripts/certbot.sh`를 사용합니다.
+HTTPS는 `scripts/certbot.sh`로 Let's Encrypt 인증서를 받아 적용합니다.
 
 ```bash
 chmod +x scripts/certbot.sh
 ./scripts/certbot.sh
 ```
-1. 도메인 주소 및 이메일 입력
-2. SSH 키 파일명 및 EC2 IP 주소 입력
-3. Let's Encrypt를 통한 인증서 발급 및 Nginx 설정 자동 갱신 적용
+
+자세한 절차와 검증 항목은 배포·검증 계획서를 보세요.
 
 ---
 
-## 🧪 테스트 및 품질 관리
+## 안내
 
-제공된 스크립트를 사용하여 코드의 품질을 검증할 수 있습니다.
-
-```bash
-# 테스트 실행
-./scripts/ci/run_test.sh
-
-# 코드 포맷팅 확인 (Ruff)
-./scripts/ci/code_fommatting.sh
-
-# 정적 타입 검사 (Mypy)
-./scripts/ci/check_mypy.sh
-```
-
----
-
-## 📝 개발 가이드
-
-- **API 추가**: `app/apis/v1/` 아래에 새로운 라우터 파일을 생성하고 `app/apis/v1/__init__.py`에 등록하세요.
-- **DB 모델 추가**: `app/models/`에 Tortoise 모델을 정의하고 `app/db/databases.py`의 `MODELS` 리스트에 추가하세요.
-- **AI 로직 추가**: `ai_worker/tasks/`에 새로운 처리 로직을 작성하고 `ai_worker/main.py`에서 호출하도록 구성하세요.
+이 서비스는 의료기기가 아닙니다. 진단이나 치료 목적으로 쓸 수 없습니다. 예측 결과는 참고용이며, 건강에 이상이 느껴지면 의료기관을 찾아주세요.
