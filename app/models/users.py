@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import StrEnum
 
 from tortoise import fields, models
@@ -51,7 +52,12 @@ class User(models.Model):
     total_xp = fields.IntField(default=0, description="누적 경험치 (REQ-RECO-003)")
     level = fields.SmallIntField(default=1, description="현재 레벨. total_xp에서 파생되나 조회 편의로 함께 저장")
 
-    disclaimer_agreed_at = fields.DatetimeField(null=True, description="참고용 고지 동의 일시 (REQ-USER-010)")
+    disclaimer_agreed_at: datetime | None = fields.DatetimeField(
+        null=True, description="참고용 고지 동의 일시 (REQ-USER-010)"
+    )
+
+    login_fail_count = fields.SmallIntField(default=0, description="연속 로그인 실패 횟수 (REQ-USER-004)")
+    locked_until: datetime | None = fields.DatetimeField(null=True, description="잠금 해제 시각. 5회 실패 시 10분")
 
     login_fail_count = fields.SmallIntField(default=0, description="연속 로그인 실패 횟수 (REQ-USER-004)")
     locked_until = fields.DatetimeField(null=True, description="잠금 해제 시각. 5회 실패 시 10분")
@@ -62,7 +68,7 @@ class User(models.Model):
         default=UserStatus.ACTIVE,
         description="탈퇴 시 비활성 (REQ-USER-009)",
     )
-    withdrawn_at = fields.DatetimeField(null=True, description="탈퇴 시각. +30일에 식별정보 삭제")
+    withdrawn_at: datetime | None = fields.DatetimeField(null=True, description="탈퇴 시각. +30일에 식별정보 삭제")
 
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
