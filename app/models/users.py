@@ -59,9 +59,6 @@ class User(models.Model):
     login_fail_count = fields.SmallIntField(default=0, description="연속 로그인 실패 횟수 (REQ-USER-004)")
     locked_until: datetime | None = fields.DatetimeField(null=True, description="잠금 해제 시각. 5회 실패 시 10분")
 
-    login_fail_count = fields.SmallIntField(default=0, description="연속 로그인 실패 횟수 (REQ-USER-004)")
-    locked_until = fields.DatetimeField(null=True, description="잠금 해제 시각. 5회 실패 시 10분")
-
     status = fields.CharEnumField(
         enum_type=UserStatus,
         max_length=9,
