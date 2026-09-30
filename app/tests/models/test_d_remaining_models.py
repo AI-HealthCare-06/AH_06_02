@@ -59,6 +59,7 @@ def test_challenge_log_has_mvp_evidence_and_reward_fields() -> None:
 def test_user_reward_is_unique_per_reward() -> None:
     assert ("user_id", "reward_id") in UserReward._meta.unique_together
 
+
 def test_challenge_has_safety_check_flag() -> None:
     from app.models.challenges import Challenge
 

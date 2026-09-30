@@ -179,7 +179,9 @@ class UserChallenge(models.Model):
         table = "user_challenges"
         indexes = (("user_id", "status"),)
 
+
 # ---- D persistence models: recommendation / logs / rewards ----
+
 
 class RecommendationSourceType(StrEnum):
     PREDICTION_PERSONAL = "prediction_personal"
