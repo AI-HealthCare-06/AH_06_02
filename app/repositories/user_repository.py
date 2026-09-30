@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from app.core import config
-from app.models.users import MotivationType, Sex, User
+from app.models.users import MotivationType, Sex, User, UserStatus
 
 ALLOWED_UPDATE_FIELDS = [
     "nickname",
@@ -21,6 +21,9 @@ UPDATED_AT_FIELD = "updated_at"
 #: 로그인 5회 연속 실패하면 10분 잠근다 (REQ-USER-004)
 LOGIN_FAIL_LIMIT = 5
 LOGIN_LOCK_MINUTES = 10
+
+#: 탈퇴 후 이 기간이 지나면 식별정보와 업로드 사진을 지운다 (REQ-USER-009 · NFR-SEC-005)
+PURGE_AFTER_DAYS = 30
 
 
 class UserRepository:
@@ -107,4 +110,43 @@ class UserRepository:
             return None
         user.total_xp += amount
         await user.save(update_fields=["total_xp", UPDATED_AT_FIELD])
+        return user
+
+    async def update_diagnosis(
+        self,
+        user: User,
+        *,
+        dm_diagnosed: bool,
+        htn_diagnosed: bool,
+        dm_medication: bool,
+        htn_medication: bool,
+    ) -> User:
+        user.dm_diagnosed = dm_diagnosed
+        user.htn_diagnosed = htn_diagnosed
+        user.dm_medication = dm_medication
+        user.htn_medication = htn_medication
+        await user.save(
+            update_fields=[
+                "dm_diagnosed",
+                "htn_diagnosed",
+                "dm_medication",
+                "htn_medication",
+                UPDATED_AT_FIELD,
+            ]
+        )
+        return user
+
+    async def change_password(self, user: User, password_hash: str) -> User:
+        user.password_hash = password_hash
+        # 비밀번호를 바꾸면 잠금도 함께 푼다
+        user.login_fail_count = 0
+        user.locked_until = None
+        await user.save(update_fields=["password_hash", "login_fail_count", "locked_until", UPDATED_AT_FIELD])
+        return user
+
+    async def withdraw(self, user: User) -> User:
+        """행을 지우지 않고 비활성으로 돌린다. 30일 뒤 식별정보를 삭제한다."""
+        user.status = UserStatus.WITHDRAWN
+        user.withdrawn_at = datetime.now(config.TIMEZONE)
+        await user.save(update_fields=["status", "withdrawn_at", UPDATED_AT_FIELD])
         return user

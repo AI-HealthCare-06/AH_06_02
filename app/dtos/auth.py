@@ -38,8 +38,7 @@ class LoginRequest(BaseModel):
     password: str
 
 
-class LoginResponse(BaseModel):
-    access_token: str
+class TokenRefreshRequest(BaseModel):
+    """AUTH-04 토큰 재발급. 로그인 때 받은 리프레시 토큰을 본문으로 보낸다."""
 
-
-class TokenRefreshResponse(LoginResponse): ...
+    refresh_token: str

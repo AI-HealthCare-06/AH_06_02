@@ -18,7 +18,13 @@ class TestLoginAPI(TestCase):
             response = await client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["data"]["access_token"]
+        data = response.json()["data"]
+        # AUTH-03 응답 계약 — 토큰 둘과 요약 프로필
+        assert data["access_token"]
+        assert data["refresh_token"]
+        assert data["user"]["nickname"] == "수빈"
+        assert data["user"]["level"] == 1
+        assert data["user"]["total_xp"] == 0
         assert any("refresh_token" in header for header in response.headers.get_list("set-cookie"))
 
     async def test_login_invalid_credentials(self):
