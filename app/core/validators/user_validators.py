@@ -1,56 +1,49 @@
 import re
-from datetime import date, datetime
-
-from dateutil.relativedelta import relativedelta
+from datetime import datetime
 
 from app.core import config
 
+#: 만 14세 미만은 가입할 수 없다 (서비스 약관)
+MIN_AGE = 14
+#: 출생연도 하한. 이보다 앞선 값은 오타로 본다
+MIN_BIRTH_YEAR = 1900
+
+
+def password_unmet_rules(password: str) -> list[str]:
+    """비밀번호 규칙 중 지키지 못한 항목을 돌려준다.
+
+    기준은 REQ-USER-002다. 8자 이상, 영문과 숫자를 각각 1자 이상.
+    화면에서 무엇이 모자란지 짚어주려고 목록으로 돌려준다.
+    """
+    unmet = []
+    if len(password) < 8:
+        unmet.append("min_length")
+    if not re.search(r"[A-Za-z]", password):
+        unmet.append("needs_letter")
+    if not re.search(r"[0-9]", password):
+        unmet.append("needs_digit")
+    return unmet
+
 
 def validate_password(password: str) -> str:
-    if len(password) < 8:
-        raise ValueError("비밀번호는 8자 이상이어야 합니다.")
-
-    # 대문자를 포함하고 있는지
-    if not re.search(r"[A-Z]", password):
-        raise ValueError("비밀번호에는 대문자, 소문자, 특수문자, 숫자가 각 하나씩 포함되어야 합니다.")
-
-    # 소문자를 포함하고 있는지
-    if not re.search(r"[a-z]", password):
-        raise ValueError("비밀번호에는 대문자, 소문자, 특수문자, 숫자가 각 하나씩 포함되어야 합니다.")
-
-    # 숫자를 포함하고 있는지
-    if not re.search(r"[0-9]", password):
-        raise ValueError("비밀번호에는 대문자, 소문자, 특수문자, 숫자가 각 하나씩 포함되어야 합니다.")
-
-    # 특수문자를 포함하고 있는지
-    if not re.search(r"[^a-zA-Z0-9]", password):
-        raise ValueError("비밀번호에는 대문자, 소문자, 특수문자, 숫자가 각 하나씩 포함되어야 합니다.")
-
+    if password_unmet_rules(password):
+        raise ValueError("비밀번호는 8자 이상이며 영문과 숫자를 각각 1자 이상 포함해야 합니다.")
     return password
 
 
-def validate_phone_number(phone_number: str) -> str:
-    patterns = [
-        r"010-\d{4}-\d{4}",  # 010-1234-5678
-        r"010\d{8}",  # 01012345678
-        r"\+8210\d{8}",  # +821012345678
-    ]
+def validate_birth_year(birth_year: int) -> int:
+    this_year = datetime.now(tz=config.TIMEZONE).year
 
-    if not any(re.fullmatch(p, phone_number) for p in patterns):
-        raise ValueError("유효하지 않은 휴대폰 번호 형식입니다.")
+    if birth_year < MIN_BIRTH_YEAR or birth_year > this_year:
+        raise ValueError(f"출생연도는 {MIN_BIRTH_YEAR}년부터 {this_year}년 사이여야 합니다.")
 
-    return phone_number
+    if this_year - birth_year < MIN_AGE:
+        raise ValueError(f"서비스 약관에 따라 만 {MIN_AGE}세 미만은 회원가입이 불가합니다.")
+
+    return birth_year
 
 
-def validate_birthday(birthday: date | str) -> date:
-    if isinstance(birthday, str):
-        try:
-            birthday = date.fromisoformat(birthday)
-        except ValueError as e:
-            raise ValueError("올바르지 않은 날짜 형식입니다. format: YYYY-MM-DD") from e
-
-    is_over_14 = birthday < datetime.now(tz=config.TIMEZONE).date() - relativedelta(years=14)
-    if not is_over_14:
-        raise ValueError("서비스 약관에 따라 만14세 미만은 회원가입이 불가합니다.")
-
-    return birthday
+def validate_height_cm(height_cm: float) -> float:
+    if not 50 <= height_cm <= 250:
+        raise ValueError("키는 50cm 이상 250cm 이하로 입력해주세요.")
+    return height_cm

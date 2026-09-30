@@ -12,8 +12,7 @@ wheels/
 .coverage
 *.coverage
 .coverage.*
-
-# KNHANES: restricted raw data and row-level derivatives must stay local.
+# KNHANES 원시자료와 행 단위 파생 자료는 저장소에 올리지 않는다.
 data/
 *.sav
 *.sas7bdat
