@@ -79,18 +79,38 @@ DB 스키마의 원본은 **구글 시트 테이블 명세서**입니다. 저장
 
 SHAP 값을 두 가지로 나눠 씁니다. 섞지 마세요.
 
-- 개인별 기여도: signed SHAP. 부호가 있어서 음수가 나올 수 있습니다.
+- 개인별 기여도: signed SHAP. 절댓값을 쓰지 않습니다.
 - 전역 중요도: `mean(|SHAP|)`. 절댓값 평균이라 항상 0 이상입니다.
 
-서비스에 보여주는 전역 점수는 질환별로 정규화합니다.
+두 기준값은 DB가 아니라 **모델 아티팩트 메타데이터**에 둡니다. `model_version`에 종속된 모델 메타데이터라 모델 파일과 함께 버전이 고정되는 편이 안전합니다. `ai_worker`가 해당 `model_version`의 값을 불러 계산합니다. 메타데이터에 들어가는 것은 질환별 `global_importance_max`, 질환 × factor별 `positive_shap_p95`, factor별 `threat_eligible` 세 가지입니다.
 
-`normalized_score = (해당 요인의 mean|SHAP| / 해당 질환 내 최대 mean|SHAP|) × 100`
+**전역 점수 (진단 질환)**
+
+`normalized_score = (해당 요인의 mean|SHAP| / global_importance_max) × 100`
 
 - 당뇨 요인끼리, 고혈압 요인끼리 따로 계산합니다. 질환을 섞지 않습니다.
-- 기준이 되는 최댓값은 `model_version`별로 고정합니다. 재학습할 때마다 기준이 흔들리면 기존 사용자 위협도가 일괄로 움직입니다.
+- `mean|SHAP|`은 항상 0 이상이라 음수 클립이 필요 없습니다.
 - 진단 질환 위협도 = `normalized_score × behavior_weight`
 
-질환별·요인별 원값은 모델 1회전 후 서윤님이 `mean|SHAP|` 표로 전달합니다.
+**개인 위협도 (미진단 질환)**
+
+`positive_shap = max(signed SHAP, 0)`
+
+`threat_score = min(100, positive_shap / positive_shap_p95 × 100)`
+
+- `positive_shap_p95`는 해당 `model_version`의 reference population에서 뽑은 질환 × factor별 positive SHAP 분포의 P95입니다. 질환별 max가 아닙니다. 전역 max는 요인 간 상대 중요도라서 개인 스케일 기준으로 쓰면 의미가 달라집니다.
+- P95가 0이거나 지나치게 작은 factor는 `threat_eligible = false`로 표시하고 위협도 0으로 처리합니다. 임의의 하한값을 넣어 나누지 않습니다. 근거 없이 위협도가 부풀기 때문입니다. 기준 숫자는 모델 1회전 분포를 보고 고정합니다.
+- 스파이크처럼 `monsters.default_impact_source`가 `measured`인 캐릭터는 이 계산 밖입니다. 실측 혈당으로 따로 산출합니다.
+
+**direction**
+
+`SHAP > 0`이면 `increase`, `SHAP <= 0`이면 `decrease`로 저장합니다. 0을 decrease에 넣는 건 ENUM에 자리가 없어서지 "위험을 낮춘다"는 뜻이 아닙니다. 위협도 0으로 처리하고, 서비스에서 보호 요인처럼 보여주지 않습니다.
+
+**알아둘 것**
+
+진단 질환 위협도(전역 max 기준)와 미진단 위협도(P95 기준)는 스케일 근거가 다릅니다. 둘 다 0~100이고 같은 `state` 임계값을 쓰지만, 같은 70이 같은 뜻은 아닙니다. 진단자는 예측을 돌리지 않아서 생기는 구조적 차이입니다.
+
+질환별·요인별 원값은 모델 1회전 후 서윤님이 전달합니다.
 
 ---
 
