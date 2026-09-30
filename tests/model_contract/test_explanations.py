@@ -69,13 +69,16 @@ class ExplanationContractTest(unittest.TestCase):
         }
         service = ModelExplanationService(lambda: artifact, lambda _: {})
         old_rows = service.get_global_importance("diabetes", 1)
-        self.assertEqual(old_rows, [{"factor_key": "age", "importance": 0.3, "rank": 1, "model_version": "old"}])
+        self.assertEqual(
+            old_rows,
+            [{"factor_key": "age", "importance": 0.3, "normalized_score": 100.0, "rank": 1, "model_version": "old"}],
+        )
         artifact["model_version"] = "new"
         new_rows = service.get_global_importance("diabetes", 3)
         self.assertEqual(len(new_rows), 2)
         self.assertTrue(all(row["model_version"] == "new" for row in new_rows))
         self.assertEqual(old_rows[0]["model_version"], "old")
-        self.assertIn("normalized_importance", importance[0])
+        self.assertIn("normalized_score", importance[0])
         self.assertIn("modifiable", importance[0])
         self.assertNotIn("model_version", importance[0])
 

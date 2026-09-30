@@ -15,7 +15,8 @@
 - 진단자의 `user_challenges.source_prediction_id`는 **NULL**이다. 존재하지 않는 prediction을 만들거나 0을 넣지 않는다. 확인 가능한 ERD SQL에도 nullable로 명시되어 있다.
 - 전역 중요도 원값은 factor별 `mean(|grouped SHAP|)`이며 화면용 비교 점수는 `importance / disease_global_max * 100`이다. 질환별 최대값은 `model_version`마다 고정한다.
 - 개인 위협도는 factor별 양의 기여만 사용한다: `positive_shap = max(signed_SHAP, 0)`, `threat_score = clip(positive_shap / P95_reference[disease, factor, model_version] * 100, 0, 100)`. P95와 전역 최대값은 버전 고정 artifact metadata에 둔다.
-- P95가 0인 factor는 `threat_eligible=false`로 두고 임의 floor를 넣지 않는다. P95가 양수여도 지나치게 작은지와 안정성은 1회전 분포를 본 뒤 정한다. `behavior_weight` 변환과 소디 적용 여부도 실제 결과 전에는 미확정이다.
+- P95가 0이거나 1회전 분포에서 불안정한 factor는 `threat_eligible=false`로 두고 임의 floor를 넣지 않는다. 진단자 경로의 결합식은 `normalized_score × behavior_weight`로 정했다. factor별 behavior weight 값과 변환 기준은 동일 사용자의 contribution/global 점수 분포를 1회전에서 비교한 뒤 확정한다.
+- 질환별 경로는 독립 계산한다. 미진단 질환은 사용자 기여도 P95 점수, 진단 질환은 `normalized_score × behavior_weight`를 사용한다. 같은 factor에 두 질환 경로가 있으면 각 질환 점수를 따로 계산한 뒤 max를 선택하고, `impact_source`에는 승리한 경로(`contribution` 또는 `global`)를 기록한다. 두 경로 점수를 섞거나 평균 내지 않는다.
 - `factor_key=NULL`인 챌린지는 damage 0, XP·보상만 지급한다. 수면 챌린지는 MVP에서 보류한다.
 
 ## 2. y 정의
@@ -86,9 +87,9 @@ B 제안 기본안은 확률 공간 SHAP이다. 고정된 train background와 ex
 3. `threat_score = round(100 * clip(positive_shap / P95_reference, 0, 1))`로 0~100 변환한다. 개인별 최대값이나 다른 사용자의 최신값으로 나누지 않는다.
 4. P95가 0이면 `threat_eligible=false`로 표시하고 임의 floor를 만들지 않는다. 양수지만 너무 작은 기준을 제외할지는 1회전 분포를 본 뒤 정한다.
 
-캐릭터 단위 위협도 집계, 진단자의 global importance를 `behavior_weight`로 바꾸는 규칙, 소디의 위협도 적용 조건, 위협도 구간과 봉인 조건은 1회전 결과 및 D와 합의 전까지 미확정이다. 챌린지를 수행해도 위협도는 즉시 낮아지지 않는다. 수행은 공략 점수에 기록되고, 위협도는 건강정보 재예측 때 갱신된다.
+factor별 `behavior_weight` 세부 기준은 아직 미정이다. 1회전에서 같은 사용자 집단에 대해 contribution P95 점수와 global×behavior 점수를 함께 계산하고, 한 경로가 항상 우세한지 분포로 확인한 뒤 서윤·이경이 weight를 확정한다. 소디의 위협도 적용 조건, 캐릭터별 표시 구간과 봉인 조건도 여전히 D와 합의가 필요하다. 챌린지를 수행해도 위협도는 즉시 낮아지지 않는다. 수행은 공략 점수에 기록되고, 위협도는 건강정보 재저장·재평가 때 갱신된다.
 
-진단자 경로는 개인 SHAP이 아니라 전역 중요도와 최신 생활패턴을 사용한다. `normalized_score`는 전역 요인의 상대 표시값이지 개인 위협도 점수가 아니다. 전역 점수를 `behavior_weight`에 매핑하는 기준은 1회전 뒤 정한다. `hp_source`가 바뀌는 두 산식의 변화량을 위험 감소로 비교하지 않는다. 모델/scale 버전이 바뀐 비교도 구분한다.
+진단자 경로는 개인 SHAP이 아니라 전역 중요도와 최신 생활패턴을 사용한다. `normalized_score`는 질환별 전역 중요도 최댓값을 100으로 둔 요인 간 상대값이지 개인 유병 확률이 아니다. 진단자 factor 점수는 `normalized_score × behavior_weight`다. weight 범위는 0~1이며, factor별 입력척도·위험조건을 고려한 세부 변환 규칙은 1회전 뒤 동일 사용자에서 contribution 점수와 분포를 비교해 서윤·이경이 확정한다. `hp_source`가 바뀌는 두 산식의 변화량을 의료적 위험 감소로 해석하지 않는다. 모델·scale 버전이 바뀐 비교도 구분한다.
 
 재예측에서 요인이 사라져도 기존 `user_monsters` 행과 봉인 등 성취는 보존한다. 유효한 재계산 결과가 0이면 해당 위협도를 0으로 갱신하되 입력 미확인·미지원 모델 때문에 근거가 없으면 0으로 바꾸지 않는다. 최초 비흡연자의 코티니를 자동 생성하지 않는다.
 
@@ -97,11 +98,11 @@ B 제안 기본안은 확률 공간 SHAP이다. 고정된 train background와 ex
 | 함수 | 제공 → 호출 | 계약 |
 |---|---|---|
 | get_top_contributions(prediction_id, disease, limit) | B → D | done 예측에 저장된 기여도만 조회. `[{factor_key, contribution, direction, rank}]` 반환. signed probability 단위. limit=1~100; 추천 필터를 위해 전체 조회 가능 |
-| get_global_importance(disease, limit) | B → D | 활성 모델의 고정 artifact에서 조회. 지정 시트 반환은 `[{factor_key, importance, rank, model_version}]`. 결과는 rank 오름차순이라 D는 첫 항목의 importance(질환별 최대값)로 `normalized_score = importance / first_item.importance * 100`을 계산할 수 있다. 최대값이 0이면 표시값은 0 |
+| get_global_importance(disease, limit) | B → D | 활성 모델의 고정 artifact에서 조회. 지정 시트 반환은 `[{factor_key, importance, normalized_score, rank, model_version}]`. 원값은 `mean(|grouped SHAP|)`이고, `normalized_score = 100 × importance / disease_global_max`를 B가 계산한다. 질환별 max와 결과는 `model_version`에 고정한다. max가 0이면 score는 0 |
 | refresh_hp_from_prediction(user_id, prediction_id) | D → B | 예측+기여도 커밋 뒤 호출. 같은 prediction 재호출 멱등. 예측 버전 고정. B는 D 테이블 직접 쓰지 않음 |
 | refresh_hp_from_health_record(user_id, health_record_id) | D → C | C 저장 뒤 1회 호출. measured/global 분기는 D 내부 |
 
-위 반환 형식은 지정 API 명세서의 `모듈 간 호출` 탭 F8·F9를 따른다. F9는 원 중요도와 순위, 모델 버전을 반환하므로 기존 호출 계약을 바꾸지 않고 D가 rank 1의 원 중요도를 질환별 기준값으로 써서 화면용 0~100 점수를 계산한다. B의 실험 artifact 보고서에는 비교 편의를 위해 `normalized_score`를 함께 기록한다. 개인 기여도는 요청한 prediction_id의 저장값을 읽으며 재학습 뒤 활성 모델로 다시 계산하지 않는다. 전역 중요도는 현재 활성 모델 버전을 각 반환 항목에 담는다. 제공자는 활성 artifact를 확인하고, 호출자가 캐시하면 버전 변경 시 이전 캐시를 무효화한다.
+위 반환 형식은 지정 API 명세서의 `모듈 간 호출` 탭 F8·F9 합의와 Slack에서 확인한 `normalized_score` 반환 필드를 따른다. B는 artifact에 고정된 질환별 max로 점수를 계산해 반환하고 D는 이를 최신 행동 weight와 결합한다. 개인 기여도는 요청한 prediction_id의 저장값을 읽으며 재학습 뒤 활성 모델로 다시 계산하지 않는다. 전역 중요도는 현재 활성 모델 버전을 각 반환 항목에 담는다. 제공자는 활성 artifact를 확인하고, 호출자가 캐시하면 버전 변경 시 이전 캐시를 무효화한다.
 
 공개 HTTP 기여도 API는 별도 계층이다. 라우트는 같은 prediction_id의 저장된 메타데이터를 읽어 `success/data` 응답의 prediction_id, disease, model_version, factor_dictionary_version, contribution_unit, items를 구성한다. 내부 함수가 이 metadata 객체를 반환한다고 가정하지 않는다. 공개 응답에 수정 가능 여부를 포함할 경우 해당 예측 버전의 factor 사전에서 보강한다.
 

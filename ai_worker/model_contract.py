@@ -156,6 +156,7 @@ class ModelExplanationService:
             {
                 "factor_key": item["factor_key"],
                 "importance": item["importance"],
+                "normalized_score": item["normalized_score"],
                 "rank": item["rank"],
                 "model_version": artifact["model_version"],
             }
