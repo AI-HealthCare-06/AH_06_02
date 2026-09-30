@@ -132,14 +132,16 @@ API 서버와 테스트에 필요한 것이 `app` · `dev` 그룹에 있습니�
 ### 환경 변수
 
 ```bash
-cp envs/example.local.env .env
+cp envs/example.local.env envs/.local.env
+cp envs/example.prod.env envs/.prod.env
+ln -s envs/.local.env .env
 ```
 
-**저장소 루트에 `.env`로 둡니다.** `envs/` 안에 두면 안 읽힙니다. `app/core/config.py`, `docker-compose.yml`, `scripts/ci/run_test.sh` 셋 다 루트의 `.env`를 봅니다.
+실제 값은 `envs/.local.env`에 적고, 저장소 루트의 `.env`는 그 파일을 가리키는 심볼릭 링크로 둡니다. `app/core/config.py`, `docker-compose.yml`, `scripts/ci/run_test.sh` 셋 다 루트의 `.env`를 보기 때문에 링크가 없으면 서버가 안 뜹니다.
 
-배포용은 `envs/example.prod.env`를 참고해 서버에서 따로 만듭니다.
+`envs/.prod.env`는 배포용이라 로컬에서는 건드리지 않습니다.
 
-받은 파일 안의 값은 각자 환경에 맞게 고치세요. `.env`는 커밋되지 않습니다.
+값은 각자 환경에 맞게 고치세요. `envs/.local.env`와 `.env`는 커밋되지 않습니다.
 
 ### 전체 실행
 
