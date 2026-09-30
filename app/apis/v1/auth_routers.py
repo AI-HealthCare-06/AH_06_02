@@ -1,55 +1,82 @@
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, status
-from fastapi.responses import JSONResponse as Response
+from fastapi import APIRouter, Cookie, Depends, Response, status
 
 from app.core import config
 from app.core.config import Env
-from app.dtos.auth import LoginRequest, LoginResponse, SignUpRequest, TokenRefreshResponse
+from app.core.errors import AppError, ErrorCode
+from app.dtos.auth import LoginRequest, SignUpRequest
+from app.dtos.envelope import ok
 from app.services.auth import AuthService
 from app.services.jwt import JwtService
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
+REFRESH_COOKIE_KEY = "refresh_token"
+
+
+def _set_refresh_cookie(response: Response, refresh_token: str, expires: int) -> None:
+    response.set_cookie(
+        key=REFRESH_COOKIE_KEY,
+        value=refresh_token,
+        httponly=True,
+        secure=config.ENV == Env.PROD,
+        domain=config.COOKIE_DOMAIN or None,
+        expires=expires,
+    )
+
+
+@auth_router.get("/check-email", status_code=status.HTTP_200_OK)
+async def check_email(
+    email: str,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> dict[str, Any]:
+    """AUTH-01 이메일 중복 확인. 실제 차단은 AUTH-02에서 한 번 더 한다."""
+    available = not await auth_service.user_repo.exists_by_email(email)
+    return ok({"available": available})
+
 
 @auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
 async def signup(
     request: SignUpRequest,
+    response: Response,
     auth_service: Annotated[AuthService, Depends(AuthService)],
-) -> Response:
-    await auth_service.signup(request)
-    return Response(content={"detail": "회원가입이 성공적으로 완료되었습니다."}, status_code=status.HTTP_201_CREATED)
+) -> dict[str, Any]:
+    """AUTH-02 회원가입. 레벨 1 · 경험치 0으로 시작한다."""
+    user = await auth_service.signup(request)
+    tokens = await auth_service.login(user)
+
+    _set_refresh_cookie(response, str(tokens["refresh_token"]), tokens["refresh_token"].payload["exp"])
+    return ok(
+        {
+            "user_id": user.id,
+            "access_token": str(tokens["access_token"]),
+            "refresh_token": str(tokens["refresh_token"]),
+        }
+    )
 
 
-@auth_router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+@auth_router.post("/login", status_code=status.HTTP_200_OK)
 async def login(
     request: LoginRequest,
+    response: Response,
     auth_service: Annotated[AuthService, Depends(AuthService)],
-) -> Response:
+) -> dict[str, Any]:
+    """AUTH-03 로그인. 5회 연속 실패하면 10분 잠긴다 (REQ-USER-004)."""
     user = await auth_service.authenticate(request)
     tokens = await auth_service.login(user)
-    resp = Response(
-        content=LoginResponse(access_token=str(tokens["access_token"])).model_dump(), status_code=status.HTTP_200_OK
-    )
-    resp.set_cookie(
-        key="refresh_token",
-        value=str(tokens["refresh_token"]),
-        httponly=True,
-        secure=True if config.ENV == Env.PROD else False,
-        domain=config.COOKIE_DOMAIN or None,
-        expires=tokens["access_token"].payload["exp"],
-    )
-    return resp
+
+    _set_refresh_cookie(response, str(tokens["refresh_token"]), tokens["refresh_token"].payload["exp"])
+    return ok({"user_id": user.id, "access_token": str(tokens["access_token"])})
 
 
-@auth_router.get("/token/refresh", response_model=TokenRefreshResponse, status_code=status.HTTP_200_OK)
+@auth_router.get("/token/refresh", status_code=status.HTTP_200_OK)
 async def token_refresh(
     jwt_service: Annotated[JwtService, Depends(JwtService)],
     refresh_token: Annotated[str | None, Cookie()] = None,
-) -> Response:
+) -> dict[str, Any]:
+    """AUTH-04 토큰 재발급."""
     if not refresh_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing.")
+        raise AppError(ErrorCode.AUTH_TOKEN_INVALID, message="리프레시 토큰이 없습니다. 다시 로그인해주세요.")
     access_token = jwt_service.refresh_jwt(refresh_token)
-    return Response(
-        content=TokenRefreshResponse(access_token=str(access_token)).model_dump(), status_code=status.HTTP_200_OK
-    )
+    return ok({"access_token": str(access_token)})

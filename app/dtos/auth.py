@@ -1,27 +1,41 @@
-from datetime import date
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, EmailStr, Field
 
-from app.core.validators import validate_birthday, validate_password, validate_phone_number
-from app.models.users import Gender
+from app.core.validators import validate_birth_year, validate_height_cm, validate_password
+from app.dtos.base import BaseSerializerModel
+from app.models.users import MotivationType, Sex
 
 
 class SignUpRequest(BaseModel):
-    email: Annotated[
-        EmailStr,
-        Field(None, max_length=40),
-    ]
-    password: Annotated[str, Field(min_length=8), AfterValidator(validate_password)]
-    name: Annotated[str, Field(max_length=20)]
-    gender: Gender
-    birth_date: Annotated[date, AfterValidator(validate_birthday)]
-    phone_number: Annotated[str, AfterValidator(validate_phone_number)]
+    """AUTH-02 회원가입 요청. API 명세서 A 탭 기준이다."""
+
+    email: Annotated[EmailStr, Field(max_length=255)]
+    password: Annotated[str, AfterValidator(validate_password)]
+    nickname: Annotated[str, Field(min_length=1, max_length=50)]
+
+    birth_year: Annotated[int | None, Field(None), AfterValidator(validate_birth_year)] = None
+    sex: Sex | None = None
+    height_cm: Annotated[float | None, Field(None), AfterValidator(validate_height_cm)] = None
+    motivation_type: MotivationType = MotivationType.COLLECT
+
+    dm_diagnosed: bool
+    htn_diagnosed: bool
+    dm_medication: bool
+    htn_medication: bool
+
+    disclaimer_agreed: Annotated[bool, Field(description="참고용 고지 동의. true여야 가입 가능 (REQ-USER-010)")]
+
+
+class SignUpResponse(BaseSerializerModel):
+    user_id: int
+    access_token: str
+    refresh_token: str
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: Annotated[str, Field(min_length=8)]
+    password: str
 
 
 class LoginResponse(BaseModel):

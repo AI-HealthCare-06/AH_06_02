@@ -1,40 +1,40 @@
-from datetime import date, datetime
+from datetime import datetime
+from decimal import Decimal
 from typing import Annotated
 
 from pydantic import BaseModel, EmailStr, Field
 
-from app.core.validators import optional_after_validator, validate_birthday, validate_phone_number
+from app.core.validators import optional_after_validator, validate_birth_year, validate_height_cm
 from app.dtos.base import BaseSerializerModel
-from app.models.users import Gender
+from app.models.users import MotivationType, Sex, UserStatus
 
 
 class UserUpdateRequest(BaseModel):
-    name: Annotated[str | None, Field(None, min_length=2, max_length=20)]
-    email: Annotated[
-        EmailStr | None,
-        Field(None, max_length=40),
-    ]
-    phone_number: Annotated[
-        str | None,
-        Field(None, description="Available Format: +8201011112222, 01011112222, 010-1111-2222"),
-        optional_after_validator(validate_phone_number),
-    ]
-    birthday: Annotated[
-        date | None,
-        Field(None, description="Date Format: YYYY-MM-DD"),
-        optional_after_validator(validate_birthday),
-    ]
-    gender: Annotated[
-        Gender | None,
-        Field(None, description="'MALE' or 'FEMALE'"),
-    ]
+    nickname: Annotated[str | None, Field(None, min_length=1, max_length=50)] = None
+    email: Annotated[EmailStr | None, Field(None, max_length=255)] = None
+    birth_year: Annotated[int | None, Field(None), optional_after_validator(validate_birth_year)] = None
+    sex: Sex | None = None
+    height_cm: Annotated[float | None, Field(None), optional_after_validator(validate_height_cm)] = None
+    motivation_type: MotivationType | None = None
+    dm_diagnosed: bool | None = None
+    htn_diagnosed: bool | None = None
+    dm_medication: bool | None = None
+    htn_medication: bool | None = None
 
 
 class UserInfoResponse(BaseSerializerModel):
     id: int
-    name: str
     email: str
-    phone_number: str
-    birthday: date
-    gender: Gender
+    nickname: str
+    birth_year: int | None
+    sex: Sex | None
+    height_cm: Decimal | None
+    motivation_type: MotivationType
+    dm_diagnosed: bool
+    htn_diagnosed: bool
+    dm_medication: bool
+    htn_medication: bool
+    total_xp: int
+    level: int
+    status: UserStatus
     created_at: datetime
