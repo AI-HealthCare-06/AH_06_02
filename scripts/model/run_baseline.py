@@ -27,10 +27,37 @@ from ai_worker.model_contract import (  # noqa: E402
     FEATURE_FACTOR,
     global_importance,
     group_shap,
-    monster_scores,
 )
 
-BASE = list(FEATURE_FACTOR)[:13]
+BASE = [
+    "age",
+    "sex",
+    "bmi",
+    "waist_cm",
+    "smoking_current",
+    "alcohol_frequency",
+    "alcohol_amount",
+    "walking_days",
+    "walking_minutes",
+    "strength_days",
+    "family_history_dm",
+    "family_history_htn",
+]
+CANDIDATES = {
+    "sodium": "dining_out_freq",
+    "sitting": "sitting_minutes",
+    "vegetable": "vegetable_frequency",
+}
+VARIANT_CHOICES = [
+    "base",
+    "sodium",
+    "sitting",
+    "vegetable",
+    "sodium_sitting",
+    "sodium_vegetable",
+    "sitting_vegetable",
+    "all_candidates",
+]
 CATEGORICAL = [
     "sex",
     "smoking_current",
@@ -67,7 +94,7 @@ def clean_input(frame):
     for key in ["smoking_current", "family_history_dm", "family_history_htn"]:
         if not set(frame[key].dropna()) <= {0, 1}:
             raise ValueError(f"Unmapped binary code: {key}")
-    if not frame.dining_out_freq.dropna().isin(range(1, 8)).all():
+    if "dining_out_freq" in frame and not frame.dining_out_freq.dropna().isin(range(1, 8)).all():
         raise ValueError("Unmapped dining_out_freq code")
     # Category codes must already have been checked against official annual codebooks.
     return frame.copy()
@@ -167,11 +194,16 @@ def run_one(frame, features, disease, seed, final_test):
     train_grouped, base = explain(model, train[features], train_reference, features, seed)
     validation_grouped, _ = explain(model, train[features], validation_reference, features, seed)
     supported_factors = {FEATURE_FACTOR[key] for key in features}
-    train_scores = [monster_scores(row, disease, supported_factors) for row in train_grouped]
-    scales = {}
-    for monster in train_scores[0]:
-        positives = [row[monster] for row in train_scores if row[monster] > 0]
-        scales[monster] = float(np.quantile(positives, 0.95)) if positives else None
+    reference_p95 = {}
+    for factor in sorted(supported_factors):
+        positive_shap = np.asarray([max(float(row.get(factor, 0.0)), 0.0) for row in validation_grouped])
+        p95 = float(np.quantile(positive_shap, 0.95)) if len(positive_shap) else 0.0
+        reference_p95[factor] = {
+            "positive_shap_p95": p95,
+            "positive_n": int((positive_shap > 0).sum()),
+            "reference_n": len(positive_shap),
+            "threat_eligible_candidate": p95 > 0,
+        }
     report = {
         "validation": result,
         "train_n": len(train),
@@ -183,7 +215,7 @@ def run_one(frame, features, disease, seed, final_test):
         "base_value": base,
         "global_importance_train_sample": global_importance(train_grouped),
         "validation_importance": global_importance(validation_grouped),
-        "hp_scale_train_sample_p95": scales,
+        "positive_shap_p95_validation_reference": reference_p95,
     }
     for feature in ["sitting_minutes", "dining_out_freq", "vegetable_frequency"]:
         if feature in features:
@@ -209,17 +241,27 @@ def main():
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
-    parser.add_argument("--final-variant", choices=["base", "sitting", "vegetable", "both"])
+    parser.add_argument("--final-variant", choices=VARIANT_CHOICES)
     args = parser.parse_args()
     frame = clean_input(pd.read_csv(args.data))
-    variants = {"base": BASE}
-    if "sitting_minutes" in frame:
-        variants["sitting"] = BASE + ["sitting_minutes"]
-    if "vegetable_frequency" in frame:
-        variants["vegetable"] = BASE + ["vegetable_frequency"]
-    if {"sitting_minutes", "vegetable_frequency"} <= set(frame.columns):
-        variants["both"] = BASE + ["sitting_minutes", "vegetable_frequency"]
+    variant_candidates = {
+        "base": (),
+        "sodium": ("sodium",),
+        "sitting": ("sitting",),
+        "vegetable": ("vegetable",),
+        "sodium_sitting": ("sodium", "sitting"),
+        "sodium_vegetable": ("sodium", "vegetable"),
+        "sitting_vegetable": ("sitting", "vegetable"),
+        "all_candidates": tuple(CANDIDATES),
+    }
+    variants = {
+        name: BASE + [CANDIDATES[candidate] for candidate in candidates]
+        for name, candidates in variant_candidates.items()
+        if all(CANDIDATES[candidate] in frame.columns for candidate in candidates)
+    }
     if args.final_variant:
+        if args.final_variant not in variants:
+            parser.error(f"Variant {args.final_variant!r} needs candidate columns missing from the canonical CSV")
         variants = {args.final_variant: variants[args.final_variant]}
     report = {
         "status": "experiment_only_not_deployable",

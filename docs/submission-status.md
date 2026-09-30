@@ -1,36 +1,28 @@
-# 홍서윤 B 제출 상태
+# 홍서윤 B 담당 항목 진행 현황
 
-## 준비한 내용
+기준일: 2026-09-30 KST. Notion의 본인 체크박스는 사용자 지시에 따라 직접 변경하지 않는다.
 
-| 항목 | 산출물 | 상태 |
+| 오늘 항목 | 결과 | 상태 |
 |---|---|---|
-| API 3개 | api-predictions.md | 지정 시트 양식 대조·작성본 준비 완료, 온라인 반영 대기 |
-| X/y와 누수 이유 | model.md | 계약 작성·raw 단위 및 코드북 검증 대기 |
-| 진단자 source_prediction_id | model.md 1절 | NULL 확인 완료(ERD SQL 근거) |
-| 좌식 독립 여부 | model.md 1절 | 독립 factor 확정 반영 |
-| 모델 1회전 | experiment.md + run_baseline.py | 실제 데이터 미확보로 실행 대기 |
-| B→D, global importance | model.md 7절 | 최신 명칭·버전 계약 반영 |
-| 코드 검증 | verification.md | 단위 테스트 9개·린트·합성 실행 통과 |
+| 전역 중요도 정규화 의견 확인 | 원값 `mean(|grouped SHAP|)`, 화면용 `importance / 질환별 max * 100`, 최대값은 `model_version`별 고정으로 정리해 Slack에 공유 | 의견 공유 완료 |
+| X·y 정의 고정 | core 12개 입력과 당뇨·고혈압 각각의 y 정의, 누수 차단 변수를 model.md에 반영 | 정의 문서화 완료; 공식 코드북 검증 대기 |
+| 당뇨·고혈압 1회전 학습 | 두 질환 모델, sodium·좌식·채소 후보 ablation 및 reference P95 보고를 실행할 수 있게 스크립트를 정리 | 원자료·코드북 미확보로 실행 불가 |
+| docs/model.md | 전역 중요도, 개인 위협도 P95, 좌식 독립 factor, 소디 후보, 진단자 경로와 확정 대기값을 반영 | 수정 완료 |
+| ERD 6개 항목 | 확보된 ERD SQL에서 predictions.input_snapshot, prediction_contributions.disease/contribution/direction/rank, user_challenges.source_prediction_id 확인 | 6개 존재; source_prediction_id NULL 허용 및 진단자 NULL 확인 |
+| 용어 | 사용자 표기를 위협도·공략 점수로 갱신. DB/API 식별자는 계약 유지 | 문서 반영 완료 |
+| behavior_weight·소디 위협도 | 실제 SHAP 분포와 양의 기여 P95, 안정성 결과를 보고 확정 | 1회전 후 결정 |
 
-## 확인된 원본
+## 남은 외부 의존성
 
-- 기획서 v9 PDF, 요구사항 v8 XLSX, 9/24 첨부 ERD_2.sql, factor_key v0, B 연결 확인 요청, D Mapping Table v0.
-- 9/28 13:38 API/HP 스레드와 13:44까지 ERD·mapping 답변.
-- 사용자가 지정한 API명세서_v1-1의 공통 규칙·쓰기 권한·모듈 간 호출 및 B 탭을 직접 읽었다. 응답 형식·오류 명명·추적 헤더와 내부 함수의 배열 반환 계약을 대조해 수정했다.
-- GitHub main c0caba5와 develop a09552e. 저장소는 회원·인증 템플릿과 빈 ai_worker이며 학습자료·모델·예측 ORM/API는 없다.
-- 최신 ERD는 스레드에서 185컬럼으로 변경됐다고 확인했다. 실제 확보한 SQL은 이전 첨부본이므로 최신 전체 SQL을 확보한 것으로 표시하지 않는다. 새 hp_source/last_health_record_id 등은 스레드 변경사항으로 반영했다.
+- 프로젝트 폴더에서 KNHANES 2022~2024 원시 `.sav`와 공식 연도별 코드북을 찾지 못했다. 그래서 실제 학습 결과·AUROC·SHAP·소디 안정성·`behavior_weight` 변환값은 없다. 실행 준비 코드의 표본·합성 테스트 결과를 실데이터 결과로 표시하지 않는다.
+- 확인 가능한 로컬 ERD SQL은 여섯 컬럼을 포함하지만 Slack에서는 더 최신 185컬럼 ERD 변경이 언급됐다. 최신 첨부본과의 동일성은 아직 대조하지 못했다.
+- 지정 API 시트의 모듈 호출 F9는 `get_global_importance()` 반환을 `[{factor_key, importance, rank, model_version}]`로 규정한다. 반환은 rank 오름차순이므로 D가 rank 1의 importance를 질환별 max로 사용해 표시용 0~100 점수를 계산하도록 문서화했다. 공유 반환 스키마는 그대로 유지한다.
+- 제출 저장소: [AH_06_02 PR #2](https://github.com/AI-HealthCare-06/AH_06_02/pull/2).
 
-## 아직 완료가 아닌 것
+## 확인한 대화와 문서
 
-1. HN22/23/24 원시자료와 공식 변수설명서가 필요하다. 성능·SHAP 안정성·HP scale·global importance를 실제 계산해야 한다.
-2. 제출 대상은 사용자가 새로 지정한 API명세서_v1-1이다. Google 로그인 후 원본 양식은 읽었으나 파일이 소유자의 휴지통에 있어 온라인 편집은 진행하지 않았다. B 탭 6~8행에 들어갈 작성본은 준비했다. 원본 복원 또는 사용자가 선택한 사본으로 반영해야 한다.
-3. Notion 결정/SHARE DOCUMENTS 페이지는 연결 계정에서 404다. 링크 등록과 완료 체크를 하지 않았다. 완료 체크는 공지대로 본인이 한다.
-4. Slack 전송은 아직 하지 않았다. 아래 메시지는 실제 완료 범위를 반영한 초안이다.
-
-## 팀에 보낼 답변 초안
-
-최신 API/ERD 의견 확인했습니다. B는 예측+기여도 저장 커밋 후 `refresh_hp_from_prediction(user_id, prediction_id)`를 호출하고, `get_top_contributions()`와 모델 버전이 포함된 `get_global_importance()`를 제공하는 계약으로 문서를 맞췄습니다. `user_monsters`는 직접 수정하지 않습니다.
-
-진단자는 예측을 만들지 않으므로 `user_challenges.source_prediction_id=NULL`이 맞고, global importance+생활패턴 경로로 분리하겠습니다. `sedentary_time_high`는 독립 factor/비세라 연결을 유지합니다. 실제 sitting_minutes 채택과 SHAP 안정성, 채소 후보·소디 안정성은 원시자료 1회전 결과로 별도 공유하겠습니다. 아직 실험 완료 수치는 없습니다.
-
-API 3개의 요청·응답·예외는 지정 API명세서_v1-1의 공통 규칙과 대조했고 B 탭 작성본을 준비했습니다. 온라인 시트 반영 및 model.md 링크 등록은 접근 가능한 원본에서 마무리해야 합니다. 확정이 필요한 부분은 HP 고정 스케일 세부 방식과 global factor_score의 0~100 변환, 등급 경계값입니다.
+- [9/30 B 파트 모델·X/y·용어 요약](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790755600857999)
+- [오늘 문서·실험 상태 공유](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790757885765989)
+- [전역 중요도·개인 위협도 정규화 논의](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790744047761599?thread_ts=1790744047.761599)
+- [지정 API 명세서](https://docs.google.com/spreadsheets/d/1KZMhGHa7s2y3XSPKfA2rcTeJgTsUVi7c/edit?gid=1571297883#gid=1571297883)
+- [확보한 ERD SQL이 공유된 Slack 글](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790239227750419)

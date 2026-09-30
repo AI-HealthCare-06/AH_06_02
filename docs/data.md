@@ -14,7 +14,7 @@ KNHANES 2022~2024 HN22_ALL.sav/HN23_ALL.sav/HN24_ALL.sav를 사용한다. 자료
 
 ## canonical CSV
 
-원시자료를 바로 모델에 넣지 않고 단위와 코드를 검증한 CSV를 생성한다. 열 목록은 model.md와 같다. 부가 열은 `survey_year`, `HE_DM_HbA1c`, `HE_HP`다. 후보 채소 열은 `vegetable_frequency`이며 실제 의미·단위 확인 후만 사용한다. 한 사람 한 조사연도 한 행으로 중복 ID 검사 후 내보낸다. ID는 학습 feature가 아니다.
+원시자료를 바로 모델에 넣지 않고 단위와 코드를 검증한 CSV를 생성한다. core 열은 model.md의 첫 12개 feature다. 외식 빈도 `dining_out_freq`, 좌식 `sitting_minutes`, 채소 `vegetable_frequency`는 공식 코드북·단위 확인 후 ablation 후보로만 추가한다. 부가 열은 `survey_year`, `HE_DM_HbA1c`, `HE_HP`다. 한 사람 한 조사연도 한 행으로 중복 ID 검사 후 내보낸다. ID는 학습 feature가 아니다.
 
 서비스 열의 alcohol_frequency/alcohol_amount는 공식 코드 의미를 범주로 인코딩한다. 기본 모델은 범주형으로 처리하여 코드 차이를 실제 잔 수 차이라고 해석하지 않는다. 가족력 unknown, 유효한 비해당·비음주 상태, 실제 누락을 구별한다. 필수 입력 누락 서비스 요청은 거절하며 학습 결측 대치는 train에만 fit한다.
 
@@ -23,7 +23,8 @@ BMI는 키·몸무게에서 일관된 식으로 생성해 HE_BMI와 허용 오�
 ## 분할과 누수 차단
 
 - 2022 train, 2023 validation, 2024 final test로 먼저 분리한다.
-- 인코딩·대치·SHAP background·HP scale·global importance는 train만 사용한다.
+- 인코딩·대치·모델 적합·SHAP background·global importance 원값은 train만 사용한다.
+- 위협도 calibration `P95_reference`는 2023 validation reference 집단에서 질환×factor×model_version별 계산해 artifact metadata에 고정한다. 2024 final test는 calibration에 사용하지 않는다.
 - 모델/feature 선택·분류 임계값은 validation만 사용한다. 최종 test는 선택된 모델에 대해서만 1회 평가한다.
 - y가 없는 행은 질환별 학습·평가에서 제외한다. 누락을 음성으로 만들지 않는다.
 - 모델의 threshold는 validation recall>=0.70인 후보 중 specificity 최대값으로 선택한다. 임의의 임상 기준으로 설명하지 않는다. 3단계 등급 두 경계는 성능 검토 후 별도 고정하며 현재 미산출이다.

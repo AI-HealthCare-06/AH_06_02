@@ -71,12 +71,12 @@ def global_importance(grouped_rows: Sequence[Mapping[str, float]]) -> list[dict[
     if any(set(row) != keys for row in grouped_rows):
         raise ValueError("Inconsistent factor sets")
     scores = {key: sum(abs(finite(row[key])) for row in grouped_rows) / len(grouped_rows) for key in keys}
-    total = sum(scores.values())
+    maximum = max(scores.values(), default=0.0)
     return [
         {
             "factor_key": key,
             "importance": scores[key],
-            "normalized_importance": scores[key] / total if total else 0.0,
+            "normalized_score": 100.0 * scores[key] / maximum if maximum else 0.0,
             "modifiable": key not in IMMUTABLE_FACTORS,
             "rank": rank,
         }
@@ -101,7 +101,7 @@ def monster_scores(
 
 
 def hp_from_fixed_scale(score: float, scale: float | None) -> int | None:
-    """Proposed display transform. Missing calibration is not healthy HP=0."""
+    """Legacy aggregate-score helper; not the agreed factor-level threat calibration."""
     value = finite(score)
     if scale is None:
         return None
@@ -109,6 +109,20 @@ def hp_from_fixed_scale(score: float, scale: float | None) -> int | None:
     if scale_value <= 0:
         return None
     return math.floor(100.0 * min(max(value / scale_value, 0.0), 1.0) + 0.5)
+
+
+def threat_from_reference_p95(
+    signed_shap: float, p95_reference: float | None, threat_eligible: bool = True
+) -> int | None:
+    """Convert one factor's positive SHAP to 0..100 using its fixed reference P95."""
+    value = finite(signed_shap)
+    if not threat_eligible or p95_reference is None:
+        return None
+    scale = finite(p95_reference)
+    if scale <= 0:
+        return None
+    positive_shap = max(value, 0.0)
+    return math.floor(100.0 * min(positive_shap / scale, 1.0) + 0.5)
 
 
 class ModelExplanationService:

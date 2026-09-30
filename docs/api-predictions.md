@@ -86,14 +86,14 @@ query: `disease=diabetes|hypertension` 필수, `limit` 기본 3, 1~100. done 전
 ```json
 {"success":true,"data":{"prediction_id":501,"disease":"diabetes","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}}
 ```
-값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 model.md를 따른다. top3 합이 전체 확률과 같다고 해석하지 않는다. HP나 damage는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
+값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 model.md를 따른다. top3 합이 전체 확률과 같다고 해석하지 않는다. 위협도나 공략 점수는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
 
 ## 저장·워커 계약
 
 - B writer: predictions, prediction_contributions. 읽기: 필요한 users/health_records. D 테이블은 D 함수로만 변경한다.
 - worker 성공 시 두 질환 결과와 **전체** factor 기여도를 하나의 transaction으로 저장한 뒤 done 전환. 두 질환 중 하나 실패 시 부분 결과를 done으로 게시하지 않는다.
 - 동일 job 재전달 시 완료행·기여도를 중복 생성하지 않는다. prediction row lock 및 `(prediction_id,disease,factor_key)` 중복 방지 전략을 사용한다. DB UNIQUE 추가는 A와 합의한다.
-- 커밋 후 refresh_hp_from_prediction 호출. 호출 오류는 HP 동기화 재시도로 분리한다. 사용자에게 저장된 예측까지 실패했다고 알리지 않는다.
+- 커밋 후 refresh_hp_from_prediction 호출. 호출 오류는 위협도 동기화 재시도로 분리한다. 사용자에게 저장된 예측까지 실패했다고 알리지 않는다.
 - 오래된 작업이 늦게 완료돼도 '최신 입력/예측'을 덮어쓰지 않도록 D의 근거 ID 비교가 필요하다.
 - 모든 라우트의 공통 validation/exception wrapper, 진단 플래그 모델, 건강기록 모델, 예측 ORM은 현재 템플릿에 없는 후속 구현이다.
 
@@ -108,7 +108,7 @@ query: `disease=diabetes|hypertension` 필수, `limit` 기본 3, 1~100. done 전
 | pending 조회 | 200 pending, 결과 null |
 | 같은 job 중복 소비 | 결과·기여도 한 세트 |
 | worker 오류 | failed, 이전 성공 이력 보존 |
-| D HP 함수 오류 | prediction done 유지, HP 재시도 |
+| D 위협도 갱신 오류 | prediction done 유지, 갱신 재시도 |
 | first prediction | delta_pp=null |
 | 모델 버전 변경 | comparable=false |
 | 좌식 포함 모델 | 독립 factor, 활동 factor와 중복 합산 없음 |
