@@ -29,6 +29,15 @@
 - 에러 코드 27개
 - 요구사항 67항목 (기능 49 · 비기능 18)
 
-## 아직 없는 문서
+## 데이터 문서 상태
 
-`03_ai_data/data.md` — 데이터 출처, 라이선스, 라벨 정의, 전처리 절차, 표본 수, 데이터 한계. `NFR-MODL-003` · `NFR-MODL-005` · `NFR-MODL-006` 세 항목이 이 파일을 지목하고 있습니다. 평가항목 3-1이 걸려 있어 발표 전에는 있어야 합니다.
+`03_ai_data/data.md` — 데이터 출처, 라이선스, 라벨 정의, 전처리 절차, 표본 수, 데이터 한계를 기록합니다. 현재는 모델 입력과 y 매핑을 정리한 초안이며, 공식 코드북 대조와 실데이터 통계를 채워야 완료됩니다. `NFR-MODL-003` · `NFR-MODL-005` · `NFR-MODL-006`은 이 파일을 지목합니다.
+
+## B 예측·모델 문서
+
+- `01_planning/api-predictions.md` — B 예측 API 3개 계약 초안
+- `03_ai_data/model.md` — X/y 정의, 전역 중요도와 위협도 산식
+- `03_ai_data/data.md` — KNHANES 자료원 및 전처리 현황
+- `03_ai_data/experiment.md` — 학습·비교 실험 계획
+- `03_ai_data/verification.md` — 계약 테스트와 검증 범위
+- `03_ai_data/submission-status.md` — B 제출 항목과 남은 외부 의존성
