@@ -7,7 +7,7 @@
 | 전역 중요도 정규화 의견 확인 | 원값 `mean(|grouped SHAP|)`, 화면용 `importance / 질환별 max * 100`, 최대값은 `model_version`별 고정으로 정리해 Slack에 공유 | 의견 공유 완료 |
 | X·y 정의 고정 | core 12개 입력과 당뇨·고혈압 각각의 y 정의, 누수 차단 변수를 model.md에 반영 | 정의 문서화 완료; 공식 코드북 검증 대기 |
 | 당뇨·고혈압 1회전 학습 | 두 질환 모델, sodium·좌식·채소 후보 ablation 및 reference P95 보고를 실행할 수 있게 스크립트를 정리 | 원자료·코드북 미확보로 실행 불가 |
-| docs/model.md | 전역 중요도, 개인 위협도 P95, 좌식 독립 factor, 소디 후보, 진단자 경로와 확정 대기값을 반영 | 수정 완료 |
+| docs/03_ai_data/model.md | 전역 중요도, 개인 위협도 P95, 좌식 독립 factor, 소디 후보, 진단자 경로와 확정 대기값을 반영 | 수정 완료 |
 | ERD 6개 항목 | 확보된 ERD SQL에서 predictions.input_snapshot, prediction_contributions.disease/contribution/direction/rank, user_challenges.source_prediction_id 확인 | 6개 존재; source_prediction_id NULL 허용 및 진단자 NULL 확인 |
 | 용어 | 사용자 표기를 위협도·공략 점수로 갱신. DB/API 식별자는 계약 유지 | 문서 반영 완료 |
 | 진단자 위협도 결합 | Slack 합의식 `global normalized_score × behavior_weight`와 전역 score 기준을 문서·B 함수에 반영 | 식 확정; 동일 사용자 분포 비교와 factor별 behavior_weight 확정은 미완료·1회전 대기 |

@@ -19,7 +19,7 @@
 단위 테스트 명령은 저장소 루트에서 실행한다.
 
 ```bash
-python -m unittest discover -s tests/model_contract -v
+uv run python -m unittest discover -s tests/model_contract -v
 ruff check .
 ruff format --check .
 ```

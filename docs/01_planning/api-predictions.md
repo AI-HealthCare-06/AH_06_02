@@ -20,7 +20,7 @@ Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 �
 ```json
 {"health_record_id":101}
 ```
-필수: health_record_id(양의 정수). C가 저장한 불변 건강기록만 받는다. 필수 입력 목록은 model.md를 따른다. age/sex/height 등 users 기본값도 예측 시점에 스냅샷으로 고정한다. 클라이언트가 model_version, 확률, SHAP 또는 진단자 여부를 지정하지 않는다.
+필수: health_record_id(양의 정수). C가 저장한 불변 건강기록만 받는다. 필수 입력 목록은 [모델 계약](../03_ai_data/model.md)을 따른다. age/sex/height 등 users 기본값도 예측 시점에 스냅샷으로 고정한다. 클라이언트가 model_version, 확률, SHAP 또는 진단자 여부를 지정하지 않는다.
 
 검사 순서는 토큰 → 건강기록 소유권 → 진단/약물 이력 → 필수 feature·단위 → 활성 모델 artifact → 접수다. 누락 필드는 전부 반환하고 추론은 시작하지 않는다. 데이터베이스 기본 false만으로 미확인 진단 이력을 미진단으로 판단하지 않는다.
 
@@ -86,7 +86,7 @@ query: `disease=diabetes|hypertension` 필수, `limit` 기본 3, 1~100. done 전
 ```json
 {"success":true,"data":{"prediction_id":501,"disease":"diabetes","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}}
 ```
-값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 model.md를 따른다. top3 합이 전체 확률과 같다고 해석하지 않는다. 위협도나 공략 점수는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
+값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 [모델 계약](../03_ai_data/model.md)을 따른다. top3 합이 전체 확률과 같다고 해석하지 않는다. 위협도나 공략 점수는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
 
 ## 저장·워커 계약
 
