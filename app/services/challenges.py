@@ -17,7 +17,7 @@ MAX_ACTIVE_CHALLENGES = 3
 
 def week_start_for(value: date | datetime) -> date:
     """월요일 00:00 KST 기준 달력 주간의 시작일을 반환한다."""
-    current = value.date() if isinstance(value, datetime) else value
+    current = value.astimezone(config.TIMEZONE).date() if isinstance(value, datetime) else value
     return current - timedelta(days=current.weekday())
 
 

@@ -285,3 +285,8 @@ class TestChallengeCoreService(TestCase):
 
         assert updated == []
         assert await UserMonster.filter(user_id=9109).count() == 0
+
+    def test_week_start_for_converts_utc_to_kst_before_week_boundary(self) -> None:
+        utc = ZoneInfo("UTC")
+        # 2026-10-04 15:30 UTC == 2026-10-05 00:30 KST
+        assert week_start_for(datetime(2026, 10, 4, 15, 30, tzinfo=utc)) == date(2026, 10, 5)
