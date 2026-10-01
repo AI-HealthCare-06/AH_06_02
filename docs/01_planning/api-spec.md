@@ -1,6 +1,6 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-09-30 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-01 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 
 ## 공통 인증 · 응답 규칙
@@ -11,7 +11,7 @@
 | 인증 | 토큰 수명 | Access 30분 / Refresh 14일. Access 만료 시 POST /api/v1/auth/refresh로 재발급 |
 | 인증 | 인증 불필요 엔드포인트 | 회원가입 · 로그인 · 토큰 재발급 · 이메일 중복 확인 · 헬스체크. 그 외는 전부 인증 필요 |
 | 인증 | 본인 데이터 원칙 | 개인 데이터 엔드포인트는 URL에 user_id를 받지 않는다. 항상 토큰에서 꺼낸 user_id를 쓴다 (NFR-SEC-002) |
-| 인증 | 401 vs 403 | 401 = 토큰이 없거나 만료됨 · 403 = 토큰은 유효하지만 남의 리소스에 접근 |
+| 인증 | 401 vs 403 | 401 = 토큰이 없거나 만료됨 · 남의 리소스를 가리키는 요청은 403이 아니라 404로 응답한다. 403을 주면 그 ID가 존재한다는 사실이 드러나 건강 데이터가 샌다 |
 | 응답 | 성공 형식 | { "success": true, "data": { ... } } |
 | 응답 | 실패 형식 | { "success": false, "error": { "code": "CHLG_LIMIT_EXCEEDED", "message": "동시 진행 챌린지는 최대 3개입니다." } } |
 | 응답 | 목록 형식 | { "success": true, "data": { "items": [...], "total": 120, "page": 1, "size": 20 } } |
@@ -65,11 +65,7 @@
 | CHLG | CHLG_RECOMMENDATION_UNAVAILABLE | 409 | 추천을 만들 근거가 없음 | D · CHLG-01 |
 | CHLG | CHLG_INVALID_COOLDOWN | 400 | 쿨다운 값이 7 · 30 · manual이 아님 | D · CHLG-03 |
 
-코드를 임의로 만들지 않습니다. 새 코드가 필요하면 시트에 먼저 등록하고 팀에 알린 뒤 씁니다.
-
 ## 테이블별 쓰기 권한
-
-한 테이블은 한 사람만 씁니다. 남의 테이블이 필요하면 아래 「모듈 간 호출」의 함수를 부릅니다.
 
 | 테이블 | 쓰기 (INSERT/UPDATE) | 읽기 | 담당 영역 | 비고 |
 | --- | --- | --- | --- | --- |
@@ -91,8 +87,6 @@
 
 ## 모듈 간 호출 규약
 
-남의 테이블에 써야 할 때 직접 UPDATE 하지 않고 아래 함수를 호출합니다.
-
 | 함수 | 제공 | 호출 | 호출 시점 | 인자 | 반환 |
 | --- | --- | --- | --- | --- | --- |
 | grant_xp() | 배수빈 (A) | 김이경 (D) | 챌린지 로그가 reward_eligible=TRUE로 저장된 직후 | user_id, amount, source('challenge'\|'seal'\|'bonus') | { level_up: bool, new_level: int, total_xp: int } |
@@ -104,7 +98,7 @@
 
 ## A · 회원·인증 · 11개
 
-담당 배수빈 · 11개 · 작성 완료 2026-09-28
+담당 배수빈 · 작성 완료 2026-09-28
 
 ### AUTH-01 · 이메일 중복 확인
 
@@ -204,8 +198,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: dm_diagnosed, htn_diagnosed, dm_medication, htn_medication
-- **응답 (성공)**: { dm_diagnosed, htn_diagnosed, dm_medication, htn_medication, prediction_enabled }
-※ prediction_enabled는 두 질환을 모두 진단받은 경우에만 false (기획서 v19 2.3)
+- **응답 (성공)**: { dm_diagnosed, htn_diagnosed, dm_medication, htn_medication, prediction_enabled } ※ prediction_enabled는 두 질환을 모두 진단받은 경우에만 false (기획서 v19 2.3)
 - **주요 에러**: VALIDATION_ERROR
 - **관련 요구사항**: REQ-USER-007
 - **사용 테이블**: users 쓰기
@@ -250,65 +243,52 @@
 - **사용 테이블**: users 읽기
 - **상태**: 작성 (레벨 공식 미정)
 
-## B · 예측·모델 · 4개
+## B · 예측·모델 · 3개
 
-담당 홍서윤 · [배수빈 -> 초안 작성하였습니다. 확인 후 확정 부탁드립니다. ]
+담당 홍서윤 · 확정 2026-10-01
 
-### PRED-01 · 예측 실행 (접수)
+### PRED-01 · 예측 접수
 
 `POST /api/v1/predictions`
 
 - **인증**: 필요
 - **요청 파라미터**: —
-- **요청 본문**: health_record_id(필수). 대상 질환은 서버가 users의 질환별 진단 이력으로 결정한다(REQ-PRED-007). 미진단 질환만 추론 대상이 된다. 모델 입력은 health_records에서 읽으며 클라이언트가 값을 다시 보내지 않는다
-- **응답 (성공)**: { job_id, status: "queued" } (202). 접수까지가 P95 1초 측정 구간
-- **주요 에러**: PRED_ALL_DIAGNOSED(400: 두 질환 모두 진단이라 예측 대상 없음), HLTH_RECORD_NOT_FOUND(404), HLTH_PROFILE_INCOMPLETE(400: birth_year·sex·height_cm 누락), VALIDATION_ERROR, UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-001·002·007 · NFR-PERF-002
-- **사용 테이블**: users 읽기(진단 이력) / health_records 읽기 / Redis 큐 적재. predictions 쓰기는 ai_worker가 한다
-- **상태**: 초안 · 홍서윤 확정 전
+- **요청 본문**: health_record_id(필수). 서버가 소유권과 질환별 진단·약물 이력을 확인하고, 미진단 질환만 큐에 넣는다. 둘 다 진단이면 PRED_ALL_DIAGNOSED. 입력은 불변 health_records에서 읽는다
+- **응답 (성공)**: HTTP 202 { success:true, data:{ prediction_id, job_id, status:"pending", model_version, poll_url:"/api/v1/predictions/{prediction_id}" } }. 폴링은 PRED-02 사용
+- **주요 에러**: PRED_ALL_DIAGNOSED(400), HLTH_RECORD_NOT_FOUND(404), HLTH_PROFILE_INCOMPLETE(400), PRED_INPUT_INSUFFICIENT(400), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
+- **관련 요구사항**: REQ-PRED-001·002·007·008 · NFR-PERF-002
+- **사용 테이블**: users 읽기 / health_records 읽기 / predictions 쓰기 / Redis enqueue
+- **상태**: 확정 — 홍서윤 10/1
 
-### PRED-02 · 예측 작업 상태 조회
-
-`GET /api/v1/predictions/jobs/{job_id}`
-
-- **인증**: 필요
-- **요청 파라미터**: —
-- **요청 본문**: —
-- **응답 (성공)**: { job_id, status: "queued"|"running"|"succeeded"|"failed", prediction_id (succeeded일 때만), failed_reason (failed일 때만) }
-- **주요 에러**: NOT_FOUND(404: 만료됐거나 없는 job_id), FORBIDDEN(403: 남의 작업), UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-002 · NFR-REL-001
-- **사용 테이블**: Redis 작업 상태 읽기. 종료 상태 TTL 24시간
-- **상태**: 초안 · 홍서윤 확정 전
-
-### PRED-03 · 예측 결과 조회
+### PRED-02 · 예측 상태·결과 조회
 
 `GET /api/v1/predictions/{prediction_id}`
 
 - **인증**: 필요
-- **요청 파라미터**: prediction_id 대신 latest 사용 가능 — /api/v1/predictions/latest
+- **요청 파라미터**: prediction_id(양의 정수)
 - **요청 본문**: —
-- **응답 (성공)**: { prediction_id, predicted_at, model_version, risks: [{ disease, probability, grade }] }. risks에는 미진단 질환만 담는다. 한 질환만 진단받았으면 1개, 둘 다 진단이면 예측 자체가 없다
-- **주요 에러**: NOT_FOUND(404), FORBIDDEN(403: 남의 예측), UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-001·003·004·007
-- **사용 테이블**: predictions 읽기 (본인 것만, 완료된 예측만)
-- **상태**: 초안 · 홍서윤 확정 전
+- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, job_id, status:"pending"\|"done"\|"failed", model_version, results?: [{ disease, probability }], failure?: { code, message, retryable } } }. pending일 때 results 필드 생략. 완료 결과는 미진단 질환만 포함. grade 경계는 팀 검증 후 확정
+- **주요 에러**: NOT_FOUND(404), UNAUTHORIZED(401), INTERNAL_ERROR(500)
+- **관련 요구사항**: REQ-PRED-002·003·004·006·007·009 · NFR-REL-001
+- **사용 테이블**: predictions 읽기 / users·health_records 읽기 (본인 소유·진단 분기)
+- **상태**: 확정 — 홍서윤 10/1
 
-### PRED-04 · 기여요인 조회
+### PRED-03 · 기여요인 조회
 
 `GET /api/v1/predictions/{prediction_id}/contributions`
 
 - **인증**: 필요
-- **요청 파라미터**: ?disease=diabetes|hypertension (선택, 없으면 전체) & limit=3 (선택, 기본 전체)
+- **요청 파라미터**: prediction_id(양의 정수), disease=diabetes\|hypertension(선택), limit=1~100(기본 100; 화면은 3 지정)
 - **요청 본문**: —
-- **응답 (성공)**: { model_version, items: [{ factor_key, contribution, normalized_score, direction, rank }] }. contribution은 정규화 전 원본 SHAP, normalized_score는 0~100 위협도. 저장은 매핑된 factor 전량이고 limit은 화면 노출용이다
-- **주요 에러**: NOT_FOUND(404), FORBIDDEN(403), VALIDATION_ERROR(400: disease 값 오류), UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-005 · REQ-CHLG-001
-- **사용 테이블**: prediction_contributions 읽기 / predictions 읽기(소유권 확인)
-- **상태**: 초안 · 홍서윤 확정 전
+- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, status:"pending"\|"done"\|"failed", disease, model_version, factor_dictionary_version, contribution_unit:"probability", items:[{ factor_key, contribution, direction, rank, modifiable }] } }. pending/failed 상태에는 items 생략; done이면 지원 factor 전량(0 포함). disease 생략 시 예측에 포함된 모든 미진단 질환 반환
+- **주요 에러**: NOT_FOUND(404), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
+- **관련 요구사항**: REQ-PRED-005 · REQ-CHLG-001 · NFR-MODL-002
+- **사용 테이블**: predictions 읽기 / prediction_contributions 읽기
+- **상태**: 확정 — 홍서윤 10/1
 
 ## C · 건강정보·대시보드 · 6개
 
-담당 최병주 · C API 6개 제출안 · 공통 인증/응답 규칙은 공통 탭 적용
+담당 최병주 · 공통 인증·응답 규칙은 공통 탭 적용
 
 ### HLTH-01 · 건강정보 입력·시점별 저장
 
@@ -344,7 +324,7 @@
 - **요청 파라미터**: — (토큰 사용자 기준)
 - **요청 본문**: multipart/form-data: photo(필수), user_challenge_id(필수). 본인의 활성 PHOTO 챌린지에 한해 업로드. JPEG/PNG, 최대 10 MiB(제출 설계값). AI 분석·음식 성분 추정 없음.
 - **응답 (성공)**: { evidence_url, uploaded_at } (201). evidence_url은 공개 정적 URL이 아닌 비공개 증빙 참조값.
-- **주요 에러**: VALIDATION_ERROR(형식·크기 포함), UNAUTHORIZED, FORBIDDEN, CHLG_NOT_ACTIVE
+- **주요 에러**: VALIDATION_ERROR(형식·크기 포함), UNAUTHORIZED, CHLG_NOT_ACTIVE
 - **관련 요구사항**: REQ-CHLG-008·REQ-USER-009·NFR-SEC-005
 - **사용 테이블**: C: 사진을 비공개 저장하고 evidence_url 반환. D CHLG-07: 소유권 확인 후 challenge_logs.evidence_url 기록·수행 증빙. 사진 AI 판정 없음.
 - **상태**: 제출안(MVP는 업로드 → 비공개 저장 → evidence_url 기록 → 수행 증빙까지만. 음식 사진 분석·AI 성공 판정은 2차 범위)
@@ -356,7 +336,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { prediction_available, risks:[{ disease, probability, grade, delta, predicted_at }], latest_health_record:{ health_record_id, recorded_at } | null }
+- **응답 (성공)**: { prediction_available, risks:[{ disease, probability, grade, delta, predicted_at }], latest_health_record:{ health_record_id, recorded_at } \| null }
 - **주요 에러**: UNAUTHORIZED
 - **관련 요구사항**: REQ-DASH-001·REQ-PRED-007
 - **사용 테이블**: predictions·health_records 읽기 (완료 예측만); 모델 계산 없음
@@ -390,7 +370,7 @@
 
 ## D · 챌린지·보상·도감 · 11개
 
-담당 김이경 · 11개 · 작성 완료 2026-09-29
+담당 김이경 · 작성 완료 2026-09-29
 
 ### CHLG-01 · 추천 생성
 
@@ -399,7 +379,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label }], total }  ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정.
+- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정.
 - **주요 에러**: CHLG_RECOMMENDATION_UNAVAILABLE, PRED_NOT_FOUND, UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-001·002
 - **사용 테이블**: predictions·prediction_contributions 읽기 / challenges 읽기 / challenge_recommendations 쓰기
@@ -424,9 +404,9 @@
 
 - **인증**: 필요
 - **요청 파라미터**: path: recommendation_id
-- **요청 본문**: action='rejected'|'not_applicable', cooldown_choice? ('7d'|'30d'|'until_manual', rejected일 때만)
+- **요청 본문**: action='rejected'\|'not_applicable', cooldown_choice? ('7d'\|'30d'\|'until_manual', rejected일 때만)
 - **응답 (성공)**: { recommendation_id, action, consecutive_reject_count, cooldown_choice, exclude_until, suppressed_until_manual }
-- **주요 에러**: CHLG_RECOMMENDATION_NOT_FOUND, CHLG_INVALID_COOLDOWN, FORBIDDEN
+- **주요 에러**: CHLG_RECOMMENDATION_NOT_FOUND, CHLG_INVALID_COOLDOWN
 - **관련 요구사항**: REQ-CHLG-006
 - **사용 테이블**: challenge_recommendations 쓰기
 - **상태**: 작성
@@ -439,7 +419,7 @@
 - **요청 파라미터**: path: recommendation_id
 - **요청 본문**: —
 - **응답 (성공)**: { recommendation_id, suppressed_until_manual: false }
-- **주요 에러**: CHLG_RECOMMENDATION_NOT_FOUND, FORBIDDEN
+- **주요 에러**: CHLG_RECOMMENDATION_NOT_FOUND
 - **관련 요구사항**: REQ-CHLG-006
 - **사용 테이블**: challenge_recommendations 쓰기
 - **상태**: 작성
@@ -450,7 +430,7 @@
 
 - **인증**: 필요
 - **요청 파라미터**: —
-- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean  ※ 운동형 챌린지가 포함된 경우 true 필수. 비운동형만 포함되면 생략 가능
+- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean ※ 운동형 챌린지가 포함된 경우 true 필수. 비운동형만 포함되면 생략 가능
 - **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, status, start_date, end_date, daily_target_count, target_value, duration_days }], active_count }
 - **주요 에러**: CHLG_LIMIT_EXCEEDED, CHLG_RECOMMENDATION_NOT_FOUND, CHLG_ALREADY_ACTIVE, CHLG_SAFETY_CONFIRMATION_REQUIRED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-002 · REQ-CHLG-010
@@ -476,9 +456,9 @@
 
 - **인증**: 필요
 - **요청 파라미터**: path: user_challenge_id
-- **요청 본문**: occurred_at, context_slot?, value?, verification_method, evidence_url?  ※ photo는 C 업로드 경로에서 반환된 비공개 증빙 위치값 사용
+- **요청 본문**: occurred_at, context_slot?, value?, verification_method, evidence_url? ※ photo는 C 업로드 경로에서 반환된 비공개 증빙 위치값 사용
 - **응답 (성공)**: { log_id, result, verification_status, reward_eligible, xp_granted, weekly_progress, level_up, new_level, reward? }
-- **주요 에러**: CHLG_NOT_ACTIVE, CHLG_LOG_DUPLICATED, CHLG_VERIFICATION_FAILED, VALIDATION_ERROR, FORBIDDEN
+- **주요 에러**: CHLG_NOT_ACTIVE, CHLG_LOG_DUPLICATED, CHLG_VERIFICATION_FAILED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-003·004·007·008 · REQ-RECO-003·004 · REQ-PRED-011
 - **사용 테이블**: user_challenges·challenges 읽기 / challenge_logs·user_monsters·user_rewards 쓰기 / A grant_xp() 호출
 - **상태**: 작성
@@ -491,7 +471,7 @@
 - **요청 파라미터**: path: user_challenge_id, ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&page=1&size=20
 - **요청 본문**: —
 - **응답 (성공)**: { items: [{ log_id, log_date, occurred_at, sequence_no, context_slot, value, unit, result, verification_method, verification_status, reward_eligible, xp_granted }], total, page, size }
-- **주요 에러**: CHLG_NOT_FOUND, FORBIDDEN
+- **주요 에러**: CHLG_NOT_FOUND
 - **관련 요구사항**: REQ-CHLG-003·004
 - **사용 테이블**: user_challenges·challenge_logs 읽기
 - **상태**: 작성
@@ -504,7 +484,7 @@
 - **요청 파라미터**: path: user_challenge_id
 - **요청 본문**: stop_reason?
 - **응답 (성공)**: { user_challenge_id, status: 'abandoned', stopped_at, stop_reason }
-- **주요 에러**: CHLG_NOT_ACTIVE, CHLG_NOT_FOUND, FORBIDDEN
+- **주요 에러**: CHLG_NOT_ACTIVE, CHLG_NOT_FOUND
 - **관련 요구사항**: REQ-CHLG-005
 - **사용 테이블**: user_challenges 쓰기
 - **상태**: 작성
@@ -516,7 +496,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, weekly_progress, progress_week_start, sealed_at, seal_count, impact_source }] }  ※ state: rage | caution | stable | not_contributing | resolved | sealed | unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시.
+- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, weekly_progress, progress_week_start, sealed_at, seal_count, impact_source }] } ※ state: rage \| caution \| stable \| not_contributing \| resolved \| sealed \| unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시.
 - **주요 에러**: UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-007 · REQ-RECO-005 · REQ-PRED-010·011
 - **사용 테이블**: monsters·user_monsters 읽기
@@ -534,4 +514,3 @@
 - **관련 요구사항**: REQ-RECO-001·002·004
 - **사용 테이블**: user_rewards·rewards 읽기
 - **상태**: 작성
-
