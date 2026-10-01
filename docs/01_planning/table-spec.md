@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-09-30 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-01 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 
 ## 테이블 목록
@@ -19,8 +19,7 @@
 | 10 | challenge_recommendations | 추천·거절 이력 | 김이경 (D) | /challenges | 15 |  |
 | 11 | rewards | 보상 마스터 | 김이경 (D) | /rewards | 11 |  |
 | 12 | user_rewards | 보상 획득 이력 | 김이경 (D) | /rewards | 6 |  |
-
-합계 12개 테이블 · 컬럼 187개 · FK 17개
+|  | 합계 12개 테이블 · 컬럼 187개 |  |  |  |  |  |
 
 ## 테이블별 컬럼 명세
 
@@ -99,7 +98,7 @@
 | 9 | htn_grade | ENUM('low','caution','high') | NULL |  |  |  | 확정 |
 | 10 | metabolic_count | TINYINT | NULL |  |  | 대사증후군 해당 지표 수 0~5 (REQ-PRED-009) | 확정 |
 | 11 | model_version | VARCHAR(32) | NN |  |  | 모델 버전 고정 (NFR-MODL-002) | 확정 |
-| 12 | input_snapshot | JSON | NULL |  |  | 예측 당시 모델에 넣은 입력값 스냅샷. 모델 버전이 올라가도 과거 결과를 재현·검증할 수 있게 남긴다 (REQ-PRED-003) | 초안 — 배수빈 9/29 · 홍서윤 확정 대기 |
+| 12 | input_snapshot | JSON | NULL |  |  | 예측 당시 모델 입력 스냅샷. 전처리 전 canonical 값·단위와 결측 여부를 보존하며 model_version에 연결된 전처리·모델 아티팩트로 과거 결과를 검증한다. 혈압·혈당·진단·약물은 모델 X에서 제외 (REQ-PRED-003) | 확정 — 홍서윤 9/30 |
 | 13 | predicted_at | DATETIME | NULL |  |  | 추론 완료 시각 | 확정 |
 | 14 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 요청 접수 시각 | 확정 |
 | 15 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
@@ -111,11 +110,11 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | id | BIGINT | NN | PK | AUTO_INCREMENT |  | 확정 |
 | 2 | prediction_id | BIGINT | NN | FK |  | → predictions.id | 확정 |
-| 3 | disease | ENUM('diabetes','hypertension') | NN |  |  | 어느 질환 모델에서 나온 기여도인지. 같은 factor도 질환별로 값이 다르므로 행을 나눠 저장한다 | 초안 — 배수빈 9/29 · 홍서윤 확정 대기 |
+| 3 | disease | ENUM('diabetes','hypertension') | NN |  |  | 기여도를 산출한 질환 모델: diabetes 또는 hypertension. 미진단 질환만 개인 예측·SHAP을 생성하며 같은 factor도 질환별 행으로 분리한다 | 확정 — 홍서윤 9/30 |
 | 4 | factor_key | VARCHAR(50) | NN |  |  | 공통 요인 코드. 값 목록은 Feature Dictionary v0 · 13개 | 확정 — 9/28 Mapping v1 |
-| 5 | contribution | DECIMAL(8,5) | NN |  |  | 정규화 전 원본 SHAP 기여도. 0~100 위협도는 이 값에서 계산하며 스케일 상수는 모델 버전에 묶는다 | 초안 — 배수빈 9/29 · 홍서윤 확정 대기 |
-| 6 | direction | ENUM('increase','decrease') | NN |  |  | 이 요인이 위험을 올렸는지 내렸는지. SHAP 부호에서 정한다. decrease인 요인은 위협도 0으로 처리한다 | 초안 — 배수빈 9/29 · 홍서윤 확정 대기 |
-| 7 | rank | TINYINT | NN |  |  | 질환 내 기여도 순위. 화면에는 상위 3개만 노출한다(REQ-PRED-005). 저장은 매핑된 factor 전량이며 rank는 정렬용이지 저장 범위가 아니다 | 초안 — 배수빈 9/29 · 홍서윤 확정 대기 |
+| 5 | contribution | DECIMAL(8,5) | NN |  |  | 정규화 전 signed grouped SHAP(확률 단위). 같은 factor의 원시/one-hot SHAP을 부호 유지 합산하고 DECIMAL(8,5)로 저장. 0 포함 지원 factor 전량 저장; 위협도 정규화 상수는 model_version 메타데이터에 고정 | 확정 — 홍서윤 9/30 |
+| 6 | direction | ENUM('increase','decrease') | NN |  |  | 저장 contribution > 0이면 increase, <= 0이면 decrease. 0은 ENUM 제약에 따른 decrease이며 보호 효과를 뜻하지 않는다. 0·음수의 위협도는 0 | 확정 — 홍서윤 9/30 |
+| 7 | rank | TINYINT | NN |  |  | 질환별 abs(저장 contribution) 내림차순, 동률은 factor_key 오름차순의 1기반 순위. 0 포함 지원 factor 전량 저장하며 Top3는 화면 표시 범위만 뜻한다 (REQ-PRED-005) | 확정 — 홍서윤 9/30 |
 | 8 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
 
 ### monsters — 캐릭터 마스터
@@ -153,7 +152,7 @@
 | 11 | last_prediction_id | BIGINT | NULL | FK |  | → predictions.id · contribution 방식일 때 근거 예측. 진단자·실측은 NULL | 확정 |
 | 12 | last_health_record_id | BIGINT | NULL | FK |  | → health_records.id · measured·global 방식일 때 근거 입력. contribution은 NULL | 신규 — 9/28 진단자 경로 |
 | 13 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
-| 14 | weekly_progress | SMALLINT | NN |  | 0 | 이번 주 누적 공략 점수. 챌린지 수행 시 즉시 증가. 위협도는 건드리지 않는다 (REQ-PRED-011). 화면 목표는 100 고정이며 초과해도 계속 누적한다. 100 미달에 불이익은 없고 게임 진행 표시용이다 | 확정 — 9/29 주간 목표 100 |
+| 14 | weekly_progress | SMALLINT | NN |  | 0 | 이번 주 누적 공략 점수. 챌린지 수행 시 즉시 증가하되 DB 저장값은 최대 100으로 제한한다. 위협도는 건드리지 않는다 (REQ-PRED-011). 화면 목표는 100 고정이다. 100 미달에 불이익은 없고 게임 진행 표시용이다. | 확정 — 10/1 PR #8 주간 공략 점수 100 상한 반영 |
 | 15 | progress_week_start | DATE | NULL |  |  | 공략 점수 누적 기준 주 시작일. 해당 주 월요일 날짜를 저장한다. 월요일 00:00 KST에 weekly_progress를 0으로 초기화한다. C의 대시보드 week_start와 같은 달력 주간 기준 | 확정 — 9/29 월요일 기준 |
 | 16 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
 
@@ -184,7 +183,7 @@
 | 20 | reward_xp | SMALLINT | NN |  | 0 | 1회 수행당 지급 경험치 | 신규 — 9/24 레벨 도입 결정 |
 | 21 | progress_value | SMALLINT | NN |  | 10 | 인정된 수행 1회당 쌓이는 공략 점수. MVP는 전 챌린지 동일 값. factor_key가 NULL이면 반드시 0 (마스터 데이터 규칙, REQ-PRED-011) | 변경 — 9/28 용어 치환 |
 | 22 | is_enabled | BOOLEAN | NN |  | TRUE | 운영 중인 정의인지 | 확정 |
-| 23 | safety_check_required | BOOLEAN | NN |  | False | 운동 전 안전 확인이 필요한 챌린지 여부. TRUE이면 챌린지 시작 요청에서 safety_confirmed=true를 서버가 검증한다. safety_confirmed 응답값 자체는 저장하지 않는다. category='activity' 전체가 아니라 마스터 데이터에서 필요한 챌린지만 TRUE로 지정한다. (REQ-CHLG-010) | 신규 — 9/30 REQ-CHLG-010 안전확인 판정 |
+| 23 | safety_check_required | BOOLEAN | NN |  | FALSE | 운동 전 안전 확인이 필요한 챌린지 여부. TRUE이면 챌린지 시작 요청에서 safety_confirmed=true를 서버가 검증한다. safety_confirmed 응답값 자체는 저장하지 않는다. category='activity' 전체가 아니라 마스터 데이터에서 필요한 챌린지만 TRUE로 지정한다. (REQ-CHLG-010) | 신규 — 9/30 REQ-CHLG-010 안전확인 판정 |
 | 24 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
 | 25 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
 
@@ -197,7 +196,7 @@
 | 2 | user_id | BIGINT | NN | FK |  | → users.id · status='active'는 사용자당 최대 3개 (REQ-CHLG-002) | 확정 |
 | 3 | challenge_id | BIGINT | NN | FK |  | → challenges.id | 확정 |
 | 4 | recommendation_id | BIGINT | NULL | FK |  | → challenge_recommendations.id · 어느 카드에서 시작했는지 | 확정 |
-| 5 | source_prediction_id | BIGINT | NULL | FK |  | → predictions.id · 이 챌린지를 추천한 근거 예측. 미진단 질환의 기여도로 추천됐으면 그 예측 id, 전역 중요도로 추천됐거나 보너스 챌린지면 NULL | 초안 — 배수빈 9/29 · 홍서윤 확정 대기 |
+| 5 | source_prediction_id | BIGINT | NULL | FK |  | → predictions.id · 미진단 질환의 개인 기여도 기반 추천이면 근거 prediction_id. 진단 질환의 전역 중요도 기반 추천·보너스는 NULL. 한 질환만 진단받은 사용자는 다른 미진단 질환 추천의 prediction_id를 가질 수 있다 | 확정 — 홍서윤 9/30 |
 | 6 | status | ENUM('active','completed','abandoned') | NN |  | 'active' |  | 확정 |
 | 7 | start_date | DATE | NN |  |  |  | 확정 |
 | 8 | end_date | DATE | NN |  |  |  | 확정 |
@@ -307,54 +306,44 @@
 
 ## 규칙과 범례
 
-
-### 네이밍 규칙 — 그리기 전에 고정
-
-- **테이블명** — 복수형 snake_case. users · health_records · challenge_logs
-- **PK** — 전 테이블 id · BIGINT · AUTO_INCREMENT
-- **FK** — {단수형}_id. user_id · challenge_id · prediction_id
-- **공통 컬럼** — created_at · updated_at 전 테이블 필수
-- **삭제** — soft delete. 탈퇴 데이터 30일 보관 때문에 물리 삭제하지 않음
-- **시각** — UTC DATETIME으로 저장. 화면에 보일 때만 KST 변환
-- **불리언** — BOOLEAN. is_ 접두사는 마스터 테이블의 is_enabled에만 사용
-- **금액·비율** — 확률은 DECIMAL(5,4) 0~1로 저장. 화면에서 %로 변환
-- **ENUM · 정수 타입** — 명세서에 ENUM으로 적은 컬럼은 Tortoise가 VARCHAR로 만들고 값 검증은 애플리케이션에서 한다. TINYINT는 SMALLINT로 생성된다. 시트는 허용되는 값을 적는 문서이고, 실제 DDL은 ERD.sql을 본다
-
-### 이 파일 보는 법
-
-- **노란 칸** — 아직 확정되지 않았거나 담당자 확인이 필요한 부분입니다. 여기만 봐주세요
-- **상태 · 확정** — 요구사항 정의서 v5에서 도출된 것으로 그대로 가면 됩니다
-- **상태 · 확인 대기** — 담당자 답변이 있어야 확정됩니다
-- **상태 · 검토 필요** — 제가 임의로 정한 것이라 의견이 필요합니다
-- **상태 · 신규** — 9월 24일 회의에서 새로 결정된 것입니다
-
-### 채워주실 것 — 자기 테이블만 보시면 됩니다
-
-- **배수빈 (A)** — users
-- **홍서윤 (B)** — predictions · prediction_contributions
-- **최병주 (C)** — health_records
-- **김이경 (D)** — monsters · user_monsters · challenges · user_challenges · challenge_logs · challenge_recommendations · rewards · user_rewards
-- **보는 방법** — '테이블 명세' 시트에서 담당 열로 필터를 거시면 본인 것만 나옵니다
-- **고칠 것** — 빠진 컬럼 추가 · 타입 수정 · 노란 칸 확정. 컬럼을 지우실 때는 이유를 상태 칸에 적어주세요
-
-### 아직 정해지지 않은 것
-
-- **factor_key 값 목록** — 김이경 · 9월 25일. 타입은 VARCHAR(50)이라 구조에는 영향 없음
-- **기여요인 저장 구조** — 홍서윤 확인 대기. prediction_contributions 전체
-- **스파이크 위협도 산출** — 홍서윤 확인 대기. monsters.default_impact_source
-- **레벨별 필요 경험치** — 테이블로 만들지 않고 코드 상수로 둡니다. levels 테이블을 만들면 13개가 되고 ERD를 다시 그려야 하는데, 레벨 30개짜리 상수 배열이면 밸런스 조정 시 숫자만 바꾸면 됩니다
-- **XP 지급량 · 공략 점수** — challenges.reward_xp와 progress_value의 실제 값입니다. 컬럼과 타입은 정해져 있어 구조에는 영향이 없고, 4주차에 챌린지 목록을 채울 때 같이 정합니다 (김이경)
-- **XP 갱신 주체** — users는 A만 쓰므로, D는 A가 제공하는 내부 함수로 지급을 요청합니다. 레벨 재계산과 레벨업 판정은 A에서 한 곳으로 모읍니다
-- **리프레시 토큰** — Redis에 저장하기로 하여 테이블을 만들지 않았습니다. 다른 의견 있으면 알려주세요
-
-### 예시 — 이렇게 채워주시면 됩니다
-
-- **컬럼명** — sleep_minutes
-- **타입** — SMALLINT
-- **NULL** — NULL
-- **키** — (비움)
-- **기본값** — (비움)
-- **설명** — 하루 수면 시간(분). 간편 모드 10번째 항목으로 추가 요청
-- **상태** — 추가 요청 — 최병주
-- AH_06_02 · 당고킬러 · 테이블 명세서 v2 · 2026.09.25 · 작성 배수빈
-
+| ■ 네이밍 규칙 — 그리기 전에 고정 |  |
+| --- | --- |
+| 테이블명 | 복수형 snake_case. users · health_records · challenge_logs |
+| PK | 전 테이블 id · BIGINT · AUTO_INCREMENT |
+| FK | {단수형}_id. user_id · challenge_id · prediction_id |
+| 공통 컬럼 | created_at · updated_at 전 테이블 필수 |
+| 삭제 | soft delete. 탈퇴 데이터 30일 보관 때문에 물리 삭제하지 않음 |
+| 시각 | UTC DATETIME으로 저장. 화면에 보일 때만 KST 변환 |
+| 불리언 | BOOLEAN. is_ 접두사는 마스터 테이블의 is_enabled에만 사용 |
+| 금액·비율 | 확률은 DECIMAL(5,4) 0~1로 저장. 화면에서 %로 변환 |
+| ENUM · 정수 타입 | 명세서에 ENUM으로 적은 컬럼은 Tortoise가 VARCHAR로 만들고 값 검증은 애플리케이션에서 한다. TINYINT는 SMALLINT로 생성된다. 시트는 허용되는 값을 적는 문서이고, 실제 DDL은 ERD.sql을 본다 |
+| ■ 이 파일 보는 법 |  |
+| 노란 칸 | 아직 확정되지 않았거나 담당자 확인이 필요한 부분입니다. 여기만 봐주세요 |
+| 상태 · 확정 | 요구사항 정의서 v5에서 도출된 것으로 그대로 가면 됩니다 |
+| 상태 · 확인 대기 | 담당자 답변이 있어야 확정됩니다 |
+| 상태 · 검토 필요 | 제가 임의로 정한 것이라 의견이 필요합니다 |
+| 상태 · 신규 | 9월 24일 회의에서 새로 결정된 것입니다 |
+| ■ 채워주실 것 — 자기 테이블만 보시면 됩니다 |  |
+| 배수빈 (A) | users |
+| 홍서윤 (B) | predictions · prediction_contributions |
+| 최병주 (C) | health_records |
+| 김이경 (D) | monsters · user_monsters · challenges · user_challenges · challenge_logs · challenge_recommendations · rewards · user_rewards |
+| 보는 방법 | '테이블 명세' 시트에서 담당 열로 필터를 거시면 본인 것만 나옵니다 |
+| 고칠 것 | 빠진 컬럼 추가 · 타입 수정 · 노란 칸 확정. 컬럼을 지우실 때는 이유를 상태 칸에 적어주세요 |
+| ■ 아직 정해지지 않은 것 |  |
+| factor_key 값 목록 | 김이경 · 9월 25일. 타입은 VARCHAR(50)이라 구조에는 영향 없음 |
+| 기여요인 저장 구조 | 홍서윤 확인 대기. prediction_contributions 전체 |
+| 스파이크 위협도 산출 | 홍서윤 확인 대기. monsters.default_impact_source |
+| 레벨별 필요 경험치 | 테이블로 만들지 않고 코드 상수로 둡니다. levels 테이블을 만들면 13개가 되고 ERD를 다시 그려야 하는데, 레벨 30개짜리 상수 배열이면 밸런스 조정 시 숫자만 바꾸면 됩니다 |
+| XP 지급량 · 공략 점수 | challenges.reward_xp와 progress_value의 실제 값입니다. 컬럼과 타입은 정해져 있어 구조에는 영향이 없고, 4주차에 챌린지 목록을 채울 때 같이 정합니다 (김이경) |
+| XP 갱신 주체 | users는 A만 쓰므로, D는 A가 제공하는 내부 함수로 지급을 요청합니다. 레벨 재계산과 레벨업 판정은 A에서 한 곳으로 모읍니다 |
+| 리프레시 토큰 | Redis에 저장하기로 하여 테이블을 만들지 않았습니다. 다른 의견 있으면 알려주세요 |
+| ■ 예시 — 이렇게 채워주시면 됩니다 |  |
+| 컬럼명 | sleep_minutes |
+| 타입 | SMALLINT |
+| NULL | NULL |
+| 키 | (비움) |
+| 기본값 | (비움) |
+| 설명 | 하루 수면 시간(분). 간편 모드 10번째 항목으로 추가 요청 |
+| 상태 | 추가 요청 — 최병주 |
+| AH_06_02 · 당고킬러 · 테이블 명세서 v2 · 2026.09.25 · 작성 배수빈 |  |
