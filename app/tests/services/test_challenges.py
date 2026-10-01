@@ -297,7 +297,7 @@ class TestChallengeCoreService(TestCase):
             code="TEST-MON-CAP",
             no=9110,
             name="CAP",
-            factor_keys=["walking_low"],
+            factor_keys=["physical_activity_low"],
         )
         row = await UserMonster.create(
             user_id=9110,
@@ -309,7 +309,7 @@ class TestChallengeCoreService(TestCase):
         for _ in range(2):
             updated = await service.add_weekly_progress(
                 user_id=9110,
-                factor_key="walking_low",
+                factor_key="physical_activity_low",
                 progress_value=15,
                 occurred_at=datetime(2026, 9, 30, 15, 0, tzinfo=KST),
             )
