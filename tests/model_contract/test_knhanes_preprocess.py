@@ -6,7 +6,7 @@ from scripts.model.preprocess_knhanes import canonicalize
 
 
 class KnHANESPreprocessTest(unittest.TestCase):
-    def test_vegetable_frequency_keeps_ls_veg2_categories_and_missing(self):
+    def test_special_codes_and_candidate_mapping(self):
         raw = pd.DataFrame(
             {
                 "year": [2022, 2023, 2024],
@@ -16,11 +16,11 @@ class KnHANESPreprocessTest(unittest.TestCase):
                 "HE_wc": [80, 81, 82],
                 "sm_presnt": [0, 1, 0],
                 "BD1": [1, 2, 2],
-                "BD1_11": [8, 5, 4],
-                "BD2_1": [8, 3, 2],
-                "BE3_31": [1, 4, 8],
-                "BE3_32": [0, 1, 1],
-                "BE3_33": [0, 30, 0],
+                "BD1_11": [8, 5, 9],
+                "BD2_1": [8, 3, 9],
+                "BE3_31": [1, 4, 99],
+                "BE3_32": [88, 1, 99],
+                "BE3_33": [88, 30, 99],
                 "BE5_1": [1, 3, 6],
                 "BE8_1": [8, 6, 2],
                 "BE8_2": [0, 30, 0],
@@ -46,6 +46,14 @@ class KnHANESPreprocessTest(unittest.TestCase):
 
         self.assertEqual(result["vegetable_frequency"].iloc[:2].tolist(), [1, 9])
         self.assertTrue(pd.isna(result["vegetable_frequency"].iloc[2]))
+        self.assertEqual(result["walking_days"].iloc[:2].tolist(), [0, 3])
+        self.assertEqual(result["walking_minutes"].iloc[:2].tolist(), [0, 90])
+        self.assertTrue(pd.isna(result["walking_days"].iloc[2]))
+        self.assertTrue(pd.isna(result["walking_minutes"].iloc[2]))
+        self.assertEqual(result["alcohol_frequency"].iloc[:2].tolist(), [1, 5])
+        self.assertEqual(result["alcohol_amount"].iloc[:2].tolist(), [0, 3])
+        self.assertTrue(pd.isna(result["alcohol_frequency"].iloc[2]))
+        self.assertTrue(pd.isna(result["alcohol_amount"].iloc[2]))
 
 
 if __name__ == "__main__":

@@ -86,6 +86,8 @@ def canonicalize(raw):
     amount = category(frame.BD2_1, range(1, 6), [8, 9])
     out["alcohol_amount"] = amount.mask(frequency.eq(1) & frame.BD2_1.eq(8), 0)
     out["walking_days"] = category(frame.BE3_31, range(1, 9), [88, 99]) - 1
+    # 88/88 is skipped for verified no-walking (BE3_31=1); 99 means unknown.
+    # Mask special time codes first, then set zero only when no walking is confirmed.
     out["walking_minutes"] = minutes(frame.BE3_32, frame.BE3_33).mask(out.walking_days.eq(0), 0)
     # Code 6 means >=5 days: retain lower bound 5, never invent an exact 6 or 7.
     out["strength_days"] = category(frame.BE5_1, range(1, 7), [8, 9]) - 1

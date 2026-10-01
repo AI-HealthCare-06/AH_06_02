@@ -6,6 +6,7 @@
 |---|---|
 | KNHANES 원자료 | 2022~2024 20,191행 확인; 만 19세 이상 canonical 17,262행 생성(2022 5,322, 2023 5,907, 2024 6,033); 연도별 ID 중복 0 |
 | 코드 매핑 | 성별·흡연·음주·걷기·근력·좌식·외식·가족력 및 질환 eligibility 코드를 KNHANES 제9기 지침과 원자료 value labels/domain에 대조 |
+| 걷기·음주 특수값 재대조 | 성인 17,262명에서 BE3_32/33의 88 각각 2,291건은 BE3_31=1과 일치해 0분/회; BE3_31=99 1,508건과 시간 변수 99 각 1,532건은 결측. BD1_11=8 1,856건 전부 BD1=1·BD2_1=8이라 빈도1·양0 처리; 전처리 출력 단위검증 통과 |
 | 당뇨·고혈압 모델 | 기본·소디·좌식 4 variants × 2 diseases × 3 seeds = 24; 별도 LS_VEG2 채소 variant 2 diseases × 3 seeds = 6. 2022 train, 2023 validation; 2024 holdout은 미평가 |
 | Label 누수 | 질환별 미진단·미복약 대상을 분리; valid y 코드만 사용; 혈압·혈당·진단·약물 원변수는 X에서 제외 |
 | SHAP | probability-space, factor별 signed grouping, 가산성 오차 <= 0.01; global mean absolute grouped SHAP 및 질환별 max=100 score 산출 |
