@@ -152,7 +152,10 @@ class ChallengeCoreService:
             if user_monster.progress_week_start != week_start:
                 user_monster.weekly_progress = 0
                 user_monster.progress_week_start = week_start
-            user_monster.weekly_progress += progress_value
+            user_monster.weekly_progress = min(
+                100,
+                user_monster.weekly_progress + progress_value,
+            )
             await user_monster.save(update_fields=["weekly_progress", "progress_week_start", "updated_at"])
             updated.append(user_monster)
         return updated
