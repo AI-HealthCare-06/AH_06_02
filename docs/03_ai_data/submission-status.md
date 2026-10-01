@@ -16,7 +16,7 @@
 | 용어 | 사용자 문구를 위협도·공략 점수로 갱신하고 DB/API 식별자는 호환을 위해 유지 | 완료 |
 | 좌식시간 factor | 독립 `sedentary_time_high`로 세 seed SHAP·validation·2024 성능 비교. 당뇨 첫 실험 모델에 추가 | 실험 입력 결정; 앱 적용은 C/D 계약 확인 필요 |
 | 진단자 `behavior_weight` | 동일 validation 사용자에서 personal P95 점수와 global×후보 weight를 비교 | 분포 산출; factor별 weight·risk_condition 최종 합의 대기 |
-| GitHub 제출 | 기존 B 전달 [PR #7](https://github.com/AI-HealthCare-06/AH_06_02/pull/7)은 main에 병합됨. 2024 비교 평가와 전체-reference 척도 재계산은 [후속 PR #9](https://github.com/AI-HealthCare-06/AH_06_02/pull/9)에 제출 | CI·리뷰 대기 |
+| GitHub 제출 | 기존 B 전달 [PR #7](https://github.com/AI-HealthCare-06/AH_06_02/pull/7)은 main에 병합됨. 2024 비교 평가와 전체-reference 척도 재계산은 [후속 PR #9](https://github.com/AI-HealthCare-06/AH_06_02/pull/9)에 제출 | CI 통과·리뷰 대기 |
 | Notion 제출 링크 | 지정 SHARE DOCUMENTS 페이지를 연결된 Notion에서 찾지 못함(직접 조회 404, 검색 결과 없음) | 외부 접근 차단; 정확한 페이지 공유/접근 필요 |
 
 ## 실험 요약
