@@ -286,6 +286,8 @@
 - **사용 테이블**: predictions 읽기 / prediction_contributions 읽기
 - **상태**: 확정 — 홍서윤 10/1
 
+상세 인증·응답 규칙과 JSON 예시는 [B 예측 API 계약](api-predictions.md)을 따른다.
+
 ## C · 건강정보·대시보드 · 6개
 
 담당 최병주 · 공통 인증·응답 규칙은 공통 탭 적용

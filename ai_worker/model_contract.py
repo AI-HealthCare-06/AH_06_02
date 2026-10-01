@@ -49,9 +49,9 @@ def group_shap(raw: Mapping[str, float], feature_factor: Mapping[str, str] = FEA
 
 
 def rank_contributions(grouped: Mapping[str, float]) -> list[dict[str, Any]]:
-    """Use stored precision for deterministic ranks and omit zero rows."""
+    """Persist every supported factor, including zero, with deterministic ranks."""
     values = {key: round(finite(value), 5) for key, value in grouped.items()}
-    keys = sorted((key for key, value in values.items() if value != 0), key=lambda key: (-abs(values[key]), key))
+    keys = sorted(values, key=lambda key: (-abs(values[key]), key))
     return [
         {
             "factor_key": key,
@@ -100,26 +100,19 @@ def monster_scores(
     }
 
 
-def hp_from_fixed_scale(score: float, scale: float | None) -> int | None:
-    """Legacy aggregate-score helper; not the agreed factor-level threat calibration."""
-    value = finite(score)
-    if scale is None:
-        return None
-    scale_value = finite(scale)
-    if scale_value <= 0:
-        return None
-    return math.floor(100.0 * min(max(value / scale_value, 0.0), 1.0) + 0.5)
-
-
 def threat_from_reference_p95(
     signed_shap: float, p95_reference: float | None, threat_eligible: bool = True
 ) -> int | None:
     """Convert one factor's positive SHAP to 0..100 using its fixed reference P95."""
     value = finite(signed_shap)
-    if not threat_eligible or p95_reference is None:
+    if not threat_eligible:
+        return 0
+    if p95_reference is None:
         return None
     scale = finite(p95_reference)
-    if scale <= 0:
+    if scale == 0:
+        return 0
+    if scale < 0:
         return None
     positive_shap = max(value, 0.0)
     return math.floor(100.0 * min(positive_shap / scale, 1.0) + 0.5)
