@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -73,6 +74,17 @@ CATEGORICAL = [
 ]
 # KNHANES IX guide and all three raw annual label domains verified.
 LABELS = {"diabetes": ("HE_DM_HbA1c", [1, 2, 3], 3), "hypertension": ("HE_HP", [1, 2, 3, 4], 4)}
+P95_MIN_STORED_CONTRIBUTION = 1e-5  # DECIMAL(8,5): one persistable contribution unit.
+MIN_POSITIVE_SHAP_N = 400  # At least 20 positive observations are expected above the empirical P95.
+
+
+def assess_threat_eligibility(p95, positive_n):
+    """Reject unresolvable P95 scales and scales with too little upper-tail support."""
+    if not math.isfinite(p95) or p95 < P95_MIN_STORED_CONTRIBUTION:
+        return False, "positive_shap_p95_below_storage_precision"
+    if positive_n < MIN_POSITIVE_SHAP_N:
+        return False, "fewer_than_20_expected_rows_above_positive_p95"
+    return True, "p95_resolvable_with_at_least_20_expected_upper_tail_rows"
 
 
 def clean_input(frame):
@@ -220,12 +232,14 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_
         signed = np.asarray([float(row[factor]) for row in train_grouped])
         positive_shap = signed[signed > 0]
         p95 = float(np.quantile(positive_shap, 0.95)) if len(positive_shap) else 0.0
+        threat_eligible, eligibility_reason = assess_threat_eligibility(p95, len(positive_shap))
         reference_p95[factor] = {
             "positive_shap_p95": p95,
             "positive_n": int((positive_shap > 0).sum()),
             "reference_n": len(train_grouped),
             "reference_year": 2022,
-            "threat_eligible_candidate": p95 > 0,
+            "threat_eligible": threat_eligible,
+            "threat_eligibility_reason": eligibility_reason,
         }
     global_scores = {item["factor_key"]: float(item["normalized_score"]) for item in global_importance(train_grouped)}
     paired_scores = {}

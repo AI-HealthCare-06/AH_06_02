@@ -15,7 +15,8 @@
 - 진단 질환의 전역 중요도 추천과 보너스 챌린지의 `user_challenges.source_prediction_id`는 **NULL**이다. 한 질환만 진단된 사용자의 다른 미진단 질환 개인기여도 추천은 해당 예측 ID를 저장한다. 존재하지 않는 prediction을 만들거나 0을 넣지 않는다.
 - 전역 중요도 원값은 factor별 `mean(|grouped SHAP|)`이며 화면용 비교 점수는 `importance / disease_global_max * 100`이다. 질환별 최대값은 `model_version`마다 고정한다.
 - 개인 위협도는 factor별 양의 기여만 사용한다: `positive_shap = max(signed_SHAP, 0)`, `threat_score = clip(positive_shap / P95_reference[disease, factor, model_version] * 100, 0, 100)`. P95와 전역 최대값은 버전 고정 artifact metadata에 둔다.
-- P95가 0이거나 1회전 분포에서 불안정한 factor는 `threat_eligible=false`로 두고 임의 floor를 넣지 않는다. 진단자 경로의 결합식은 `normalized_score × behavior_weight`로 정했다. factor별 behavior weight 값과 변환 기준은 동일 사용자의 contribution/global 점수 분포를 1회전에서 비교한 뒤 확정한다.
+- `threat_eligible`은 저장 단위보다 작은 P95와 표본이 빈약한 양의 SHAP 분포를 거른다. 현재 운영 기준은 `positive_shap_p95 >= 0.00001` 및 `positive_n >= 400`(양의 분포 상위 5%에 기대 관측치 20개 이상)이다. 수치는 임상 cutoff가 아니라 저장 정밀도·추정 가능성 기준이다. 선택 모델 1회전의 24개 질환×factor 조합은 모두 통과했다. 최종값은 [factor별 척도표](factor-scales.md)에 기록한다.
+- 진단자 경로의 결합식은 `normalized_score × behavior_weight`다. 2026-10-01 Slack에서 MVP 가중치를 `behavior_weight ∈ {0,1}`로 단순화하는 안에 A가 찬성했다. 사용자별 weight는 유효한 입력이 D가 승인한 행동 조건을 만족하고 적용 가능한 챌린지가 있을 때 1, 유효한 입력이 비대상이거나 적합한 챌린지가 없을 때 0이다. 결측·모름은 건강한 행동으로 간주하지 않으며 미평가로 두고 추천하지 않는다. 수치 행동 cutoff는 D의 조건표 검토가 남아 있어 아직 런타임 값으로 확정하지 않았다.
 - 질환별 경로는 독립 계산한다. 미진단 질환은 사용자 기여도 P95 점수, 진단 질환은 `normalized_score × behavior_weight`를 사용한다. 같은 factor에 두 질환 경로가 있으면 각 질환 점수를 따로 계산한 뒤 max를 선택하고, `impact_source`에는 승리한 경로(`contribution` 또는 `global`)를 기록한다. 두 경로 점수를 섞거나 평균 내지 않는다.
 - `factor_key=NULL`인 챌린지는 damage 0, XP·보상만 지급한다. 수면 챌린지는 MVP에서 보류한다.
 
@@ -86,11 +87,13 @@ B 제안 기본안은 확률 공간 SHAP이다. 고정된 train background와 ex
 1. factor의 개인 기여도에서 `positive_shap = max(signed_group_shap, 0)`을 계산한다. 음수 SHAP은 보호 방향 설명으로 남기되 위협도를 만들지 않는다. 정확히 0인 factor는 위협도 0 / `not_contributing`이며 보호 요인으로 설명하지 않는다.
 2. 질환 × factor × `model_version`별 2022 training reference 집단의 positive SHAP 분포에서 `P95_reference`를 계산해 artifact metadata에 저장한다.
 3. `threat_score = round(100 * clip(positive_shap / P95_reference, 0, 1))`로 0~100 변환한다. 개인별 최대값이나 다른 사용자의 최신값으로 나누지 않는다.
-4. P95가 0이면 `threat_eligible=false`로 표시하고 임의 floor를 만들지 않는다. 양수지만 너무 작은 기준을 제외할지는 1회전 분포를 본 뒤 정한다.
+4. `positive_shap_p95 < 0.00001`이면 `DECIMAL(8,5)` contribution 저장 정밀도보다 작으므로, 또는 양수 SHAP 표본이 400개 미만이면 P95 위쪽 기대 관측치가 20개 미만이므로 `threat_eligible=false`로 둔다. 어느 하나라도 해당하면 위협도는 0이며 임의 floor를 나누지 않는다. 그렇지 않으면 true다. 저장 단위·reference 정의가 바뀌면 기준도 다시 확인한다.
 
-Mapping v1의 `risk_condition`은 위험 방향을 설명한 문구이며 확정 숫자 임계값 표가 아니다. factor별 `behavior_weight`도 미정이다. 구현에서 확정값처럼 사용하지 않는다. 추천에서는 세 질문을 분리한다: (1) 입력이 행동 적용 조건에 해당하는가, (2) 미진단자의 개인 grouped SHAP이 증가 방향인가, (3) 해당 사용자에게 제공 가능한 챌린지가 있는가. 미진단 SHAP 경로는 세 조건을 모두 확인하고, 진단자 global 경로에는 개인 SHAP이 없으므로 지원 factor·행동 적용 조건·팀 합의 후의 `behavior_weight`로 처리한다. 숫자 임계값과 weight는 D의 조건 초안 및 추가 검토에서 정한다. 챌린지를 수행해도 위협도는 즉시 낮아지지 않는다. 수행은 공략 점수에 기록되고, 위협도는 건강정보 재저장·재평가 때 갱신된다.
+Mapping v1의 `risk_condition`은 위험 방향을 설명한 문구이며 확정 숫자 임계값 표가 아니다. MVP `behavior_weight` 척도는 0/1로 정리했지만, BMI·허리둘레·걷기·근력·좌식의 적용 cutoff와 알코올 사용 범위는 D가 초안·팀 검토를 마쳐야 한다. 미진단 추천은 (1) 입력이 승인된 행동 조건에 해당하고, (2) 개인 grouped SHAP이 증가 방향이며, (3) 실제 제공 가능한 챌린지가 있는 경우만 허용한다. 진단자 추천은 개인 SHAP 대신 지원 factor와 승인된 행동 조건으로 0/1 weight를 만든다. 결측·모름은 비대상과 구분해 평가 불가로 처리한다. 챌린지를 수행해도 위협도는 즉시 낮아지지 않는다. 수행은 공략 점수에 기록되고, 위협도는 건강정보 재저장·재평가 때 갱신된다.
 
-진단자 경로는 개인 SHAP이 아니라 전역 중요도와 최신 생활패턴을 사용한다. `normalized_score`는 질환별 전역 중요도 최댓값을 100으로 둔 요인 간 상대값이지 개인 유병 확률이 아니다. 진단자 factor 점수는 `normalized_score × behavior_weight`다. weight 범위는 0~1이며, factor별 입력척도·위험조건을 고려한 세부 변환 규칙은 1회전 뒤 동일 사용자에서 contribution 점수와 분포를 비교해 서윤·이경이 확정한다. `impact_source`가 바뀌는 두 산식의 변화량을 의료적 위험 감소로 해석하지 않는다. 모델·scale 버전이 바뀐 비교도 구분한다.
+소디 factor `sodium_behavior`는 `L_OUT_FQ` 범주를 그대로 모델 입력으로 쓰며, 외식 횟수를 나트륨 mg/g으로 바꾸지 않는다. HTN 2024 비교에서는 AP/AUROC/Brier가 base보다 조금 나아졌지만, 2023 validation은 AP가 낮았고 256명 direction audit에서 범주별 평균 signed SHAP 부호가 달랐다. 그러므로 이 값은 고혈압의 실험 후보로만 유지한다. 외식 빈도 감소 챌린지를 자동 추천할 단조 임계값이나 양의 `behavior_weight`는 이 결과만으로 만들지 않는다. 방향과 코드 범위를 D·팀과 합의하기 전에는 해당 추천 weight를 산출하지 않는다.
+
+진단자 경로는 개인 SHAP이 아니라 전역 중요도와 최신 생활패턴을 사용한다. `normalized_score`는 질환별 전역 중요도 최댓값을 100으로 둔 요인 간 상대값이지 개인 유병 확률이 아니다. 진단자 factor 점수는 `normalized_score × behavior_weight`다. MVP `behavior_weight`는 A가 찬성한 이진값이며 승인된 risk condition과 챌린지를 사용자 입력에 적용해 0/1로 정한다. D의 수치 조건이 승인되면 같은 사용자에서 조건 적용 후 점수 분포를 비교해 보정 필요성을 검토한다. `impact_source`가 바뀌는 두 산식의 변화량을 의료적 위험 감소로 해석하지 않는다. 모델·scale 버전이 바뀐 비교도 구분한다.
 
 재예측에서 요인이 사라져도 기존 `user_monsters` 행과 봉인 등 성취는 보존한다. 지원되는 factor의 유효한 재계산 결과가 0이면 해당 위협도를 0으로 갱신하되 입력 미확인·미지원 모델 때문에 근거가 없으면 0으로 바꾸지 않는다. 최초 비흡연자의 코티니를 자동 생성하지 않는다.
 
@@ -115,7 +118,7 @@ Mapping v1의 `risk_condition`은 위험 방향을 설명한 문구이며 확정
 
 validation에서 sitting 추가 시 평균 AP는 당뇨 +0.0024, 고혈압 +0.0021이었다. 2024 비교 평가 후 첫 모델에는 좌식을 당뇨에만 넣었다. 이는 팀의 factor 분리 결정과 외식 대리변수의 고혈압 한정 범위를 따른 실험 선택이며, 좌식시간 변화의 인과효과를 뜻하지 않는다.
 
-진단자 경로의 `normalized_score × behavior_weight`와 개인 위협도 P95 경로는 같은 validation 사용자로 비교했다. 좌식 요인에서 후보 weight 0.25/0.5/0.75/1.0일 때 global 경로가 개인점수 이상인 사용자 비율은 당뇨 약 66–71%/72–74%/77%/79–80%, 고혈압 약 62–66%/66–68%/68–70%/70–72%였다. 한 경로가 항상 우세하지는 않지만 대체로 global 쪽이 더 높았다. 이것만으로 임상·행동 가중치를 정할 수 없으므로 factor별 `behavior_weight`와 조건 임계값은 아직 확정하지 않는다.
+진단자 경로의 `normalized_score × candidate_weight`와 개인 위협도 P95 경로는 같은 validation 사용자로 비교했다. 당시 탐색 가중치 0.25/0.5/0.75/1.0 결과는 [실험 기록](experiment.md)에 있다. 이 비교는 A가 찬성한 binary MVP weight의 사용자 행동 cutoff를 결정하지 않는다. 고정 가중치 숫자를 배포값으로 쓰지 않는다. 남은 것은 D 조건표의 행동 cutoff 검토·팀 승인, 승인된 조건별로 같은 사용자 분포를 다시 집계하는 일이다.
 
 별도 `LS_VEG2` ablation의 vegetable global normalized score는 당뇨 21.17–24.41(rank 6), 고혈압 21.07–24.79(rank 8)였다. 2022 train reference의 positive SHAP P95는 모든 seed에서 양수였다. 다만 base 대비 validation 변화가 당뇨 AUROC −0.00018/AP +0.00239, 고혈압 AUROC −0.00115/AP −0.00729였고 Brier는 고혈압에서 +0.00009 악화됐다. 별도 factor 후보로 보존하되 공통 서비스 입력 필드와 성능을 추가 합의하기 전에는 final X에 포함하지 않는다. 수치는 배포 모델이 아닌 탐색 결과다.
 

@@ -57,9 +57,9 @@
 | 당뇨 · core+sitting | 4,418 | `sedentary_time_high` | 0.016026 (양수 1,415명) | 21.118 (6) | 0.774021 / 0.112496 / 0.037272 |
 | 고혈압 · core+sodium | 3,697 | `sodium_behavior` | 0.037642 (양수 1,004명) | 18.725 (8) | 0.726962 / 0.222261 / 0.092491 |
 
-전역 원점수는 해당 요인의 전체 2022 SHAP 평균 절댓값이며, score는 각 질환의 최고 전역 중요도를 100으로 둔 `importance / disease_max × 100`이다. 2024 지표는 feature 선택에 사용한 평가 자료이며 독립 성능 추정치가 아니다. 전체 P95·importance artifact와 개인 SHAP 행은 gitignore된 `data/experiment-2024-final-full/` 아래에만 저장한다. 두 선택 요인의 P95는 양수지만, `threat_eligible` 최종 정책·배포 version은 별도 합의와 artifact packaging이 남아 있다.
+전역 원점수는 해당 요인의 전체 2022 SHAP 평균 절댓값이며, score는 각 질환의 최고 전역 중요도를 100으로 둔 `importance / disease_max × 100`이다. 2024 지표는 feature 선택에 사용한 평가 자료이며 독립 성능 추정치가 아니다. 모델별 모든 factor의 원값·P95·양수 표본 수·`threat_eligible` 판정은 [factor별 척도표](factor-scales.md)에 기록했다. 저장 정밀도와 상위 꼬리 표본 기준을 적용한 결과 선택 모델의 24개 조합은 모두 true다. 개인 SHAP 행은 gitignore된 `data/experiment-2024-final-full/` 아래에만 저장한다.
 
-같은 2023 validation 표본 256명에서 risk condition을 아직 적용하지 않고 비교하면 global×weight가 개인 위협도 이상인 비율은 좌식에서 weight 0.25/0.5/0.75/1.0일 때 71.9%/76.6%/79.7%/83.6%, sodium 대리요인에서는 85.9%/89.8%/92.2%/92.6%였다. 이는 진단자 행동 조건으로 필터링하기 전의 비교이며, 임의로 작은 weight를 확정해 해결할 근거가 되지 않는다. 실제 위험 행동 조건을 반영한 동일 사용자 분포를 D와 함께 계산한 후 weight를 확정해야 한다.
+같은 2023 validation 표본 256명에서 risk condition을 적용하기 전에 탐색 가중치 0.25/0.5/0.75/1.0과 개인 위협도를 비교했다. global 경로가 개인 점수 이상인 비율은 좌식 71.9%/76.6%/79.7%/83.6%, sodium 대리요인 85.9%/89.8%/92.2%/92.6%였다. 이 가중치는 비교 실험치이며 팀에서 합의한 binary MVP 값을 대체하지 않는다. D의 실제 행동 조건이 승인되면 그 조건으로 동일 사용자 분포를 다시 집계한다.
 
 ## 좌식 factor 및 척도 확인
 
@@ -84,8 +84,8 @@
 ## 입력·소디 권고
 
 - 공통 core X는 12개다. 첫 질환별 설정은 당뇨 core+sitting, 고혈압 core+sodium이다. 좌식 `BE8_1×60+BE8_2`는 별도 `sedentary_time_high` factor이며 걷기와 합치지 않는다.
-- `sodium_behavior`는 `L_OUT_FQ` 외식 빈도 대리변수로만 채택했다. 실제 나트륨 섭취량·mg으로 부르거나 `LS_VEG2`와 합산하지 않는다. 모델 적용은 고혈압에 한정하며, 챌린지의 행동 임계값과 `behavior_weight`는 D와 팀 합의 전까지 확정하지 않는다.
-- 추천 단계에서는 `risk_condition` 충족 여부·미진단자의 양의 개인 SHAP·실제 챌린지 제공 가능 여부를 각각 확인한다. 진단자는 개인 SHAP이 없으므로 지원 factor 및 합의된 행동 조건·`behavior_weight`로 처리한다. Mapping v1에는 숫자 임계값이나 확정 `behavior_weight`가 없으므로 임의로 채우지 않는다.
+- `sodium_behavior`는 `L_OUT_FQ` 외식 빈도 대리변수로만 입력한다. 실제 나트륨 섭취량·mg으로 부르거나 `LS_VEG2`와 합산하지 않는다. 2024 성능 비교상 고혈압 입력 후보로 남겼지만 validation 성능은 엇갈리고 범주별 SHAP 방향도 달라 자동 소디 챌린지 weight는 보류한다. 상세 수치와 판단은 [factor별 척도표](factor-scales.md)에 있다.
+- 추천 단계에서는 `risk_condition` 충족 여부·미진단자의 양의 개인 SHAP·실제 챌린지 제공 가능 여부를 각각 확인한다. 진단자는 개인 SHAP이 없으므로 지원 factor와 승인된 행동 조건으로 A가 찬성한 binary `behavior_weight`(1=대상, 0=비대상)를 사용한다. D의 숫자 임계값은 아직 승인 전이며 결측·모름은 정상 행동 또는 자동 0으로 간주하지 않는다.
 - 화면의 최근 4주 음주·외식 질문과 KNHANES 최근 1년 평균 문항은 관찰 기간이 다르다. 비슷한 빈도 범주 매핑도 근사임을 표시하고, 화면 문구와 수집 기간은 C와 합의해 고정한다.
 
 ## 재실행

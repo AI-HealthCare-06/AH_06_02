@@ -99,7 +99,7 @@ SHAP 값을 두 가지로 나눠 씁니다. 섞지 마세요.
 `threat_score = min(100, positive_shap / positive_shap_p95 × 100)`
 
 - `positive_shap_p95`는 해당 `model_version`의 reference population에서 뽑은 질환 × factor별 positive SHAP 분포의 P95입니다. 질환별 max가 아닙니다. 전역 max는 요인 간 상대 중요도라서 개인 스케일 기준으로 쓰면 의미가 달라집니다.
-- P95가 0이거나 지나치게 작은 factor는 `threat_eligible = false`로 표시하고 위협도 0으로 처리합니다. 임의의 하한값을 넣어 나누지 않습니다. 근거 없이 위협도가 부풀기 때문입니다. 기준 숫자는 모델 1회전 분포를 보고 고정합니다.
+- 현재 SHAP contribution 저장 정밀도는 `DECIMAL(8,5)`입니다. model metadata에서는 `positive_shap_p95 < 0.00001`이면 저장 정밀도보다 작으므로 `threat_eligible = false`로 처리합니다. 또한 양수 SHAP 표본이 400개 미만이면 P95 상위 5%를 뒷받침하는 기대 관측치가 20개 미만이므로 false로 처리합니다. 두 기준을 모두 통과한 factor만 true입니다. 이 기준은 추정 가능성과 저장 정밀도를 위한 운영 기준이며 임상적 의미는 없습니다. contribution 형식이나 P95 산출 표본이 바뀌면 다시 검토합니다.
 - 스파이크처럼 `monsters.default_impact_source`가 `measured`인 캐릭터는 이 계산 밖입니다. 실측 혈당으로 따로 산출합니다.
 
 **direction**

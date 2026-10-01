@@ -10,14 +10,14 @@
 | 당뇨·고혈압 모델 | validation 후보 30회 완료. base/sodium/sitting/sodium_sitting 4 variants × 2 diseases × 3 seeds = 24회는 2024 비교 평가도 실행; 당뇨 core+sitting·고혈압 core+sodium 선택 |
 | Label 누수 | 질환별 미진단·미복약 대상을 분리; valid y 코드만 사용; 혈압·혈당·진단·약물 원변수는 X에서 제외 |
 | SHAP | probability-space, factor별 signed grouping, 가산성 오차 <= 0.01; global mean absolute grouped SHAP 및 질환별 max=100 score 산출 |
-| 위협도·진단자 비교 | 초기 256명 탐색치로 validation 사용자 256명에서 `global × weight` 후보와 personal threat를 비교. 선택 모델 seed 42의 P95·global importance는 전체 eligible 2022 training reference로 재계산; 실험용이지 배포 승인 아님 |
+| 위협도·진단자 비교 | validation 사용자 256명에서 후보식을 비교. 선택 모델 seed 42의 P95·global importance는 전체 eligible 2022 training reference로 재계산; 정밀도 1e-5 및 P95 상위 꼬리 기대 n≥20 기준으로 24개 조합 모두 `threat_eligible=true` |
 | 좌식 독립성 | sitting 변형 세 seed 모두 좌식 양수 grouped SHAP 및 양수 train P95 관찰; 각 질환 성능 비교 완료; 결과는 연관 설명이지 인과 아님 |
 | 채소 후보 | LS_VEG2 1~9와 99 결측을 세 연도 값 영역과 대조하고 canonical 변환 단위 테스트 및 6회 validation ablation 완료. 제품 서비스 입력 없음, 최종 X 미선정 |
 | API 계약 | 지정 API 명세서 B 탭의 3 endpoints 및 조회·폴링 응답을 문서와 대조 |
 | ERD 쓰기/NULL 계약 | Slack 제공 테이블 명세 v2-1에서 여섯 설명 필드 및 `source_prediction_id` 질환별 NULL 의미를 확인하고 로컬 수정 사본 생성 |
 | 데이터 비공개 | `.gitignore`에서 `data/` 제외; `git status` 및 staged file 목록에서 원자료·개인별 output이 없는지 확인 후 commit |
 
-실제 모델 지표와 요인별 결과는 `experiment.md`에 요약한다. 2024 평가를 feature selection에 썼으므로 그 선택 뒤 독립 일반화 성능으로 해석하지 않는다. API 서버 통합·배포 검증은 완료하지 않았다. 개인 단위 SHAP와 모델 파일은 `data/` 밖으로 공유하지 않는다.
+실제 모델 지표는 `experiment.md`, 질환×factor별 원 `mean(|SHAP|)`·P95·`threat_eligible` 값은 `factor-scales.md`에 기록한다. 2024 평가를 feature selection에 썼으므로 그 선택 뒤 독립 일반화 성능으로 해석하지 않는다. API 서버 통합·배포 검증은 완료하지 않았다. 개인 단위 SHAP와 모델 파일은 `data/` 밖으로 공유하지 않는다.
 
 기본 확인 명령:
 
