@@ -69,6 +69,7 @@ CATEGORICAL = [
     "family_history_dm",
     "family_history_htn",
     "dining_out_freq",
+    "vegetable_frequency",
 ]
 # KNHANES IX guide and all three raw annual label domains verified.
 LABELS = {"diabetes": ("HE_DM_HbA1c", [1, 2, 3], 3), "hypertension": ("HE_HP", [1, 2, 3, 4], 4)}
@@ -97,8 +98,7 @@ def clean_input(frame):
     for key in ["smoking_current", "family_history_dm", "family_history_htn"]:
         if not set(frame[key].dropna()) <= {0, 1}:
             raise ValueError(f"Unmapped binary code: {key}")
-    if "dining_out_freq" in frame and not frame.dining_out_freq.dropna().isin(range(1, 8)).all():
-        raise ValueError("Unmapped dining_out_freq code")
+    validate_candidate_categories(frame)
     # Category codes must already have been checked against official annual codebooks.
     return frame.copy()
 
@@ -123,6 +123,15 @@ def pipeline(features, seed):
     )
     forest = RandomForestClassifier(n_estimators=200, min_samples_leaf=10, max_depth=10, random_state=seed, n_jobs=-1)
     return Pipeline([("transform", transform), ("forest", forest)])
+
+
+def validate_candidate_categories(frame):
+    for key, allowed in {
+        "dining_out_freq": range(1, 8),
+        "vegetable_frequency": range(1, 10),
+    }.items():
+        if key in frame and not frame[key].dropna().isin(allowed).all():
+            raise ValueError(f"Unmapped {key} code")
 
 
 def metrics(labels, probability, threshold=None):

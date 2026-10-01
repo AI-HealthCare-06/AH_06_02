@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pyreadstat
 
-VERSION = "knhanes-ix-v1"
+VERSION = "knhanes-ix-v2"
 RAW_COLUMNS = [
     "ID",
     "year",
@@ -36,6 +36,7 @@ RAW_COLUMNS = [
     "HE_DM_HbA1c",
     "HE_HP",
     "L_OUT_FQ",
+    "LS_VEG2",
     "DE1_dg",
     "DI1_dg",
     "DE1_31",
@@ -90,6 +91,8 @@ def canonicalize(raw):
     out["strength_days"] = category(frame.BE5_1, range(1, 7), [8, 9]) - 1
     out["sitting_minutes"] = minutes(frame.BE8_1, frame.BE8_2)
     out["dining_out_freq"] = category(frame.L_OUT_FQ, range(1, 8), [9])
+    # Exclude kimchi/pickles to keep this candidate distinct from sodium_behavior.
+    out["vegetable_frequency"] = category(frame.LS_VEG2, range(1, 10), [99])
     out["family_history_dm"] = family_history(frame, "HE_DMfh")
     out["family_history_htn"] = family_history(frame, "HE_HPfh")
     out["HE_DM_HbA1c"] = category(frame.HE_DM_HbA1c, [1, 2, 3], [])

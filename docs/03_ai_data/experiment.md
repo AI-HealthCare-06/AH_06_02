@@ -1,4 +1,4 @@
-# KNHANES core·외식·좌식 첫 탐색 실험
+# KNHANES core·외식·좌식·채소 첫 탐색 실험
 
 상태: 2026-10-01. 목적은 당뇨·고혈압 baseline을 한 번 학습하고 `sedentary_time_high`가 `physical_activity_low`와 별도 설명 신호를 보이는지 확인하는 것이다. 성능 최적화·임상 판단·배포 인증 실험은 아니다.
 
@@ -12,6 +12,7 @@
 | sodium | base + `dining_out_freq` (`sodium_behavior`) |
 | sitting | base + `sitting_minutes` (`sedentary_time_high`) |
 | sodium_sitting | base + 두 후보 |
+| vegetable | base + `vegetable_frequency` (`vegetable_intake_low`, LS_VEG2) |
 
 개인 위협도 P95와 전역 중요도를 2022 train SHAP sample에서 계산했다. 개인 기여도와 `global normalized_score × candidate behavior_weight`는 같은 2023 validation 사용자 SHAP sample에서 비교했다. 계산은 사용자/질환별 설명 실험용이며 256명 reference는 최종 artifact용 calibration 크기로 승인된 것이 아니다.
 
@@ -27,6 +28,8 @@
 | 고혈압 | sodium | 0.71487 | 0.18402 | 0.07964 |
 | 고혈압 | sitting | 0.71789 | 0.18931 | 0.07951 |
 | 고혈압 | sodium_sitting | 0.71652 | 0.18627 | 0.07956 |
+| 당뇨 | vegetable | 0.73144 | 0.10403 | 0.03750 |
+| 고혈압 | vegetable | 0.71692 | 0.17994 | 0.07966 |
 
 각 행은 seed 42·43·44의 평균이다. 각 변형은 당뇨 validation n=4,838·양성 194, 고혈압 n=4,143·양성 381로 평가됐다. 보고서 `data/experiment-final/report.json`은 `.gitignore` 아래 로컬에만 둔다. 개인 단위 특징·행 SHAP을 Git이나 Slack에 올리지 않는다.
 
@@ -44,11 +47,23 @@
 
 2024 holdout test는 미평가다. validation 결과는 변형·seed를 고르는 탐색 지표다. 2022 training SHAP reference 256명의 95분위수는 전체 training 분포의 안정된 배포 calibration이 아니다. 최종 모델·feature를 승인한 뒤 충분한 2022 train reference에서 P95·global importance를 다시 계산해 artifact version에 고정한다. y threshold, 등급, 의료적 위험 해석도 이 결과만으로 정하지 않는다.
 
-채소 feature는 서비스의 공통 입력 필드·기간이 확정되지 않아 이번 ablation에서 제외했다. 외식 빈도는 나트륨 섭취량의 대리변수일 뿐이며, 당뇨·고혈압 모델 점수 개선만으로 나트륨 요인을 임상 지표로 해석하지 않는다.
+## 채소 후보 추가 1회전
+
+최신 팀 의견에 따라 `LS_VEG2`(김치·장아찌 제외)로 `vegetable_frequency`를 만들고 1~9 범주를 one-hot 처리했다. 99는 결측이며 훈련 데이터에서만 최빈값 대치했다. 2022 train·2023 validation, 2024 holdout 미평가, 같은 seed 42·43·44로 질환별 세 번씩 추가 학습했다. `data/experiment-vegetable/report.json`과 개인 단위 SHAP은 ignored `data/` 아래에만 있다.
+
+세 seed 전체 평균 변화는 당뇨 AUROC −0.00018·AP +0.00239·Brier −0.00002, 고혈압 AUROC −0.00115·AP −0.00729·Brier +0.00009다. `vegetable_intake_low`는 모든 seed의 train reference에서 양의 SHAP/P95가 있었지만 고혈압 지표가 전반적으로 나빠졌고 제품 입력 필드도 없다. 따라서 별도 요인 후보로 기록하되 final service X에는 아직 넣지 않는다. 채택하려면 C가 채소 빈도 입력·기간·DB/API 필드를 추가하고 같은 검증 설계로 feature 선택을 다시 해야 한다.
+
+## 입력·소디 권고
+
+- 기본 X는 core 12개다. 좌식 `BE8_1×60+BE8_2`는 `sedentary_time_high` 후보, 외식 `L_OUT_FQ`는 `sodium_behavior` 대리 지표 후보, 채소 `LS_VEG2`는 별도 `vegetable_intake_low` 후보로 분리한다.
+- 소디는 `L_OUT_FQ`만 대리변수로 유지한다. 이를 실제 나트륨 섭취량·mg으로 부르거나 `LS_VEG2`와 합산하지 않는다. sodium 1회전의 당뇨 지표는 개선됐지만 고혈압 AUROC·AP는 낮아져 전 질환 final X 채택 근거로는 혼합이다. 따라서 계산 계약은 `sodium_behavior`로 한정하고, 생산용 위협도·챌린지 적용은 D와 조건 합의 및 추가 비교 전까지 후보로 둔다.
+- 추천 단계에서는 `risk_condition` 충족 여부·미진단자의 양의 개인 SHAP·실제 챌린지 제공 가능 여부를 각각 확인한다. 진단자는 개인 SHAP이 없으므로 지원 factor 및 합의된 행동 조건·`behavior_weight`로 처리한다. Mapping v1에는 숫자 임계값이나 확정 `behavior_weight`가 없으므로 임의로 채우지 않는다.
+- 화면의 최근 4주 음주·외식 질문과 KNHANES 최근 1년 평균 문항은 관찰 기간이 다르다. 비슷한 빈도 범주 매핑도 근사임을 표시하고, 화면 문구와 수집 기간은 C와 합의해 고정한다.
 
 ## 재실행
 
 ```bash
 ../model-venv/bin/python scripts/model/preprocess_knhanes.py
 ../model-venv/bin/python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-final --seeds 42 43 44 --variants base sodium sitting sodium_sitting
+../model-venv/bin/python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-vegetable --seeds 42 43 44 --variants vegetable
 ```

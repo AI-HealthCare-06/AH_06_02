@@ -19,7 +19,9 @@
 | family_history_dm | 0/1 | `HE_DMfh1~3` | `family_history_dm` |
 | family_history_htn | 0/1 | `HE_HPfh1~3` | `family_history_htn` |
 
-첫 비교 실험은 위 12개에 `sitting_minutes`를 별도 입력으로 더한 경우와 뺀 경우를 비교했다. `sitting_minutes`는 하루 좌식 시간(분, 0~1440)이며 SHAP은 `sedentary_time_high`에 따로 합산한다. 걷기 SHAP과 합치지 않는다. 이 이름만으로 고정 고위험 분기값을 뜻하지 않으며 임계값은 별도 확정이 필요하다.
+기본 X는 위 12개다. 추가 ablation 후보는 좌식 `BE8_1×60+BE8_2` → `sedentary_time_high`, 외식 `L_OUT_FQ` 1~7 범주 → `sodium_behavior` 대리 지표, 채소 `LS_VEG2` 1~9 범주(김치·장아찌 제외) → 별도 `vegetable_intake_low`다. 외식 범주는 나트륨 양이 아니며, 채소 빈도는 현재 서비스 공통 입력 필드가 없다. 최근 실험에서 좌식은 독립 SHAP 요인으로 유지했고, 소디·채소는 질환별 성능이 엇갈려 최종 서비스 X 포함을 확정하지 않았다. 좌식 SHAP은 걷기와 합치지 않는다.
+
+Mapping v1의 `risk_condition`은 설명 문구이며 숫자 임계값은 미정이다. 행동 조건 충족, 미진단자의 양의 개인 SHAP, 제공 가능한 챌린지 여부를 따로 판정한다. factor별 `behavior_weight`와 적용 임계값을 확정값처럼 사용하지 않는다.
 
 혈압, 공복혈당, HbA1c, 진단력 및 해당 질환 약물은 X에서 제외한다. 당뇨와 고혈압 y를 정하는 검사·진단 구성요소가 X에도 들어가면 정답 누수가 발생하고, 사용자가 검진 결과를 입력하지 않는 간편 입력 흐름과도 맞지 않기 때문이다.
 
