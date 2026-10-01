@@ -6,7 +6,7 @@
 
 ## 1. 최신 팀 결정 반영
 
-- `sedentary_time_high`는 독립 factor로 확정됐고 비세라에 연결한다. `physical_activity_low`에 좌식 SHAP을 다시 더하지 않는다. `sitting_minutes`의 실제 모델 채택은 1회전 검증 후 확정한다.
+- `sedentary_time_high`는 독립 factor로 확정됐고 비세라에 연결한다. `physical_activity_low`에 좌식 SHAP을 다시 더하지 않는다. 2024 비교 평가를 거쳐 첫 실험 설정은 당뇨에 `sitting_minutes`, 고혈압에 `dining_out_freq`를 각각 추가한다. sodium 대리변수는 팀 범위에 맞춰 고혈압에만 둔다.
 - 사용자 용어는 **HP → 위협도**, **주간 데미지 → 공략 점수**다. 이에 대응하는 DB·함수는 `user_monsters.impact_score`, `weekly_progress`, `impact_source`, `monsters.default_impact_source`, `challenges.progress_value`, `refresh_impact_from_prediction()` 및 `refresh_impact_from_health_record()`다.
 - 미진단자의 위협도 근거는 `contribution`, 실측 혈당 스파이크는 `measured`, 진단 질환의 전역 중요도·생활패턴 경로는 `global`이며 `user_monsters.impact_source`에 저장한다.
 - B는 예측과 기여도 저장을 커밋한 뒤 D의 `refresh_impact_from_prediction(user_id, prediction_id)`를 호출한다. B가 `user_monsters`를 직접 수정하지 않는다.
@@ -36,7 +36,7 @@
 
 ## 3. X 입력 목록
 
-아래 표의 첫 12개 열이 기본 core 입력이다. 외식 빈도(소디), 좌식시간, 채소 빈도는 별도 후보 ablation이다. 좌식 factor는 걷기와 독립으로 확정됐다. 최신 팀 의견에 따라 채소 후보는 `LS_VEG2`(김치·장아찌 제외)로 평가한다. 원시 코드와 변환은 `input-code-map.md` 및 `data.md`에 정리했다.
+아래 표의 첫 12개 열이 공통 core 입력이다. 2024 비교 평가 뒤 첫 실험 설정은 당뇨에 좌식시간, 고혈압에 외식 빈도 대리변수를 각각 추가했다. 좌식 factor는 걷기와 독립으로 확정됐다. 최신 팀 의견에 따라 채소 후보는 `LS_VEG2`(김치·장아찌 제외)로 별도 평가했고 첫 모델에서는 제외했다. 원시 코드와 변환은 `input-code-map.md` 및 `data.md`에 정리했다.
 
 | 서비스 feature | 원시 연결 | 단위·형식 | factor_key | 채택 상태 |
 |---|---|---|---|---|
@@ -52,13 +52,13 @@
 | strength_days | BE5_1 | 코드 1~6에서 1을 뺀 0~5; 5는 5일 이상 하한 | strength_activity_low | 기본 |
 | family_history_dm | HE_DMfh1~3 | 가족 중 하나라도 예=1, 전부 아니오/외동=0, 그 외 결측 | family_history_dm | 기본 |
 | family_history_htn | HE_HPfh1~3 | 가족 중 하나라도 예=1, 전부 아니오/외동=0, 그 외 결측 | family_history_htn | 기본 |
-| dining_out_freq | L_OUT_FQ | 코드 1~7 순서 범주; 9 결측 | sodium_behavior | 소디 후보·1회전 안정성 검증 |
-| sitting_minutes | BE8_1·BE8_2 | 시간×60+분, 하루 0~1440분 | sedentary_time_high | 독립 factor·feature는 validation 안정성 보고 결정 |
-| vegetable_frequency | LS_VEG2 | 1~9 범주형; 1=하루 3회 이상, 9=월 1회 미만; 99 결측 | vegetable_intake_low | 독립 후보·1회전 추가 ablation; 서비스 공통 입력 없음 |
+| dining_out_freq | L_OUT_FQ | 코드 1~7 순서 범주; 9 결측 | sodium_behavior | 고혈압 첫 모델에 포함; 외식 빈도 대리 지표 |
+| sitting_minutes | BE8_1·BE8_2 | 시간×60+분, 하루 0~1440분 | sedentary_time_high | 당뇨 첫 모델에 포함; 독립 factor |
+| vegetable_frequency | LS_VEG2 | 1~9 범주형; 1=하루 3회 이상, 9=월 1회 미만; 99 결측 | vegetable_intake_low | 비교 후보만 평가; 첫 모델에서는 제외 |
 
-키·체중은 서비스 입력과 BMI 계산에 필요하지만 기본 모델에서는 BMI와 중복 입력하지 않는다(B 모델 설계안). 나이·성별·가족력은 설명용이며 챌린지와 위협도 대상이 아니다. `vegetable_intake_low`는 `LS_VEG2`를 쓰는 별도 연구 후보이며, 외식 빈도와 합쳐 소디를 산출하지 않는다. 1회전 validation 결과와 C의 입력 필드 합의 전에는 최종 서비스 X에 포함하지 않는다. `N_NA`, `HE_UNa`, 수면 변수는 입력에서 제외한다.
+키·체중은 서비스 입력과 BMI 계산에 필요하지만 BMI와 중복 입력하지 않는다(B 모델 설계안). 나이·성별·가족력은 설명용이며 챌린지와 위협도 대상이 아니다. 질환별 첫 모델은 당뇨 core 12개+좌식, 고혈압 core 12개+외식 빈도 대리변수를 사용한다. `vegetable_intake_low`는 비교 후보로만 남기며, 외식 빈도와 합쳐 소디를 산출하지 않는다. `N_NA`, `HE_UNa`, 수면 변수는 입력에서 제외한다.
 
-실제 모델의 기본 12개 feature에는 혈압·혈당·당화혈색소·진단·약물 변수를 포함하지 않는다. 후보 ablation은 `dining_out_freq`, `sitting_minutes`, `vegetable_frequency`다. 정확한 특수코드와 단위 변환은 [전처리 기록](data.md)에 정리했다.
+기본 core 12개 및 선택된 추가 feature 어디에도 혈압·혈당·당화혈색소·진단·약물 변수를 포함하지 않는다. 정확한 특수코드와 단위 변환은 [전처리 기록](data.md)에 정리했다.
 
 ## 4. 혈압·혈당 제외 이유
 
@@ -81,7 +81,7 @@ B 제안 기본안은 확률 공간 SHAP이다. 고정된 train background와 ex
 
 ## 6. 위협도 정규화와 미확정 산식
 
-미진단자 factor별 위협도는 아래 기준으로 계산한다. reference 집단은 질환별 미진단·미복약 2022 training 표본으로 두고, 집단·모델 버전을 함께 artifact에 고정한다. 2023 validation은 같은 사용자 점수 비교와 변수 선택에 쓰며 calibration 기준값에는 쓰지 않는다. 2024 final test는 보정값 선택에 쓰지 않는다.
+미진단자 factor별 위협도는 아래 기준으로 계산한다. reference 집단은 선택된 질환별 모델의 2022 training 전체 eligible 표본이며, 집단·모델 버전을 함께 artifact에 고정한다. 2023 validation은 후보 비교에 쓰고 calibration 기준값에는 쓰지 않는다. 2024 비교 평가는 소디 채택 여부와 질환별 입력 변형을 정하는 데 사용했으므로, 그 feature 선택 후 2024는 독립 최종 일반화 평가로 간주할 수 없다. P95 산출에는 2024 자료를 쓰지 않는다.
 
 1. factor의 개인 기여도에서 `positive_shap = max(signed_group_shap, 0)`을 계산한다. 음수 SHAP은 보호 방향 설명으로 남기되 위협도를 만들지 않는다. 정확히 0인 factor는 위협도 0 / `not_contributing`이며 보호 요인으로 설명하지 않는다.
 2. 질환 × factor × `model_version`별 2022 training reference 집단의 positive SHAP 분포에서 `P95_reference`를 계산해 artifact metadata에 저장한다.
@@ -111,9 +111,9 @@ Mapping v1의 `risk_condition`은 위험 방향을 설명한 문구이며 확정
 
 ## 8. 검증과 남은 결정
 
-기본·소디·좌식 실험은 당뇨·고혈압 각 4개 입력 변형(base, sodium, sitting, sodium_sitting)과 seed 42·43·44, 총 24회로 수행했다. 최신 Slack 의견에 따라 채소 후보(base+vegetable)도 같은 seed와 연도 분할로 6회 추가해 총 30회다. 추가 run은 `data/experiment-vegetable`에 기록한다. 질환별 미진단·미복약 표본으로 별도 모델을 학습했고 연도 분할은 2022 train, 2023 validation, 2024 holdout test다. 2022 training에서 seed 고정 256명 SHAP reference로 전역 중요도와 양수 grouped-SHAP P95를 계산하고, 같은 validation 사용자 256명에서 개인 기여도와 전역×후보 가중치 점수를 비교했다. 이 작은 reference 표본은 척도·요인 분리의 탐색용이며 최종 배포 calibration은 아니다. 2024 test는 미평가 상태로 보존했다.
+기본·소디·좌식 validation 비교는 당뇨·고혈압 각 4개 입력 변형(base, sodium, sitting, sodium_sitting)과 seed 42·43·44, 총 24회로 수행했다. 채소 후보는 6회 추가해 총 30회 validation 탐색이다. 이어 네 변형 24개 run의 2024 평가를 수행해 당뇨는 core+sitting, 고혈압은 core+sodium을 첫 실험 입력으로 선택했다. 전체 결과와 trade-off, 2024 선택 사용 한계는 `experiment.md`에 기록한다. 선택된 모델은 seed 42로 다시 학습하고 각 질환의 전체 eligible 2022 training 표본을 SHAP calibration reference로 사용해 P95와 전역 중요도를 재계산했다. 이 산출물은 로컬 `data/`에만 있고 실험용이며 배포 승인을 의미하지 않는다.
 
-`sedentary_time_high`는 세 seed 모두 양수 기여 사례와 양수 training P95가 있었고, 당뇨에서 global normalized score 18.4–20.7(순위 5–6), 고혈압에서 8.1–8.9(순위 8–10)이었다. feature 추가 시 평균 validation AUROC 변화는 당뇨 +0.0009, 고혈압 −0.0002, AP는 각각 +0.0024, +0.0021이었다. 이는 좌식시간이 걷기·근력 factor와 별도 설명 신호를 가질 수 있다는 탐색 근거이며, 인과효과나 최종 feature 채택을 뜻하지 않는다.
+validation에서 sitting 추가 시 평균 AP는 당뇨 +0.0024, 고혈압 +0.0021이었다. 2024 비교 평가 후 첫 모델에는 좌식을 당뇨에만 넣었다. 이는 팀의 factor 분리 결정과 외식 대리변수의 고혈압 한정 범위를 따른 실험 선택이며, 좌식시간 변화의 인과효과를 뜻하지 않는다.
 
 진단자 경로의 `normalized_score × behavior_weight`와 개인 위협도 P95 경로는 같은 validation 사용자로 비교했다. 좌식 요인에서 후보 weight 0.25/0.5/0.75/1.0일 때 global 경로가 개인점수 이상인 사용자 비율은 당뇨 약 66–71%/72–74%/77%/79–80%, 고혈압 약 62–66%/66–68%/68–70%/70–72%였다. 한 경로가 항상 우세하지는 않지만 대체로 global 쪽이 더 높았다. 이것만으로 임상·행동 가중치를 정할 수 없으므로 factor별 `behavior_weight`와 조건 임계값은 아직 확정하지 않는다.
 

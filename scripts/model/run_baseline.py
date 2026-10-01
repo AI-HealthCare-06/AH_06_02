@@ -188,7 +188,7 @@ def enumerate_row(row):
     return [(str(index), float(value)) for index, value in enumerate(row)]
 
 
-def run_one(frame, features, disease, seed, final_test, artifact_dir):
+def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_size=256):
     label_key, valid_codes, positive_code = LABELS[disease]
     valid = frame[frame[label_key].isin(valid_codes)].copy()
     eligible = valid[valid[f"eligible_{disease}"]].copy()
@@ -203,8 +203,12 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir):
     result = metrics(
         validation[label_key].eq(positive_code).to_numpy(), model.predict_proba(validation[features])[:, 1]
     )
-    # Fixed sample for a quick first pass; report size and do not call this full-data calibration.
-    train_reference = train[features].sample(min(256, len(train)), random_state=42)
+    # Use a bounded sample for a quick pass, or the complete 2022 training set for final scale references.
+    train_reference = (
+        train[features]
+        if reference_size == 0
+        else train[features].sample(min(reference_size, len(train)), random_state=42)
+    )
     validation_reference = validation[features].sample(min(256, len(validation)), random_state=42)
     train_grouped, base, train_additivity_error = explain(model, train[features], train_reference, features, seed)
     validation_grouped, _, validation_additivity_error = explain(
@@ -321,7 +325,16 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
     parser.add_argument("--variants", nargs="+", choices=VARIANT_CHOICES)
     parser.add_argument("--final-variant", choices=VARIANT_CHOICES)
+    parser.add_argument("--diseases", nargs="+", choices=LABELS, default=list(LABELS))
+    parser.add_argument(
+        "--reference-size",
+        type=int,
+        default=256,
+        help="2022 train rows for SHAP scale calculation; 0 uses all eligible 2022 train rows",
+    )
     args = parser.parse_args()
+    if args.reference_size < 0:
+        parser.error("--reference-size must be 0 (all rows) or a positive integer")
     frame = clean_input(pd.read_csv(args.data))
     variant_candidates = {
         "base": (),
@@ -354,13 +367,21 @@ def main():
         "packages": {name: importlib.metadata.version(name) for name in ["numpy", "pandas", "scikit-learn", "shap"]},
         "split": {"train": 2022, "validation": 2023, "test": 2024},
         "test_evaluated": bool(args.final_variant),
+        "diseases": args.diseases,
+        "reference_size_requested": args.reference_size,
         "runs": [],
     }
     for variant, features in variants.items():
-        for disease in LABELS:
+        for disease in args.diseases:
             for seed in args.seeds:
                 result = run_one(
-                    frame, features, disease, seed, bool(args.final_variant), args.out / f"{variant}-{disease}-{seed}"
+                    frame,
+                    features,
+                    disease,
+                    seed,
+                    bool(args.final_variant),
+                    args.out / f"{variant}-{disease}-{seed}",
+                    args.reference_size,
                 )
                 report["runs"].append(
                     {"variant": variant, "disease": disease, "seed": seed, "features": features, **result}
