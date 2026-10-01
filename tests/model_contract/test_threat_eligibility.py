@@ -1,6 +1,6 @@
 import unittest
 
-from scripts.model.run_baseline import assess_threat_eligibility
+from ai_worker.model_contract import assess_threat_eligibility
 
 
 class ThreatEligibilityTest(unittest.TestCase):

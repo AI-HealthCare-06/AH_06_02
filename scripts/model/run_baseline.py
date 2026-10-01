@@ -8,7 +8,6 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
-import math
 import sys
 from pathlib import Path
 
@@ -28,6 +27,7 @@ from ai_worker.model_contract import (  # noqa: E402
     FACTOR_DICTIONARY_VERSION,
     FEATURE_FACTOR,
     IMMUTABLE_FACTORS,
+    assess_threat_eligibility,
     global_importance,
     group_shap,
 )
@@ -74,17 +74,6 @@ CATEGORICAL = [
 ]
 # KNHANES IX guide and all three raw annual label domains verified.
 LABELS = {"diabetes": ("HE_DM_HbA1c", [1, 2, 3], 3), "hypertension": ("HE_HP", [1, 2, 3, 4], 4)}
-P95_MIN_STORED_CONTRIBUTION = 1e-5  # DECIMAL(8,5): one persistable contribution unit.
-MIN_POSITIVE_SHAP_N = 400  # At least 20 positive observations are expected above the empirical P95.
-
-
-def assess_threat_eligibility(p95, positive_n):
-    """Reject unresolvable P95 scales and scales with too little upper-tail support."""
-    if not math.isfinite(p95) or p95 < P95_MIN_STORED_CONTRIBUTION:
-        return False, "positive_shap_p95_below_storage_precision"
-    if positive_n < MIN_POSITIVE_SHAP_N:
-        return False, "fewer_than_20_expected_rows_above_positive_p95"
-    return True, "p95_resolvable_with_at_least_20_expected_upper_tail_rows"
 
 
 def clean_input(frame):

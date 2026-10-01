@@ -24,12 +24,23 @@ FEATURE_FACTOR = {
 IMMUTABLE_FACTORS = frozenset({"age", "sex", "family_history_dm", "family_history_htn"})
 DISEASES = frozenset({"diabetes", "hypertension"})
 FACTOR_DICTIONARY_VERSION = "v0.1-sedentary"
+P95_MIN_STORED_CONTRIBUTION = 1e-5  # DECIMAL(8,5): one persistable contribution unit.
+MIN_POSITIVE_SHAP_N = 400  # At least 20 positive observations are expected above the empirical P95.
 MONSTER_FACTORS = {
     "alde": ("alcohol_frequency", "alcohol_amount"),
     "cotinine": ("smoking_current",),
     "viscera": ("bmi_high", "waist_high", "physical_activity_low", "strength_activity_low", "sedentary_time_high"),
     "sodi": ("sodium_behavior",),
 }
+
+
+def assess_threat_eligibility(p95: float, positive_n: int) -> tuple[bool, str]:
+    """Reject unresolvable P95 scales and scales with too little upper-tail support."""
+    if not math.isfinite(p95) or p95 < P95_MIN_STORED_CONTRIBUTION:
+        return False, "positive_shap_p95_below_storage_precision"
+    if positive_n < MIN_POSITIVE_SHAP_N:
+        return False, "fewer_than_20_expected_rows_above_positive_p95"
+    return True, "p95_resolvable_with_at_least_20_expected_upper_tail_rows"
 
 
 def finite(value: float) -> float:
