@@ -15,6 +15,7 @@
 | 용어 | 사용자 문구를 위협도·공략 점수로 갱신하고 DB/API 식별자는 호환을 위해 유지 | 완료 |
 | 좌식시간 factor | 독립 `sedentary_time_high`로 세 seed 양수 SHAP/P95 및 전역 rank 확인, validation 성능 비교 | 근거 공유 가능; 앱 feature 최종 채택은 팀 판단 |
 | 진단자 `behavior_weight` | 동일 validation 사용자에서 personal P95 점수와 global×후보 weight를 비교 | 분포 산출; factor별 weight·risk_condition 최종 합의 대기 |
+| 새 GitHub 저장소 반영 | `feature/knhanes-b-deliverables` 로컬 브랜치, commit `9d1c3f2` 생성 | push 거부됨: GitHub의 `sy-h0ng` 계정에 `subin-1122/DangoKiller` 쓰기 권한 없음 |
 | Notion 제출 링크 | 지정 SHARE DOCUMENTS 페이지를 연결된 Notion에서 찾지 못함(직접 조회 404, 검색 결과 없음) | 외부 접근 차단; 정확한 페이지 공유/접근 필요 |
 
 ## 실험 요약
@@ -38,3 +39,4 @@
 - [좌식 분리 결정](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790564317593679)
 - [9/30 B 파트 계약 요약](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790755600857999)
 - [2026-10-01 모델 입력코드 문의 스레드](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790820503219129)
+- [입력 코드 및 1회전 결과 공유](https://2026-ndc9438.slack.com/archives/C0C3BG88DHR/p1790824382158959?thread_ts=1790820503.219129)
