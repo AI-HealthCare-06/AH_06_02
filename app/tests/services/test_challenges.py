@@ -290,3 +290,31 @@ class TestChallengeCoreService(TestCase):
         utc = ZoneInfo("UTC")
         # 2026-10-04 15:30 UTC == 2026-10-05 00:30 KST
         assert week_start_for(datetime(2026, 10, 4, 15, 30, tzinfo=utc)) == date(2026, 10, 5)
+
+    async def test_weekly_progress_caps_at_100(self) -> None:
+        service = ChallengeCoreService()
+        monster = await Monster.create(
+            code="TEST-MON-CAP",
+            no=9110,
+            name="CAP",
+            factor_keys=["walking_low"],
+        )
+        row = await UserMonster.create(
+            user_id=9110,
+            monster_id=monster.id,
+            weekly_progress=95,
+            progress_week_start=date(2026, 9, 28),
+        )
+
+        for _ in range(2):
+            updated = await service.add_weekly_progress(
+                user_id=9110,
+                factor_key="walking_low",
+                progress_value=15,
+                occurred_at=datetime(2026, 9, 30, 15, 0, tzinfo=KST),
+            )
+
+            assert len(updated) == 1
+            assert updated[0].weekly_progress == 100
+            await row.refresh_from_db()
+            assert row.weekly_progress == 100
