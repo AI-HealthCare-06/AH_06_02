@@ -20,24 +20,21 @@
 
 저장소 안에 두면 `docs/01_planning/`을 읽고 `AGENTS.md` 규칙대로 만들라고 한 줄로 지시할 수 있습니다.
 
-## 현재 숫자
+## 사본 갱신
 
-2026-09-30 기준입니다.
-
-- 테이블 12개 · 컬럼 187개 · FK 17개
-- API 엔드포인트 32개 (A 11 · B 4 · C 6 · D 11)
-- 에러 코드 27개
-- 요구사항 67항목 (기능 49 · 비기능 18)
+문서별 항목 수는 각 원본 시트를 기준으로 확인한다. 2026-10-01 현재 B 예측 API는 지정 B 탭에 확정된 예측 접수·상태/결과 조회·기여도 조회 3개다. 전체 테이블·API·요구사항 수는 원본 시트에서 확인하며 이 README에는 오래된 집계를 복제하지 않는다.
 
 ## 데이터 문서 상태
 
-`03_ai_data/data.md` — 데이터 출처, 라이선스, 라벨 정의, 전처리 절차, 표본 수, 데이터 한계를 기록합니다. 현재는 모델 입력과 y 매핑을 정리한 초안이며, 공식 코드북 대조와 실데이터 통계를 채워야 완료됩니다. `NFR-MODL-003` · `NFR-MODL-005` · `NFR-MODL-006`은 이 파일을 지목합니다.
+`03_ai_data/data.md` — KNHANES 출처, 라이선스 확인 항목, 코드북 대조, 전처리 규칙, 표본 수와 데이터 한계를 기록합니다. raw data와 개인별 결과는 ignored `data/`에만 둡니다. `NFR-MODL-003` · `NFR-MODL-005` · `NFR-MODL-006`은 이 파일을 지목합니다.
 
 ## B 예측·모델 문서
 
-- `01_planning/api-predictions.md` — B 예측 API 3개 계약 초안
-- `03_ai_data/model.md` — X/y 정의, 전역 중요도와 위협도 산식
+- `01_planning/api-predictions.md` — 지정 B API 시트와 대조한 예측 API 3개 계약
+- `model.md` — X/y 정의와 혈압·혈당 제외 사유를 빠르게 찾는 모델 입력 요약
+- `03_ai_data/model.md` — X/y 정의, 전역 중요도와 위협도 산식, 내부 호출 계약
+- `03_ai_data/input-code-map.md` — KNHANES 원 코드와 서비스 입력값 매핑
 - `03_ai_data/data.md` — KNHANES 자료원 및 전처리 현황
-- `03_ai_data/experiment.md` — 학습·비교 실험 계획
-- `03_ai_data/verification.md` — 계약 테스트와 검증 범위
-- `03_ai_data/submission-status.md` — B 제출 항목과 남은 외부 의존성
+- `03_ai_data/experiment.md` — 실제 24조합 탐색 1회전의 조건과 결과·제한
+- `03_ai_data/verification.md` — 전처리·계약 테스트와 검증 범위
+- `03_ai_data/submission-status.md` — B 제출 항목, 완료 상태와 외부 의존성

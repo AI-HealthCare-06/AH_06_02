@@ -4,9 +4,9 @@ from ai_worker.model_contract import (
     ModelExplanationService,
     global_importance,
     group_shap,
-    hp_from_fixed_scale,
     monster_scores,
     rank_contributions,
+    threat_from_reference_p95,
 )
 
 
@@ -21,18 +21,21 @@ class ExplanationContractTest(unittest.TestCase):
         rows = [group_shap({"walking_days": 0.3, "walking_minutes": -0.3})]
         self.assertEqual(global_importance(rows)[0]["importance"], 0)
 
-    def test_rank_uses_magnitude_tie_break_and_omits_rounded_zero(self):
+    def test_rank_uses_magnitude_tie_break_and_keeps_rounded_zero(self):
         rows = rank_contributions({"sex": -0.1, "age": 0.1, "bmi_high": 0.0000001})
-        self.assertEqual([row["factor_key"] for row in rows], ["age", "sex"])
+        self.assertEqual([row["factor_key"] for row in rows], ["age", "sex", "bmi_high"])
         self.assertEqual(rows[1]["direction"], "decrease")
+        self.assertEqual(rows[2]["contribution"], 0)
+        self.assertEqual(rows[2]["rank"], 3)
         self.assertFalse(rows[0]["modifiable"])
 
-    def test_hp_missing_scale_is_not_zero(self):
-        self.assertIsNone(hp_from_fixed_scale(0.2, None))
-        self.assertIsNone(hp_from_fixed_scale(0.2, 0))
-        self.assertEqual(hp_from_fixed_scale(-0.1, 0.2), 0)
-        self.assertEqual(hp_from_fixed_scale(0.1, 0.2), 50)
-        self.assertEqual(hp_from_fixed_scale(0.8, 0.2), 100)
+    def test_factor_threat_uses_positive_reference_only_and_zero_for_ineligible(self):
+        self.assertIsNone(threat_from_reference_p95(0.2, None))
+        self.assertEqual(threat_from_reference_p95(0.2, 0), 0)
+        self.assertEqual(threat_from_reference_p95(-0.1, 0.2), 0)
+        self.assertEqual(threat_from_reference_p95(0.1, 0.2), 50)
+        self.assertEqual(threat_from_reference_p95(0.8, 0.2), 100)
+        self.assertEqual(threat_from_reference_p95(0.2, None, threat_eligible=False), 0)
 
     def test_hp_excludes_immutable_and_measured_spike(self):
         scores = monster_scores(

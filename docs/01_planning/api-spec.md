@@ -250,61 +250,38 @@
 - **사용 테이블**: users 읽기
 - **상태**: 작성 (레벨 공식 미정)
 
-## B · 예측·모델 · 4개
+## B · 예측·모델 · 3개
 
-담당 홍서윤 · [배수빈 -> 초안 작성하였습니다. 확인 후 확정 부탁드립니다. ]
+담당 홍서윤 · 지정 API 시트의 B 탭 6~8행을 기준으로 2026-10-01 확정.
 
-### PRED-01 · 예측 실행 (접수)
+### PRED-01 · 비동기 예측 접수
 
 `POST /api/v1/predictions`
 
-- **인증**: 필요
-- **요청 파라미터**: —
-- **요청 본문**: health_record_id(필수). 대상 질환은 서버가 users의 질환별 진단 이력으로 결정한다(REQ-PRED-007). 미진단 질환만 추론 대상이 된다. 모델 입력은 health_records에서 읽으며 클라이언트가 값을 다시 보내지 않는다
-- **응답 (성공)**: { job_id, status: "queued" } (202). 접수까지가 P95 1초 측정 구간
-- **주요 에러**: PRED_ALL_DIAGNOSED(400: 두 질환 모두 진단이라 예측 대상 없음), HLTH_RECORD_NOT_FOUND(404), HLTH_PROFILE_INCOMPLETE(400: birth_year·sex·height_cm 누락), VALIDATION_ERROR, UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-001·002·007 · NFR-PERF-002
-- **사용 테이블**: users 읽기(진단 이력) / health_records 읽기 / Redis 큐 적재. predictions 쓰기는 ai_worker가 한다
-- **상태**: 초안 · 홍서윤 확정 전
+- **요청 본문**: `health_record_id`(필수). 사용자 ID와 모델 입력값은 토큰·저장된 본인 health_record에서 읽는다.
+- **성공**: HTTP 202, `prediction_id`, `job_id`, `status: pending`, `model_version`, `poll_url`, `created_at`.
+- **오류**: UNAUTHORIZED, FORBIDDEN, PRED_ALL_DIAGNOSED, PRED_DIAGNOSIS_HISTORY_REQUIRED, NOT_FOUND, PRED_INPUT_INSUFFICIENT, VALIDATION_ERROR, PRED_MODEL_UNAVAILABLE, PRED_QUEUE_UNAVAILABLE, INTERNAL_ERROR.
+- **요구사항·테이블**: REQ-PRED-001/002/007, NFR-PERF-002 · users·health_records 읽기, predictions·prediction_contributions 워커 저장.
 
-### PRED-02 · 예측 작업 상태 조회
-
-`GET /api/v1/predictions/jobs/{job_id}`
-
-- **인증**: 필요
-- **요청 파라미터**: —
-- **요청 본문**: —
-- **응답 (성공)**: { job_id, status: "queued"|"running"|"succeeded"|"failed", prediction_id (succeeded일 때만), failed_reason (failed일 때만) }
-- **주요 에러**: NOT_FOUND(404: 만료됐거나 없는 job_id), FORBIDDEN(403: 남의 작업), UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-002 · NFR-REL-001
-- **사용 테이블**: Redis 작업 상태 읽기. 종료 상태 TTL 24시간
-- **상태**: 초안 · 홍서윤 확정 전
-
-### PRED-03 · 예측 결과 조회
+### PRED-02 · 예측 상태·결과 조회
 
 `GET /api/v1/predictions/{prediction_id}`
 
-- **인증**: 필요
-- **요청 파라미터**: prediction_id 대신 latest 사용 가능 — /api/v1/predictions/latest
-- **요청 본문**: —
-- **응답 (성공)**: { prediction_id, predicted_at, model_version, risks: [{ disease, probability, grade }] }. risks에는 미진단 질환만 담는다. 한 질환만 진단받았으면 1개, 둘 다 진단이면 예측 자체가 없다
-- **주요 에러**: NOT_FOUND(404), FORBIDDEN(403: 남의 예측), UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-001·003·004·007
-- **사용 테이블**: predictions 읽기 (본인 것만, 완료된 예측만)
-- **상태**: 초안 · 홍서윤 확정 전
+- **성공**: HTTP 200. `pending`이면 결과를 생략하며, `done`이면 미진단 질환별 `probability`와 `model_version`을 반환하고, `failed`이면 안전한 오류 요약을 반환한다.
+- **응답에서 보류**: 미확정 등급·직전 결과 변화량·이력·대사증후군 요약은 추가하지 않는다.
+- **오류**: UNAUTHORIZED, FORBIDDEN, NOT_FOUND.
+- **요구사항·테이블**: REQ-PRED-003/004/006/009/010/011, NFR-REL-001, NFR-SCAL-001 · predictions 읽기.
 
-### PRED-04 · 기여요인 조회
+### PRED-03 · 질환별 기여도 조회
 
 `GET /api/v1/predictions/{prediction_id}/contributions`
 
-- **인증**: 필요
-- **요청 파라미터**: ?disease=diabetes|hypertension (선택, 없으면 전체) & limit=3 (선택, 기본 전체)
-- **요청 본문**: —
-- **응답 (성공)**: { model_version, items: [{ factor_key, contribution, normalized_score, direction, rank }] }. contribution은 정규화 전 원본 SHAP, normalized_score는 0~100 위협도. 저장은 매핑된 factor 전량이고 limit은 화면 노출용이다
-- **주요 에러**: NOT_FOUND(404), FORBIDDEN(403), VALIDATION_ERROR(400: disease 값 오류), UNAUTHORIZED
-- **관련 요구사항**: REQ-PRED-005 · REQ-CHLG-001
-- **사용 테이블**: prediction_contributions 읽기 / predictions 읽기(소유권 확인)
-- **상태**: 초안 · 홍서윤 확정 전
+- **요청 파라미터**: `disease=diabetes|hypertension` 선택, `limit=1..100` 선택(기본 100). 질환이 없으면 해당 prediction의 전체 질환을 조회한다.
+- **성공**: HTTP 200. done 예측에서 매핑된 factor의 signed contribution, direction, rank를 전량(0 포함) 반환한다. pending·failed는 상태만 반환한다. 이 API의 원본 contribution은 위협도나 공략 점수가 아니다.
+- **오류**: UNAUTHORIZED, FORBIDDEN, NOT_FOUND, VALIDATION_ERROR.
+- **요구사항·테이블**: REQ-PRED-005, REQ-CHLG-001, NFR-MODL-002 · predictions·prediction_contributions 읽기.
+
+공통 인증·응답과 상세 JSON 예시는 [B 예측 API 계약](api-predictions.md), 최신 행은 [지정 API 시트 B 탭](https://docs.google.com/spreadsheets/d/1YGAncv-rZBLBvrVFjlk7yg1kP7fabZunzYmOZz8C9OE/edit?gid=1286618417#gid=1286618417)을 따른다.
 
 ## C · 건강정보·대시보드 · 6개
 
@@ -534,4 +511,3 @@
 - **관련 요구사항**: REQ-RECO-001·002·004
 - **사용 테이블**: user_rewards·rewards 읽기
 - **상태**: 작성
-

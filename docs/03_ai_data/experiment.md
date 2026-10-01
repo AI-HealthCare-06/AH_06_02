@@ -1,41 +1,54 @@
-# Core 입력 및 sodium·좌식·채소 후보 1회전 실험
+# KNHANES core·외식·좌식 첫 탐색 실험
 
-상태: 실제 데이터 실행 대기. 좌식 독립 factor 결정은 이미 완료됐으며 이 실험은 외식 빈도(소디), 좌식시간, 채소 후보의 feature 채택과 안정성을 판단한다.
+상태: 2026-10-01. 목적은 당뇨·고혈압 baseline을 한 번 학습하고 `sedentary_time_high`가 `physical_activity_low`와 별도 설명 신호를 보이는지 확인하는 것이다. 성능 최적화·임상 판단·배포 인증 실험은 아니다.
 
-## 비교
+## 설계
 
-| 실험 | 입력 |
+2022 train, 2023 validation, 2024 final test 연도 분할을 사용한다. 질환별로 미진단·미복약 성인만 eligibility에 포함하고, 유효 y가 없는 행은 제외한다. 2024 test는 열지 않았다. RandomForest(200 trees, min leaf 10, max depth 10), train-only median/mode imputation과 one-hot encoding, seed 42·43·44를 썼다. SHAP 설명은 train 256명·validation 256명의 seed 고정 reference 표본이다.
+
+| variant | feature |
 |---|---|
-| base | model.md core 12개 feature |
-| sodium | base + dining_out_freq |
-| sitting | base + sitting_minutes |
-| vegetable | base + vegetable_frequency (검증된 열이 있을 때만) |
-| sodium_sitting / sodium_vegetable / sitting_vegetable | base + 해당 후보 두 개 |
-| all_candidates | base + 외식 빈도 + 좌식 + 채소 (존재·검증된 열만) |
+| base | model.md의 12개 core feature |
+| sodium | base + `dining_out_freq` (`sodium_behavior`) |
+| sitting | base + `sitting_minutes` (`sedentary_time_high`) |
+| sodium_sitting | base + 두 후보 |
 
-동일 분할·하이퍼파라미터에서 seed 42·43·44를 사용한다. baseline은 RandomForestClassifier, 범주 one-hot·연속형 중앙값 대치이며 train에만 fit한다. 이 1회전의 목표는 최고 성능 확보가 아니라 실행 가능한 비교 기준 확보다.
+개인 위협도 P95와 전역 중요도를 2022 train SHAP sample에서 계산했다. 개인 기여도와 `global normalized_score × candidate behavior_weight`는 같은 2023 validation 사용자 SHAP sample에서 비교했다. 계산은 사용자/질환별 설명 실험용이며 256명 reference는 최종 artifact용 calibration 크기로 승인된 것이 아니다.
 
-## 산출
+## 3-seed 평균 validation 결과
 
-- 질환별 validation AUROC, AP, Brier, recall>=0.70 조건의 threshold·specificity, 유효 표본/양성 수.
-- seed별 factor mean(abs(group SHAP)), 질환별 max 기준 normalized score, 방향 및 순위.
-- validation reference에서 질환×factor별 positive SHAP P95, 양의 기여 관측 수, 좌식·소디 factor 안정성.
-- 같은 validation 사용자에서 미진단 경로 `positive_shap/P95 → 0~100`과 진단 경로 `global normalized_score × behavior_weight`를 함께 계산하고 질환×factor별 두 score 분포와 경로별 우세 비율을 비교한다. behavior_weight는 원문 문항 척도와 D의 risk_condition을 보고 서윤·이경이 이 결과에서 확정한다. 임의 weight를 학습 결과처럼 제출하지 않는다.
-- 좌식값 구간별 signed SHAP 평균은 연관 패턴 점검이며 인과효과가 아니다.
-- sodium_behavior의 기여도 안정성과 P95를 같은 기준으로 확인한다.
-- 선택된 변형만 2024 test 평가. 합성자료 테스트 결과를 실데이터 성능으로 쓰지 않는다.
+| 질환 | variant | AUROC | Average precision | Brier |
+|---|---|---:|---:|---:|
+| 당뇨 | base | 0.73162 | 0.10164 | 0.03752 |
+| 당뇨 | sodium | 0.73687 | 0.10469 | 0.03747 |
+| 당뇨 | sitting | 0.73253 | 0.10404 | 0.03750 |
+| 당뇨 | sodium_sitting | 0.73805 | 0.10607 | 0.03745 |
+| 고혈압 | base | 0.71807 | 0.18723 | 0.07958 |
+| 고혈압 | sodium | 0.71487 | 0.18402 | 0.07964 |
+| 고혈압 | sitting | 0.71789 | 0.18931 | 0.07951 |
+| 고혈압 | sodium_sitting | 0.71652 | 0.18627 | 0.07956 |
 
-## 채택 검토 기준 제안
+각 행은 seed 42·43·44의 평균이다. 각 변형은 당뇨 validation n=4,838·양성 194, 고혈압 n=4,143·양성 381로 평가됐다. 보고서 `data/experiment-final/report.json`은 `.gitignore` 아래 로컬에만 둔다. 개인 단위 특징·행 SHAP을 Git이나 Slack에 올리지 않는다.
 
-validation AUROC가 두 질환 모두 base 대비 0.005 이상 하락하지 않고, 좌식의 결측·특수코드·연도별 분포에 이상이 없으며, seed별 중요도 및 구간별 해석이 과도하게 흔들리지 않으면 채택 후보로 검토한다. 이 수치는 B의 검토 기준 제안이며 팀 확정 기준이 아니다. 낮은 SHAP을 임의로 키워서 캐릭터를 만들지 않는다. 구조는 독립 factor로 유지하되 feature 미채택과 구분한다.
+## 좌식 factor 및 척도 확인
 
-채소는 서비스 입력이 없으면 성능이 좋아도 MVP에 바로 채택하지 않는다. P95가 0인 factor는 `threat_eligible=false`; 임의 floor는 두지 않는다. P95가 양수여도 지나치게 작거나 seed마다 불안정한 factor의 기준은 결과를 확인한 뒤 정한다. 결합식 `global normalized_score × behavior_weight`는 합의됐고, factor별 weight 기준과 소디 위협도 적용 조건은 실제 1회전 뒤 서윤·이경이 비교 결과를 보고 확정한다.
+각 seed에서 sitting model의 grouped SHAP을 `sedentary_time_high`에 따로 보존하고 `physical_activity_low`에 합치지 않았다.
 
-## 실행
+- 당뇨 좌식 전역 normalized score는 18.40–20.67(순위 5–6), 2022 train sample의 positive-SHAP P95는 0.01024–0.01240이다. 고혈압은 score 8.06–8.93(순위 8–10), P95 0.01092–0.01147이다. 3 seed 모두 reference 256명에서 양의 SHAP 관측이 나왔다.
+- sitting 입력의 세 seed 평균 성능 변화는 base 대비 당뇨 AUROC +0.00091·AP +0.00240, 고혈압 AUROC −0.00018·AP +0.00208이다.
+- 같은 validation 표본 256명에서 global 점수가 personal P95 위협도 이상인 비율은 당뇨의 weight 0.25/0.5/0.75/1.0에서 seed 범위 각각 66.0–70.7% / 71.9–73.8% / 76.6–77.0% / 78.9–80.5%였다. 고혈압은 62.1–66.0% / 66.4–68.4% / 68.0–69.9% / 69.5–72.3%였다.
+
+가중치 비교에서 양 경로 중 하나가 항상 우세하지는 않지만, 이 표본에서는 global 경로가 대부분의 사용자에서 더 큰 점수를 냈다. 따라서 1회전 결과는 척도 차이를 드러냈고 사용자 행동에 따라 충분히 달라지는 가중치 설계가 필요함을 보여준다. factor별 `behavior_weight`와 소디 적용 조건은 D의 `risk_condition` 및 챌린지 정의와 함께 서윤·이경이 정한다. 결과는 연관 설명이며 좌식시간 변화의 인과효과라고 말하지 않는다.
+
+## 결과 해석 범위
+
+2024 holdout test는 미평가다. validation 결과는 변형·seed를 고르는 탐색 지표다. 2022 training SHAP reference 256명의 95분위수는 전체 training 분포의 안정된 배포 calibration이 아니다. 최종 모델·feature를 승인한 뒤 충분한 2022 train reference에서 P95·global importance를 다시 계산해 artifact version에 고정한다. y threshold, 등급, 의료적 위험 해석도 이 결과만으로 정하지 않는다.
+
+채소 feature는 서비스의 공통 입력 필드·기간이 확정되지 않아 이번 ablation에서 제외했다. 외식 빈도는 나트륨 섭취량의 대리변수일 뿐이며, 당뇨·고혈압 모델 점수 개선만으로 나트륨 요인을 임상 지표로 해석하지 않는다.
+
+## 재실행
 
 ```bash
-python -m pip install -r scripts/model/requirements.txt
-python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment --seeds 42 43 44
+../model-venv/bin/python scripts/model/preprocess_knhanes.py
+../model-venv/bin/python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-final --seeds 42 43 44 --variants base sodium sitting sodium_sitting
 ```
-
-출력은 로컬 data/ 아래에 둔다. raw 데이터가 아닌 집계 보고서만 검토 후 공유한다. 학습 완료 전에는 AUROC, P95 calibration, global importance 값을 채운 가짜 artifact를 제출하지 않는다. 기본 실행의 validation SHAP reference는 탐색용 256행 표본이므로 배포 calibration으로 사용하지 않는다.
