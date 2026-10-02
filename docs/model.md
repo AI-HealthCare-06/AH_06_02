@@ -2,7 +2,7 @@
 
 담당: B · 홍서윤. 자세한 전처리 근거와 서비스 계약은 [모델 계약](03_ai_data/model.md), 원시 변수 처리표는 [KNHANES 입력 코드표](03_ai_data/input-code-map.md)를 따른다.
 
-## X: 첫 학습 입력
+## X: 1회전 모델 입력
 
 | 입력 | 형식·단위 | KNHANES 원 변수 | 설명 요인 |
 |---|---|---|---|
@@ -19,9 +19,9 @@
 | family_history_dm | 0/1 | `HE_DMfh1~3` | `family_history_dm` |
 | family_history_htn | 0/1 | `HE_HPfh1~3` | `family_history_htn` |
 
-기본 X는 위 12개다. 추가 ablation 후보는 좌식 `BE8_1×60+BE8_2` → `sedentary_time_high`, 외식 `L_OUT_FQ` 1~7 범주 → `sodium_behavior` 대리 지표, 채소 `LS_VEG2` 1~9 범주(김치·장아찌 제외) → 별도 `vegetable_intake_low`다. 외식 범주는 나트륨 양이 아니며, 채소 빈도는 현재 서비스 공통 입력 필드가 없다. 최근 실험에서 좌식은 독립 SHAP 요인으로 유지했고, 소디·채소는 질환별 성능이 엇갈려 최종 서비스 X 포함을 확정하지 않았다. 좌식 SHAP은 걷기와 합치지 않는다.
+공통 core X는 위 12개다. 2024 비교 평가로 고정한 첫 모델 변형은 질환별로 다르다: 당뇨는 core 12개 + `sitting_minutes` → `sedentary_time_high`, 고혈압은 core 12개 + `dining_out_freq` → `sodium_behavior`다. 소디 대리변수는 팀에서 정한 고혈압 범위에만 둔다. `L_OUT_FQ`는 외식 빈도이며 나트륨 섭취량이 아니다. `vegetable_frequency`는 이번 모델에서 제외했다. 좌식 SHAP은 걷기와 합치지 않는다. 2024 지표와 선택 한계는 [1회전 실험 기록](03_ai_data/experiment.md)을 참조한다.
 
-Mapping v1의 `risk_condition`은 설명 문구이며 숫자 임계값은 미정이다. 행동 조건 충족, 미진단자의 양의 개인 SHAP, 제공 가능한 챌린지 여부를 따로 판정한다. factor별 `behavior_weight`와 적용 임계값을 확정값처럼 사용하지 않는다.
+Mapping v1의 `risk_condition`은 설명 문구이며 행동 숫자 임계값은 D의 검토가 남아 있다. 2026-10-01 기준 A는 MVP `behavior_weight`를 사용자별 0/1로 두는 데 찬성했다. 입력이 유효하고 승인된 행동 조건과 적용 가능한 챌린지를 충족할 때 1, 비대상 또는 챌린지 없음은 0으로 둔다. 결측·모름은 건강한 행동으로 간주하지 않고 미평가로 처리한다. 질환별 `mean(|SHAP|)`, positive-SHAP P95, `threat_eligible` 실측값은 [factor별 척도표](03_ai_data/factor-scales.md)에 있다.
 
 혈압, 공복혈당, HbA1c, 진단력 및 해당 질환 약물은 X에서 제외한다. 당뇨와 고혈압 y를 정하는 검사·진단 구성요소가 X에도 들어가면 정답 누수가 발생하고, 사용자가 검진 결과를 입력하지 않는 간편 입력 흐름과도 맞지 않기 때문이다.
 

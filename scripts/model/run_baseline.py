@@ -27,6 +27,7 @@ from ai_worker.model_contract import (  # noqa: E402
     FACTOR_DICTIONARY_VERSION,
     FEATURE_FACTOR,
     IMMUTABLE_FACTORS,
+    assess_threat_eligibility,
     global_importance,
     group_shap,
 )
@@ -188,7 +189,7 @@ def enumerate_row(row):
     return [(str(index), float(value)) for index, value in enumerate(row)]
 
 
-def run_one(frame, features, disease, seed, final_test, artifact_dir):
+def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_size=256):
     label_key, valid_codes, positive_code = LABELS[disease]
     valid = frame[frame[label_key].isin(valid_codes)].copy()
     eligible = valid[valid[f"eligible_{disease}"]].copy()
@@ -203,8 +204,12 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir):
     result = metrics(
         validation[label_key].eq(positive_code).to_numpy(), model.predict_proba(validation[features])[:, 1]
     )
-    # Fixed sample for a quick first pass; report size and do not call this full-data calibration.
-    train_reference = train[features].sample(min(256, len(train)), random_state=42)
+    # Use a bounded sample for a quick pass, or the complete 2022 training set for final scale references.
+    train_reference = (
+        train[features]
+        if reference_size == 0
+        else train[features].sample(min(reference_size, len(train)), random_state=42)
+    )
     validation_reference = validation[features].sample(min(256, len(validation)), random_state=42)
     train_grouped, base, train_additivity_error = explain(model, train[features], train_reference, features, seed)
     validation_grouped, _, validation_additivity_error = explain(
@@ -216,12 +221,14 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir):
         signed = np.asarray([float(row[factor]) for row in train_grouped])
         positive_shap = signed[signed > 0]
         p95 = float(np.quantile(positive_shap, 0.95)) if len(positive_shap) else 0.0
+        threat_eligible, eligibility_reason = assess_threat_eligibility(p95, len(positive_shap))
         reference_p95[factor] = {
             "positive_shap_p95": p95,
             "positive_n": int((positive_shap > 0).sum()),
             "reference_n": len(train_grouped),
             "reference_year": 2022,
-            "threat_eligible_candidate": p95 > 0,
+            "threat_eligible": threat_eligible,
+            "threat_eligibility_reason": eligibility_reason,
         }
     global_scores = {item["factor_key"]: float(item["normalized_score"]) for item in global_importance(train_grouped)}
     paired_scores = {}
@@ -321,7 +328,16 @@ def main():
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
     parser.add_argument("--variants", nargs="+", choices=VARIANT_CHOICES)
     parser.add_argument("--final-variant", choices=VARIANT_CHOICES)
+    parser.add_argument("--diseases", nargs="+", choices=LABELS, default=list(LABELS))
+    parser.add_argument(
+        "--reference-size",
+        type=int,
+        default=256,
+        help="2022 train rows for SHAP scale calculation; 0 uses all eligible 2022 train rows",
+    )
     args = parser.parse_args()
+    if args.reference_size < 0:
+        parser.error("--reference-size must be 0 (all rows) or a positive integer")
     frame = clean_input(pd.read_csv(args.data))
     variant_candidates = {
         "base": (),
@@ -354,13 +370,21 @@ def main():
         "packages": {name: importlib.metadata.version(name) for name in ["numpy", "pandas", "scikit-learn", "shap"]},
         "split": {"train": 2022, "validation": 2023, "test": 2024},
         "test_evaluated": bool(args.final_variant),
+        "diseases": args.diseases,
+        "reference_size_requested": args.reference_size,
         "runs": [],
     }
     for variant, features in variants.items():
-        for disease in LABELS:
+        for disease in args.diseases:
             for seed in args.seeds:
                 result = run_one(
-                    frame, features, disease, seed, bool(args.final_variant), args.out / f"{variant}-{disease}-{seed}"
+                    frame,
+                    features,
+                    disease,
+                    seed,
+                    bool(args.final_variant),
+                    args.out / f"{variant}-{disease}-{seed}",
+                    args.reference_size,
                 )
                 report["runs"].append(
                     {"variant": variant, "disease": disease, "seed": seed, "features": features, **result}
