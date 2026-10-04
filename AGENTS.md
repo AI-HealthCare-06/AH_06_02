@@ -37,10 +37,10 @@
 
 | 파트 | 담당 | 테이블 |
 | --- | --- | --- |
-| A | 배수빈 | `users` |
-| B | 홍서윤 | `predictions` · `prediction_contributions` |
+| A | 배수빈 | `users` · `predictions` · `prediction_contributions` |
+| B | (공석) | 2026-10-03 홍서윤 이탈. `predictions` · `prediction_contributions` 는 A가 맡습니다 |
 | C | 최병주 | `health_records` |
-| D | 김이경 | `monsters` · `user_monsters` · `challenges` · `user_challenges` · `challenge_logs` · `challenge_recommendations` · `rewards` · `user_rewards` |
+| D | 김이경 | `monsters` · `user_monsters` · `challenges` · `user_challenges` · `user_challenge_occurrences` · `user_attack_cycles` · `challenge_logs` · `challenge_recommendations` · `rewards` · `user_rewards` |
 
 남의 테이블에 직접 쓰지 않습니다. 필요하면 담당자가 제공하는 내부 함수로 요청합니다.
 예를 들어 경험치 지급은 D가 `users`를 건드리지 않고 A의 함수를 부릅니다. 레벨 재계산과 레벨업 판정도 A 한 곳에서만 합니다.
@@ -49,11 +49,37 @@
 
 ## 스키마를 바꾸려면
 
-DB 스키마의 원본은 **구글 시트 테이블 명세서**입니다. 저장소 안에 명세서 사본을 만들지 마세요.
+DB 스키마의 원본은 **구글 시트 테이블 명세서**입니다. 저장소 안의 사본을 손으로 고치지 마세요.
 
-순서는 이렇습니다. 시트를 고친다 → 팀에 알린다 → ERD와 DDL을 다시 뽑는다 → 코드를 고친다.
+순서는 이렇습니다. 시트를 고친다 → 팀에 알린다 → ERD와 DDL을 다시 뽑는다 → migration을 쓴다 → 코드를 고친다.
 
-현재 기준은 12테이블 186컬럼 FK 17입니다.
+사본은 [`docs/01_planning`](docs/01_planning)에 있습니다. [`erd.md`](docs/01_planning/erd.md)가 다이어그램, [`erd.sql`](docs/01_planning/erd.sql)이 DDL 기준입니다. 시트와 사본이 다르면 시트가 맞습니다. 사본은 `python scripts/sync_specs.py`로 다시 뽑습니다.
+
+migration은 한 사람이 돌립니다. 번호가 겹치면 머지할 때 충돌하니, 새로 만들기 전에 main에 올라온 마지막 번호를 확인하세요.
+
+현재 기준은 14테이블 222컬럼 FK 23입니다. 실제 DB에 걸린 FK는 그중 일부입니다. `health_records` · `user_attack_cycles` · `user_challenge_occurrences` 가 들어온 뒤 한 번에 겁니다.
+
+---
+
+## 공략 사이클 — 한 번에 한 캐릭터
+
+2026-10-04 확정입니다. 배수빈·김이경 합의, 최병주 위임입니다.
+
+한 주기 동안 캐릭터 하나만 공략합니다. 챌린지 슬롯 3개를 여러 캐릭터에 나누지 않습니다. 나누면 공략 점수가 캐릭터마다 3분의 1 속도로 쌓여서 28일이 끝나도 봉인이 생기지 않습니다.
+
+| 항목 | 기준 |
+| --- | --- |
+| 대상 선정 | 위협도 1순위 자동 선정. 사용자가 도감에서 변경 가능 (REQ-RECO-006) |
+| 대상 고정 | 주기 중에는 재측정 결과로 자동 변경하지 않습니다 |
+| 기간 | 같은 주기의 챌린지는 투입 시점과 관계없이 D28 경계에서 함께 끝납니다. 이월 없음 (REQ-CHLG-011) |
+| 투입 | 초기 최대 2개. 2주차부터 주기당 1개 추가. 동시 최대 3개 (REQ-CHLG-002) |
+| 저장 | `user_attack_cycles` 한 행. 미션과 추천은 `cycle_id` 로 참조합니다 |
+
+주기 번호 `cycle_week` 와 공략 중 여부 `is_target` 은 저장하지 않고 조회할 때 계산합니다. 주간 공략 점수는 월요일 0시 KST에 초기화되는 달력 주 기준이라 주기 주차와 다릅니다. 섞지 마세요.
+
+수행률은 인정 완료한 예정 기회 수를 예정 기회 수로 나눈 값입니다. 예정 기회는 `user_challenge_occurrences` 에 날짜와 슬롯 단위로 미리 만들어둡니다. `skipped` 와 기한이 지난 미기록은 분자에 넣지 않고 분모에는 남깁니다.
+
+1단계에서는 습관 졸업을 판정하지 않습니다. `habit_established` 는 NULL이 미평가이고 FALSE를 미형성으로 읽지 않습니다. 종료 상태명 `graduated` 는 그대로 두되 화면에는 "기간 종료"로 표시합니다.
 
 ---
 
