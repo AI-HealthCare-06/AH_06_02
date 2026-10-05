@@ -1,71 +1,78 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-01 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-05 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
+> `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
 ## 공통 인증 · 응답 규칙
+
+4명 모두 이 규칙을 따라 API 명세를 작성합니다 · 작성 배수빈 (A) · 2026-09-28
 
 | 구분 | 항목 | 내용 |
 | --- | --- | --- |
 | 인증 | 방식 | JWT Bearer 토큰. 헤더 Authorization: Bearer {access_token} |
-| 인증 | 토큰 수명 | Access 30분 / Refresh 14일. Access 만료 시 POST /api/v1/auth/refresh로 재발급 |
-| 인증 | 인증 불필요 엔드포인트 | 회원가입 · 로그인 · 토큰 재발급 · 이메일 중복 확인 · 헬스체크. 그 외는 전부 인증 필요 |
-| 인증 | 본인 데이터 원칙 | 개인 데이터 엔드포인트는 URL에 user_id를 받지 않는다. 항상 토큰에서 꺼낸 user_id를 쓴다 (NFR-SEC-002) |
-| 인증 | 401 vs 403 | 401 = 토큰이 없거나 만료됨 · 남의 리소스를 가리키는 요청은 403이 아니라 404로 응답한다. 403을 주면 그 ID가 존재한다는 사실이 드러나 건강 데이터가 샌다 |
+|  | 토큰 수명 | Access 30분 / Refresh 14일. Access 만료 시 POST /api/v1/auth/refresh로 재발급 |
+|  | 인증 불필요 엔드포인트 | 회원가입 · 로그인 · 토큰 재발급 · 이메일 중복 확인 · 헬스체크. 그 외는 전부 인증 필요 |
+|  | 본인 데이터 원칙 | 개인 데이터 엔드포인트는 URL에 user_id를 받지 않는다. 항상 토큰에서 꺼낸 user_id를 쓴다 (NFR-SEC-002) |
+|  | 401 vs 403 | 401 = 토큰이 없거나 만료됨 · 남의 리소스를 가리키는 요청은 403이 아니라 404로 응답한다. 403을 주면 그 ID가 존재한다는 사실이 드러나 건강 데이터가 샌다 |
 | 응답 | 성공 형식 | { "success": true, "data": { ... } } |
-| 응답 | 실패 형식 | { "success": false, "error": { "code": "CHLG_LIMIT_EXCEEDED", "message": "동시 진행 챌린지는 최대 3개입니다." } } |
-| 응답 | 목록 형식 | { "success": true, "data": { "items": [...], "total": 120, "page": 1, "size": 20 } } |
-| 응답 | HTTP 상태 코드 | 200 조회·수정 · 201 생성 · 400 잘못된 요청 · 401 인증 · 403 인가 · 404 없음 · 409 충돌(중복) · 422 검증 실패 · 500 서버 |
-| 응답 | message 문구 | 사용자에게 그대로 보여줄 수 있는 한국어 문장으로 쓴다. 내부 예외 메시지를 그대로 내보내지 않는다 |
+|  | 실패 형식 | { "success": false, "error": { "code": "CHLG_LIMIT_EXCEEDED", "message": "동시 진행 챌린지는 최대 3개입니다." } } |
+|  | 목록 형식 | { "success": true, "data": { "items": [...], "total": 120, "page": 1, "size": 20 } } |
+|  | HTTP 상태 코드 | 200 조회·수정 · 201 생성 · 400 잘못된 요청 · 401 인증 · 403 인가 · 404 없음 · 409 충돌(중복) · 422 검증 실패 · 500 서버 |
+|  | message 문구 | 사용자에게 그대로 보여줄 수 있는 한국어 문장으로 쓴다. 내부 예외 메시지를 그대로 내보내지 않는다 |
 | 에러 코드 | 형식 | {도메인}_{사유} 대문자 스네이크. 도메인은 AUTH · USER · HLTH · PRED · CHLG · RWRD · MNSTR |
-| 에러 코드 | 공통 코드 | VALIDATION_ERROR · UNAUTHORIZED · FORBIDDEN · NOT_FOUND · INTERNAL_ERROR |
-| 에러 코드 | 예시 | AUTH_EMAIL_DUPLICATED · CHLG_LIMIT_EXCEEDED · PRED_INPUT_INSUFFICIENT |
-| 에러 코드 | 전체 목록 | 「에러 코드」 탭 참고 |
+|  | 공통 코드 | VALIDATION_ERROR · UNAUTHORIZED · FORBIDDEN · NOT_FOUND · INTERNAL_ERROR |
+|  | 예시 | AUTH_EMAIL_DUPLICATED · CHLG_LIMIT_EXCEEDED · PRED_INPUT_INSUFFICIENT |
+|  | 전체 목록 | 「에러 코드」 탭 참고 |
 | 명명 | URL | 소문자 · 하이픈 구분 · 리소스는 복수형. 예: /api/v1/health-records |
-| 명명 | 버전 | 모든 경로에 /api/v1 접두사 |
-| 명명 | JSON 키 | snake_case. DB 컬럼명과 같게 맞춰서 변환 실수를 줄인다 |
-| 명명 | 날짜·시간 | ISO 8601 UTC. 2026-09-28T11:20:00Z · 날짜만 필요하면 2026-09-28 |
+|  | 버전 | 모든 경로에 /api/v1 접두사 |
+|  | JSON 키 | snake_case. DB 컬럼명과 같게 맞춰서 변환 실수를 줄인다 |
+|  | 날짜·시간 | ISO 8601 UTC. 2026-09-28T11:20:00Z · 날짜만 필요하면 2026-09-28 |
 | 공통 | 타임존 | 저장은 UTC. KST 변환은 프론트에서 한다 |
-| 공통 | 페이징 | ?page=1&size=20 · size 기본 20, 최대 100 |
-| 공통 | 정렬 | ?sort=created_at:desc 형식 |
-| 공통 | soft delete | status가 withdrawn이거나 삭제 표시된 행은 조회 결과에서 제외한다 |
-| 공통 | request_id | 모든 응답 헤더에 X-Request-Id를 넣는다. 로그 추적용 |
+|  | 페이징 | ?page=1&size=20 · size 기본 20, 최대 100 |
+|  | 정렬 | ?sort=created_at:desc 형식 |
+|  | soft delete | status가 withdrawn이거나 삭제 표시된 행은 조회 결과에서 제외한다 |
+|  | request_id | 모든 응답 헤더에 X-Request-Id를 넣는다. 로그 추적용 |
 | 금지 | 비밀번호 | 평문 저장·로그 출력 금지. bcrypt 해시만 저장 (NFR-SEC-003) |
-| 금지 | 비밀정보 | SECRET_KEY · API 키는 .env로만. 저장소에는 .env.example만 올린다 |
+|  | 비밀정보 | SECRET_KEY · API 키는 .env로만. 저장소에는 .env.example만 올린다 |
 
-## 에러 코드 · 27개
+## 에러 코드 목록
 
-| 도메인 | 에러 코드 | HTTP | 의미 | 쓰는 곳 |
-| --- | --- | --- | --- | --- |
-| 공통 | VALIDATION_ERROR | 400 | 요청 값이 형식·범위를 벗어남 | 전원 |
-| 공통 | UNAUTHORIZED | 401 | 토큰이 없거나 만료됨 | 전원 |
-| 공통 | FORBIDDEN | 403 | 토큰은 유효하지만 남의 리소스 | 전원 |
-| 공통 | NOT_FOUND | 404 | 대상 리소스가 없음 | 전원 |
-| 공통 | INTERNAL_ERROR | 500 | 서버 내부 오류 | 전원 |
-| AUTH | AUTH_EMAIL_DUPLICATED | 409 | 이미 가입된 이메일 | A · AUTH-02 |
-| AUTH | AUTH_WEAK_PASSWORD | 422 | 비밀번호 규칙 미달 | A · AUTH-02 · USER-04 |
-| AUTH | AUTH_INVALID_CREDENTIALS | 401 | 이메일 또는 비밀번호 불일치 | A · AUTH-03 · USER-04 · USER-05 |
-| AUTH | AUTH_ACCOUNT_LOCKED | 403 | 로그인 5회 연속 실패로 10분 잠금 | A · AUTH-03 |
-| AUTH | AUTH_TOKEN_EXPIRED | 401 | Refresh 토큰 만료 | A · AUTH-04 |
-| AUTH | AUTH_TOKEN_INVALID | 401 | Refresh 토큰이 위조됐거나 폐기됨 | A · AUTH-04 |
-| HLTH | HLTH_PROFILE_INCOMPLETE | 400 | birth_year · sex · height_cm 누락 | C · HLTH-01 |
-| HLTH | HLTH_VALUE_OUT_OF_RANGE | 400 | 입력값이 허용 범위를 벗어남 | C · HLTH-01 |
-| HLTH | HLTH_RECORD_NOT_FOUND | 404 | 해당 health_record가 없음 | B · PRED-01 (초안) |
-| PRED | PRED_ALL_DIAGNOSED | 400 | 두 질환 모두 진단이라 예측 대상 없음 | B · PRED-01 (초안) |
-| PRED | PRED_INPUT_INSUFFICIENT | 400 | 모델 입력 항목이 모자람 (REQ-PRED-008) | B (초안) |
-| PRED | PRED_NOT_FOUND | 404 | 완료된 예측이 없음 | B · D · CHLG-01 |
-| CHLG | CHLG_LIMIT_EXCEEDED | 409 | 동시 진행 챌린지 3개 초과 | D · CHLG-05 |
-| CHLG | CHLG_ALREADY_ACTIVE | 409 | 이미 진행 중인 같은 챌린지 | D · CHLG-05 |
-| CHLG | CHLG_SAFETY_CONFIRMATION_REQUIRED | 400 | 운동형 챌린지인데 safety_confirmed 누락 (REQ-CHLG-010) | D · CHLG-05 |
-| CHLG | CHLG_NOT_ACTIVE | 409 | 진행 중이 아닌 챌린지에 기록·중단 시도 | C · HLTH-03 · D · CHLG-07 · CHLG-09 |
-| CHLG | CHLG_NOT_FOUND | 404 | 해당 user_challenge 없음 | D · CHLG-08 · CHLG-09 |
-| CHLG | CHLG_LOG_DUPLICATED | 409 | 같은 날 같은 슬롯에 중복 기록 | D · CHLG-07 |
-| CHLG | CHLG_VERIFICATION_FAILED | 422 | 인증 방식에 맞지 않는 값 | D · CHLG-07 |
-| CHLG | CHLG_RECOMMENDATION_NOT_FOUND | 404 | 해당 추천 카드 없음 | D · CHLG-03 · 04 · 05 |
-| CHLG | CHLG_RECOMMENDATION_UNAVAILABLE | 409 | 추천을 만들 근거가 없음 | D · CHLG-01 |
-| CHLG | CHLG_INVALID_COOLDOWN | 400 | 쿨다운 값이 7 · 30 · manual이 아님 | D · CHLG-03 |
+작성 배수빈 · 2026-09-29
+
+| 도메인 | 에러 코드 | HTTP | 의미 | 쓰는 곳 |  |  |  |  |  |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 공통 | VALIDATION_ERROR | 400 | 요청 값이 형식·범위를 벗어남 | 전원 |  |  |  |  |  |
+| 공통 | UNAUTHORIZED | 401 | 토큰이 없거나 만료됨 | 전원 |  |  |  |  |  |
+| 공통 | FORBIDDEN | 403 | 토큰은 유효하지만 남의 리소스 | 전원 |  |  |  |  |  |
+| 공통 | NOT_FOUND | 404 | 대상 리소스가 없음 | 전원 |  |  |  |  |  |
+| 공통 | INTERNAL_ERROR | 500 | 서버 내부 오류 | 전원 |  |  |  |  |  |
+| AUTH | AUTH_EMAIL_DUPLICATED | 409 | 이미 가입된 이메일 | A · AUTH-02 |  |  |  |  |  |
+| AUTH | AUTH_WEAK_PASSWORD | 422 | 비밀번호 규칙 미달 | A · AUTH-02 · USER-04 |  |  |  |  |  |
+| AUTH | AUTH_INVALID_CREDENTIALS | 401 | 이메일 또는 비밀번호 불일치 | A · AUTH-03 · USER-04 · USER-05 |  |  |  |  |  |
+| AUTH | AUTH_ACCOUNT_LOCKED | 403 | 로그인 5회 연속 실패로 10분 잠금 | A · AUTH-03 |  |  |  |  |  |
+| AUTH | AUTH_TOKEN_EXPIRED | 401 | Refresh 토큰 만료 | A · AUTH-04 |  |  |  |  |  |
+| AUTH | AUTH_TOKEN_INVALID | 401 | Refresh 토큰이 위조됐거나 폐기됨 | A · AUTH-04 |  |  |  |  |  |
+| HLTH | HLTH_PROFILE_INCOMPLETE | 400 | birth_year · sex · height_cm 누락 | C · HLTH-01 |  |  |  |  |  |
+| HLTH | HLTH_VALUE_OUT_OF_RANGE | 400 | 입력값이 허용 범위를 벗어남 | C · HLTH-01 |  |  |  |  |  |
+| HLTH | HLTH_RECORD_NOT_FOUND | 404 | 해당 health_record가 없음 | B · PRED-01 (초안) |  |  |  |  |  |
+| PRED | PRED_ALL_DIAGNOSED | 400 | 두 질환 모두 진단이라 예측 대상 없음 | B · PRED-01 (초안) |  |  |  |  |  |
+| PRED | PRED_INPUT_INSUFFICIENT | 400 | 모델 입력 항목이 모자람 (REQ-PRED-008) | B (초안) |  |  |  |  |  |
+| PRED | PRED_NOT_FOUND | 404 | 완료된 예측이 없음 | B · D · CHLG-01 |  |  |  |  |  |
+| CHLG | CHLG_LIMIT_EXCEEDED | 409 | 동시 진행 챌린지 3개 초과 | D · CHLG-05 |  |  |  |  |  |
+| CHLG | CHLG_ALREADY_ACTIVE | 409 | 이미 진행 중인 같은 챌린지 | D · CHLG-05 |  |  |  |  |  |
+| CHLG | CHLG_SAFETY_CONFIRMATION_REQUIRED | 400 | 운동형 챌린지인데 safety_confirmed 누락 (REQ-CHLG-010) | D · CHLG-05 |  |  |  |  |  |
+| CHLG | CHLG_NOT_ACTIVE | 409 | 진행 중이 아닌 챌린지에 기록·중단 시도 | C · HLTH-03 · D · CHLG-07 · CHLG-09 |  |  |  |  |  |
+| CHLG | CHLG_NOT_FOUND | 404 | 해당 user_challenge 없음 | D · CHLG-08 · CHLG-09 |  |  |  |  |  |
+| CHLG | CHLG_LOG_DUPLICATED | 409 | 같은 날 같은 슬롯에 중복 기록 | D · CHLG-07 |  |  |  |  |  |
+| CHLG | CHLG_VERIFICATION_FAILED | 422 | 인증 방식에 맞지 않는 값 | D · CHLG-07 |  |  |  |  |  |
+| CHLG | CHLG_RECOMMENDATION_NOT_FOUND | 404 | 해당 추천 카드 없음 | D · CHLG-03 · 04 · 05 |  |  |  |  |  |
+| CHLG | CHLG_RECOMMENDATION_UNAVAILABLE | 409 | 추천을 만들 근거가 없음 | D · CHLG-01 |  |  |  |  |  |
+| CHLG | CHLG_INVALID_COOLDOWN | 400 | 쿨다운 값이 7 · 30 · manual이 아님 | D · CHLG-03 |  |  |  |  |  |
 
 ## 테이블별 쓰기 권한
+
+한 테이블은 한 사람만 쓴다. 남의 테이블이 필요하면 '모듈 간 호출' 시트의 함수를 부른다
 
 | 테이블 | 쓰기 (INSERT/UPDATE) | 읽기 | 담당 영역 | 비고 |
 | --- | --- | --- | --- | --- |
@@ -86,6 +93,8 @@
 | fasting_glucose · hba1c (스파이크 실측 위협도) · smoking_current · alcohol_frequency · alcohol_amount · bmi · waist_cm · walking_days · walking_minutes · strength_days · sitting_minutes · dining_out_freq (진단자 추천 매칭) · recorded_at (최신 1건 선택) |  |  |  |  |
 
 ## 모듈 간 호출 규약
+
+남의 테이블에 써야 할 때 직접 UPDATE 하지 말고 이 함수를 호출합니다
 
 | 함수 | 제공 | 호출 | 호출 시점 | 인자 | 반환 |
 | --- | --- | --- | --- | --- | --- |
@@ -243,9 +252,22 @@
 - **사용 테이블**: users 읽기
 - **상태**: 작성 (레벨 공식 미정)
 
-## B · 예측·모델 · 3개
+## B · 예측·모델
 
-담당 홍서윤 · 확정 2026-10-01
+담당 홍서윤 · [배수빈 -> 초안 작성하였습니다. 확인 후 확정 부탁드립니다. ]
+
+### API ID · 기능
+
+`Method Endpoint`
+
+- **인증**: 인증
+- **요청 파라미터**: 요청 파라미터
+- **요청 본문**: 요청 본문
+- **응답 (성공)**: 응답 (성공)
+- **주요 에러**: 주요 에러
+- **관련 요구사항**: 관련 요구사항
+- **사용 테이블**: 사용 테이블
+- **상태**: 상태
 
 ### PRED-01 · 예측 접수
 
@@ -288,7 +310,7 @@
 
 ## C · 건강정보·대시보드 · 6개
 
-담당 최병주 · 공통 인증·응답 규칙은 공통 탭 적용
+담당 최병주 · C API · 제출안 · 공통 인증/응답 규칙은 공통 탭 적용
 
 ### HLTH-01 · 건강정보 입력·시점별 저장
 
@@ -296,11 +318,11 @@
 
 - **인증**: 필요
 - **요청 파라미터**: — (토큰 사용자 기준)
-- **요청 본문**: 간편(simple, 최근 4주): weight_kg, waist_cm, smoking_current, alcohol_frequency, alcohol_amount(음주 시), walking_days, walking_minutes, strength_days, sitting_minutes, family_history_dm, family_history_htn, dining_out_freq(1~7). birth_year·sex·height_cm은 A users 프로필에서 입력·수정하고 C 화면에서 확인한다(누락 시 저장/예측 불가). bmi는 height_cm·weight_kg로 서버 계산. 정밀(detail): 간편값 + sbp, dbp, fasting_glucose, hba1c, triglyceride, hdl(6항목 선택). total_cholesterol은 현재 사용자 입력에서 제외.
+- **요청 본문**: 간편(simple, 최근 4주): weight_kg, waist_cm, smoking_current, alcohol_frequency, alcohol_amount(음주 시), walking_days, walking_minutes, strength_days, sitting_minutes, family_history_dm, family_history_htn, dining_out_freq(1~7). birth_year·sex·height_cm은 A users 프로필에서 입력·수정하고 C 화면에서 확인한다(누락 시 저장/예측 불가). bmi는 height_cm·weight_kg로 서버 계산. 정밀(detail): 간편값 + sbp, dbp, fasting_glucose, hba1c, triglyceride, hdl(6항목 선택). total_cholesterol은 현재 사용자 입력에서 제외. 일일(daily): weight_kg, waist_cm, sbp, dbp, fasting_glucose 전부 선택. 하나 이상 있으면 저장하고 전부 비면 400. 예측을 호출하지 않는다
 - **응답 (성공)**: { health_record_id, input_mode, recorded_at, bmi } (201)
 - **주요 에러**: HLTH_PROFILE_INCOMPLETE(400: birth_year·sex·height_cm 누락), HLTH_VALUE_OUT_OF_RANGE(400: 허용 범위 포함), VALIDATION_ERROR, UNAUTHORIZED
 - **관련 요구사항**: REQ-HLTH-001·002·003·004
-- **사용 테이블**: users 읽기(A AUTH-02·USER-02에서 기본정보 입력/수정), health_records 쓰기(C); 저장 후 D refresh_impact_from_health_record() 호출. B 예측 요청은 별도
+- **사용 테이블**: users 읽기(A AUTH-02·USER-02에서 기본정보 입력/수정), health_records 쓰기(C); 저장 후 D refresh_impact_from_health_record() 호출(daily 제외). B 예측 요청은 별도
 - **상태**: 제출안 · 식생활 확정 저장 필드는 dining_out_freq. v7 채소 빈도·야식·단 음료·식사 규칙성은 v8-1/ERD에 저장 필드가 없어 확장 제안; 채택 시 요구사항·테이블·B 모델 매핑 동시 개정
 
 ### HLTH-02 · 건강기록 목록·기간 조회
@@ -379,11 +401,11 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정.
+- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음.
 - **주요 에러**: CHLG_RECOMMENDATION_UNAVAILABLE, PRED_NOT_FOUND, UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-001·002
-- **사용 테이블**: predictions·prediction_contributions 읽기 / challenges 읽기 / challenge_recommendations 쓰기
-- **상태**: 작성
+- **사용 테이블**: predictions·prediction_contributions 읽기 / challenges 읽기 / challenge_recommendations 쓰기 / user_attack_cycles·user_monsters·monsters 읽기
+- **상태**: 수용안 — 집중 공략·주기 FK. 팀 확정 전·DB/API 미반영
 
 ### CHLG-02 · 추천 카드 조회
 
@@ -392,11 +414,11 @@
 - **인증**: 필요
 - **요청 파라미터**: ?page=1&size=20
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, description, factor_key, rank, difficulty, verification_type, context_label, action, cooldown_choice, exclude_until }], total, page, size }
+- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, description, factor_key, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name }, proposed_goal, action, cooldown_choice, exclude_until }], total, page, size } ※ proposed_goal은 서버 검증 후 저장한 개인 목표(시간·횟수·슬롯·난이도·예정 기회·정책 버전). 승인된 고정 규칙 추천도 같은 검증을 거친다. 마스터 변경으로 제안 목표를 덮어쓰지 않는다. ※ 주기와 대상은 cycle_id FK 조인으로 조회. 현재 active 주기와 다른 추천은 시작할 수 없음.
 - **주요 에러**: UNAUTHORIZED
-- **관련 요구사항**: REQ-CHLG-001·002·006
-- **사용 테이블**: challenge_recommendations·challenges 읽기
-- **상태**: 작성
+- **관련 요구사항**: REQ-CHLG-001·002·006·011
+- **사용 테이블**: challenge_recommendations·challenges 읽기 / user_attack_cycles·user_monsters·monsters 읽기
+- **상태**: 수용안 — 개인 목표는 proposed_goal, 공략 대상·기간은 주기. 팀 확정 전
 
 ### CHLG-03 · 추천 거절·해당없음/쿨다운 설정
 
@@ -430,12 +452,12 @@
 
 - **인증**: 필요
 - **요청 파라미터**: —
-- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean ※ 운동형 챌린지가 포함된 경우 true 필수. 비운동형만 포함되면 생략 가능
-- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, status, start_date, end_date, daily_target_count, target_value, duration_days }], active_count }
+- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean. 시작 목표는 본인 추천의 검증된 proposed_goal에서 읽고 허용 조합·슬롯·기회를 재검증한다. 초기 진행 합계 최대 2개, 2주차부터 적합 후보와 사용자 희망일 때 주기당 1개 추가, 기존 포함 최대 3개. safety_check_required=true인 마스터만 사용자가 직접 safety_confirmed=true로 확인; LLM 생성값 불인정. ※ 공략 미션은 본인 주기와 연결한다. 첫 시작은 draft→active 전환을 함께 검증하고, 추가 시작은 기존 active 주기만 허용한다. 추천의 cycle_id가 그 주기와 같아야 하며 challenge.factor_key가 대상 monsters.factor_keys에 포함되어야 한다. LLM이 대상/주기를 바꾸지 않는다.
+- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, cycle_id, status, start_date, end_date, daily_target_count, target_value, duration_days, goal_config_snapshot }], active_count } ※ 목표는 개인 snapshot. 같은 공략 주기 D28 00:00 KST 종료, end_date는 마지막 수행일(D0+27) 포함. D7 추가 duration_days=21. 공통 마스터를 사용자별로 덮어쓰지 않는다. ※ 응답 cycle_id는 연결 주기 ID. 주기 end_date로 공통 종료·실제 일수를 snapshot 저장. 상대 주차는 주기 시작일로 계산. 추가 시작은 주기 잠금 후 extra_added_count≤1 검증. ※ 첫 사용자 확인 때 draft 주기→active와 D0/D28을 함께 확정. 추천 조회로 기간을 시작하지 않음. 미션 생성·주기 전환은 동일 트랜잭션.
 - **주요 에러**: CHLG_LIMIT_EXCEEDED, CHLG_RECOMMENDATION_NOT_FOUND, CHLG_ALREADY_ACTIVE, CHLG_SAFETY_CONFIRMATION_REQUIRED, VALIDATION_ERROR
-- **관련 요구사항**: REQ-CHLG-002 · REQ-CHLG-010
-- **사용 테이블**: challenge_recommendations 쓰기(accepted·거절횟수 초기화) / challenges 읽기 / user_challenges 쓰기
-- **상태**: 작성
+- **관련 요구사항**: REQ-CHLG-002 · REQ-CHLG-010 · REQ-CHLG-011 · REQ-CHLG-012
+- **사용 테이블**: challenge_recommendations 쓰기(accepted·거절횟수 초기화) / challenges 읽기 / user_challenges 쓰기 / user_attack_cycles 읽기·추가 횟수 갱신
+- **상태**: 수용안 — 동일 주기·대상 일치·공통 종료·추가 횟수 검증. 팀 확정 후 구현
 
 ### CHLG-06 · 진행 중 챌린지 조회
 
@@ -444,11 +466,11 @@
 - **인증**: 필요
 - **요청 파라미터**: ?status=active&page=1&size=20
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, title, factor_key, difficulty, verification_type, context_type, context_label, start_date, end_date, completed_count, daily_target_count, progress_rate }], total, page, size }
+- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, title, factor_key, difficulty, verification_type, context_type, context_label, cycle_id, cycle_week, target_monster: { monster_id, code, name }, start_date, end_date, completed_count, daily_target_count, target_value, goal_config_snapshot, scheduled_opportunity_count, progress_rate, habit_established }], total, page, size } ※ difficulty·목표·슬롯은 사용자 snapshot. completed_count=인정 완료한 예정 기회, progress_rate=완료 기회/해당 기간 예정 기회(0~1, 분모 0이면 NULL). weekly_progress 게임 점수와 별개. 초기 최대 2개, 2주차부터 적합 후보+사용자 희망일 때 주기당 하나 추가·진행 포함 최대 3개. 1단계 habit_established=NULL 미평가, 습관 졸업 표시 없음. ※ cycle_week는 주기 start_date로 계산한 응답값이며 DB 중복 저장하지 않는다. 대상·공통 종료는 cycle_id의 주기에서 조회.
 - **주요 에러**: UNAUTHORIZED
-- **관련 요구사항**: REQ-CHLG-003·004·005
-- **사용 테이블**: user_challenges·challenges·challenge_logs 읽기
-- **상태**: 작성
+- **관련 요구사항**: REQ-CHLG-003·004·005·011 · REQ-RECO-006
+- **사용 테이블**: user_challenges·challenges·challenge_logs 읽기 / user_attack_cycles·user_monsters·monsters 읽기
+- **상태**: 수용안 — 주기 조인·계산 주차. 개인 목표/수행률 별도. 팀 확정 전
 
 ### CHLG-07 · 챌린지 수행 기록
 
@@ -456,12 +478,12 @@
 
 - **인증**: 필요
 - **요청 파라미터**: path: user_challenge_id
-- **요청 본문**: occurred_at, context_slot?, value?, verification_method, evidence_url? ※ photo는 C 업로드 경로에서 반환된 비공개 증빙 위치값 사용
+- **요청 본문**: occurred_at, context_slot?, value?, verification_method, evidence_url?. snapshot의 기간·예정 기회·슬롯·회당 목표·단위로 완료를 판정한다. 타이머는 회차별로 목표 이상이어야 하며 부족분/초과시간을 다른 회차로 환산하지 않는다. 선택하지 않은 슬롯·중복·종료 이후 요청은 기존 오류로 처리. photo는 C 업로드의 비공개 참조값만 사용. ※ cycle_id가 있는 미션은 연결 주기 active 여부·공통 종료 경계도 검사. 점수 대상은 기존 factor_key 매핑이며 주기 대상과 일치해야 함. 종료된 주기의 로그 기록/보상 지급 불가.
 - **응답 (성공)**: { log_id, result, verification_status, reward_eligible, xp_granted, weekly_progress, level_up, new_level, reward? }
 - **주요 에러**: CHLG_NOT_ACTIVE, CHLG_LOG_DUPLICATED, CHLG_VERIFICATION_FAILED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-003·004·007·008 · REQ-RECO-003·004 · REQ-PRED-011
-- **사용 테이블**: user_challenges·challenges 읽기 / challenge_logs·user_monsters·user_rewards 쓰기 / A grant_xp() 호출
-- **상태**: 작성
+- **사용 테이블**: user_challenges·challenges 읽기 / challenge_logs·user_monsters·user_rewards 쓰기 / A grant_xp() 호출 / user_attack_cycles 읽기
+- **상태**: 수용안 — 주기 기간·factor 대상 일치 검증 추가. 주간 점수/보상 정책 유지·DB/API 미반영
 
 ### CHLG-08 · 수행 기록 조회
 
@@ -496,11 +518,11 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, weekly_progress, progress_week_start, sealed_at, seal_count, impact_source }] } ※ state: rage \| caution \| stable \| not_contributing \| resolved \| sealed \| unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시.
+- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, is_target, weekly_progress, progress_week_start, seal_progress, sealed_at, seal_count, reawakened_at, impact_source }] } ※ state: rage \| caution \| stable \| not_contributing \| resolved \| sealed \| unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시. ※ is_target은 active 주기의 대상과 일치하는지 계산한 표시값이다. user_monsters.is_target 저장은 제거안이며 공략 주기 테이블을 조인한다 (REQ-RECO-006 수용안). seal_progress는 28일 누적 진행률 0~100으로 외형 단계 표시에 쓴다 (REQ-RECO-008). 봉인은 재측정으로 위협도가 올라가도 해제되지 않으며 reawakened_at에 상승 시각만 기록한다 (REQ-RECO-007).
 - **주요 에러**: UNAUTHORIZED
-- **관련 요구사항**: REQ-CHLG-007 · REQ-RECO-005 · REQ-PRED-010·011
-- **사용 테이블**: monsters·user_monsters 읽기
-- **상태**: 작성
+- **관련 요구사항**: REQ-CHLG-007 · REQ-RECO-005·006·007·008 · REQ-PRED-010·011
+- **사용 테이블**: monsters·user_monsters 읽기 / user_attack_cycles 읽기
+- **상태**: 수용안 — is_target은 주기 조인으로 계산. 외형 변화/1단계 도입은 별도 제안·미확정
 
 ### RWRD-01 · 내 보상 조회
 
