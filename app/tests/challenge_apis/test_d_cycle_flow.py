@@ -37,22 +37,22 @@ KST = ZoneInfo("Asia/Seoul")
 NOW = datetime(2026, 10, 6, 21, 0, tzinfo=KST)
 TODAY = NOW.date()
 
+CSV_ROWS = 19
+
+#: 1단계 운영 후보 6개. 카드 성격으로 빠진 10개, 보류 factor(소디)로 빠진 3개와 따로 센다
 PHASE1_CODES = {
     # 비세라
     "CH_WALK_AFTER_MEAL",
     "CH_STAND_HOURLY",
     "CH_STAIRS",
     "CH_STRENGTH_10",
-    "CH_WALK_ONE_STOP",
-    # 소디
-    "CH_LEAVE_SOUP",
-    "CH_NO_EATING_OUT",
-    "CH_HOME_MEAL",
     # 알데
     "CH_NO_DRINK_TODAY",
     # 코티니
     "CH_NO_SMOKE_TODAY",
 }
+#: 카드 자체는 1단계 대상이지만 sodium_behavior 추천 적용 보류로 빠지는 소디 카드
+HELD_SODIUM_CODES = {"CH_LEAVE_SOUP", "CH_NO_EATING_OUT", "CH_HOME_MEAL"}
 
 
 async def _seed() -> dict[str, Challenge]:
@@ -117,16 +117,24 @@ def test_cycle_week_is_computed_from_d0() -> None:
 
 
 class TestPhase1Candidates(TestCase):
-    async def test_ten_candidates_and_nine_excluded(self) -> None:
+    async def test_csv_rows_and_operational_candidates_are_counted_separately(self) -> None:
         challenges = await _seed()
         candidates = {item.code for item in await phase1_candidates()}
 
+        assert len(challenges) == CSV_ROWS
         assert candidates == PHASE1_CODES
-        excluded = set(challenges) - candidates
-        assert len(excluded) == 9
+        excluded = set(challenges) - candidates - HELD_SODIUM_CODES
+        assert len(excluded) == 10
         assert {"CH_VEGGIE_FIRST", "CH_SLOW_EAT_20"} <= excluded  # 비활성
         assert {"CH_ONE_LESS_GLASS", "CH_WATER_BETWEEN", "CH_DELAY_5MIN"} <= excluded  # 욕구 발생형
         assert {"CH_CHECK_LABEL", "CH_COUNT_DOWN", "CH_WATER_8", "CH_SLEEP_7H"} <= excluded
+        # 예정 이용일 계약 전까지 제외. 마스터 행과 난이도는 그대로 둔다
+        assert "CH_WALK_ONE_STOP" in excluded
+        walk_one_stop = challenges["CH_WALK_ONE_STOP"]
+        assert walk_one_stop.is_enabled is True
+        assert str(walk_one_stop.difficulty) == "normal"
+        # 소디 카드는 is_enabled·factor_key 를 건드리지 않고 후보 필터에서만 빠진다
+        assert all(challenges[code].is_enabled for code in HELD_SODIUM_CODES)
 
 
 # ---------------------------------------------------------------- CHLG-01
@@ -264,7 +272,33 @@ class TestGenerateRecommendations(TestCase):
         result = await _service(artifact).generate(user, NOW)
 
         assert [item.rank for item in result.items] == [1, 2, 3]
-        assert all(item.factor_key == "physical_activity_low" for item in result.items)
+        # 걷기 후보 2개(CH_WALK_ONE_STOP 제외)가 먼저, 다음 점수의 좌식 후보가 3위
+        assert [item.factor_key for item in result.items] == [
+            "physical_activity_low",
+            "physical_activity_low",
+            "sedentary_time_high",
+        ]
+
+    async def test_sodium_hold_applies_to_the_personal_path(self) -> None:
+        await _seed()
+        user = await _user("r-sodium@example.com")
+        await make_target(user.id, ["sodium_behavior"])
+        prediction = await self._prediction(user, {}, TEST_MODEL_VERSION)
+        contribution = await PredictionContribution.create(
+            prediction_id=prediction.id,
+            disease=Disease.HYPERTENSION,
+            factor_key="sodium_behavior",
+            contribution=Decimal("0.03"),
+            direction="increase",
+            rank=1,
+        )
+        artifact = fake_artifact(p95={"hypertension": {"sodium_behavior": 0.03}})
+
+        await _expect(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE, _service(artifact).generate(user, NOW))
+
+        # 후보에서만 빼고 예측값은 덮어쓰지 않는다
+        await contribution.refresh_from_db()
+        assert contribution.contribution == Decimal("0.03000")
 
 
 # ---------------------------------------------------------------- CHLG-05
@@ -566,3 +600,124 @@ class TestCloseExpired(TestCase):
 
 def test_policy_version_is_the_agreed_constant() -> None:
     assert CYCLE_POLICY_VERSION == "CYCLE-20261004-v1"
+
+
+# ---------------------------------------------------------------- 리뷰 반영 (PR #21)
+
+
+class TestNotApplicable(TestCase):
+    async def test_not_applicable_excludes_until_manual_and_comes_back(self) -> None:
+        await _seed()
+        user = await _user("na-flow@example.com", dm=True, htn=True)
+        await make_target(user.id, ["smoking_current"])
+        await HealthRecord.create(user_id=user.id, recorded_at=NOW, smoking_current=True)
+        service = _service(fake_artifact({"diabetes": {"smoking_current": 40.0}}))
+
+        [card] = (await service.generate(user, NOW)).items
+        answered = await service.act(user, card.id, RecommendationAction.NOT_APPLICABLE, None, NOW)
+        assert answered.suppressed_until_manual is True
+        # 연속 거절 집계에 넣지 않는다
+        assert answered.consecutive_reject_count == 0
+
+        await _expect(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE, service.generate(user, NOW))
+
+        await service.unsuppress(user, card.id)
+        [again] = (await service.generate(user, NOW)).items
+        assert again.challenge_id == card.challenge_id
+
+    async def test_not_applicable_neither_counts_nor_breaks_the_reject_streak(self) -> None:
+        challenges = await _seed()
+        user = await _user("na-streak@example.com")
+        cycle = await make_cycle(user.id, ["smoking_current"])
+        service = _service(None)
+        actions = [
+            RecommendationAction.REJECTED,
+            RecommendationAction.REJECTED,
+            RecommendationAction.NOT_APPLICABLE,
+        ]
+        for action in actions:
+            card = await make_card(user.id, challenges["CH_NO_SMOKE_TODAY"], cycle)
+            await service.act(user, card.id, action, None, NOW)
+        third = await make_card(user.id, challenges["CH_NO_SMOKE_TODAY"], cycle)
+
+        # 해당없음을 사이에 둬도 세 번째 거절이다
+        await _expect(
+            ErrorCode.CHLG_INVALID_COOLDOWN, service.act(user, third.id, RecommendationAction.REJECTED, None, NOW)
+        )
+        row = await service.act(user, third.id, RecommendationAction.REJECTED, CooldownChoice.DAYS_30, NOW)
+        assert row.consecutive_reject_count == 3
+
+
+class TestStartGuards(TestCase):
+    async def test_answered_cards_cannot_start_and_keep_their_action(self) -> None:
+        challenges = await _seed()
+        cycle = await make_cycle(4001, ["smoking_current"])
+        service = ChallengeCoreService()
+        for action in (RecommendationAction.REJECTED, RecommendationAction.NOT_APPLICABLE):
+            card = await make_card(4001, challenges["CH_NO_SMOKE_TODAY"], cycle)
+            await ChallengeRecommendation.filter(id=card.id).update(action=action, acted_at=NOW)
+
+            await _expect(
+                ErrorCode.VALIDATION_ERROR,
+                service.start_from_recommendations(user_id=4001, recommendation_ids=[card.id], now=NOW),
+            )
+
+            await card.refresh_from_db()
+            assert card.action == action
+        assert await UserChallenge.filter(user_id=4001).count() == 0
+
+    async def test_accepted_card_cannot_start_twice(self) -> None:
+        challenges = await _seed()
+        cycle = await make_cycle(4002, ["smoking_current"])
+        card = await make_card(4002, challenges["CH_NO_SMOKE_TODAY"], cycle)
+        service = ChallengeCoreService()
+        [mission] = await service.start_from_recommendations(user_id=4002, recommendation_ids=[card.id], now=NOW)
+        await service.stop(user_id=4002, user_challenge_id=mission.id, now=NOW)
+
+        await _expect(
+            ErrorCode.VALIDATION_ERROR,
+            service.start_from_recommendations(user_id=4002, recommendation_ids=[card.id], now=NOW),
+        )
+
+    async def test_card_with_personal_goal_is_refused(self) -> None:
+        challenges = await _seed()
+        cycle = await make_cycle(4003, ["physical_activity_low"])
+        card = await make_card(4003, challenges["CH_WALK_AFTER_MEAL"], cycle)
+        await ChallengeRecommendation.filter(id=card.id).update(proposed_goal={"target_value": 5, "slots": ["lunch"]})
+
+        # 개인화는 후속 범위다. 마스터 목표로 바꿔 시작하지 않는다
+        await _expect(
+            ErrorCode.VALIDATION_ERROR,
+            ChallengeCoreService().start_from_recommendations(user_id=4003, recommendation_ids=[card.id], now=NOW),
+        )
+        assert await UserChallenge.filter(user_id=4003).count() == 0
+
+    async def test_card_whose_cycle_was_closed_cannot_start(self) -> None:
+        challenges = await _seed()
+        cycle = await make_cycle(4004, ["smoking_current"], start=TODAY - timedelta(days=30))
+        card = await make_card(4004, challenges["CH_NO_SMOKE_TODAY"], cycle)
+
+        await _expect(
+            ErrorCode.CHLG_RECOMMENDATION_NOT_FOUND,
+            ChallengeCoreService().start_from_recommendations(user_id=4004, recommendation_ids=[card.id], now=NOW),
+        )
+        assert (await UserAttackCycle.get(id=cycle.id)).status == AttackCycleStatus.COMPLETED
+
+
+class TestConditionalCompletion(TestCase):
+    async def test_already_completed_occurrence_is_not_completed_again(self) -> None:
+        challenges = await _seed()
+        cycle = await make_cycle(4101, ["smoking_current"])
+        card = await make_card(4101, challenges["CH_NO_SMOKE_TODAY"], cycle)
+        [mission] = await ChallengeCoreService().start_from_recommendations(
+            user_id=4101, recommendation_ids=[card.id], now=NOW
+        )
+        occurrence = await UserChallengeOccurrence.get(user_challenge_id=mission.id, scheduled_date=TODAY)
+        first = await ChallengeLog.create(user_challenge_id=mission.id, log_date=TODAY, occurred_at=NOW)
+        second = await ChallengeLog.create(user_challenge_id=mission.id, log_date=TODAY, occurred_at=NOW)
+
+        assert await ChallengeCoreService._complete(occurrence, first, NOW) is True
+        # 다른 요청이 먼저 완료한 기회는 다시 완료하지 않는다
+        assert await ChallengeCoreService._complete(occurrence, second, NOW) is False
+        await occurrence.refresh_from_db()
+        assert occurrence.completed_log_id == first.id

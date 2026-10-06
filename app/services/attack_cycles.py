@@ -17,6 +17,7 @@ from app.models.challenges import (
     UserChallengeStatus,
     UserMonster,
 )
+from app.models.users import User
 
 #: 이 버전이 가리키는 규칙은 AGENTS.md 공략 사이클 절이다.
 #: D28 공통 종료, 초기 최대 2개, 2주차부터 주기당 1개 추가, 동시 최대 3개.
@@ -31,6 +32,15 @@ MAX_ACTIVE_CHALLENGES = 3
 
 #: 공략 대상이 될 수 있는 상태 (MNSTR-01)
 TARGETABLE_STATES = (MonsterState.RAGE, MonsterState.CAUTION, MonsterState.STABLE)
+
+
+async def lock_user(user_id: int) -> None:
+    """사용자 단위 잠금. 주기 생성·전환과 미션 시작을 직렬화한다.
+
+    table-spec 의 user_attack_cycles.user_id '사용자 단위 잠금' 구현안이다. users 행은 잠그기만 하고 쓰지 않는다.
+    트랜잭션 안에서 불러야 한다.
+    """
+    await User.select_for_update().filter(id=user_id).first()
 
 
 def today_kst(now: datetime | None = None) -> date:
@@ -124,18 +134,21 @@ class AttackCycleService:
         draft 는 기간이 없다. 추천 조회만으로 28일을 시작하지 않는다.
         주기 중에는 재측정 결과로 대상을 바꾸지 않는다.
         """
-        current = await self.get_current(user_id)
-        if current is not None:
-            return current
-        target = await self.select_target(user_id)
-        if target is None:
-            return None
-        return await UserAttackCycle.create(
-            user_id=user_id,
-            target_user_monster_id=target.id,
-            status=AttackCycleStatus.DRAFT,
-            policy_version=CYCLE_POLICY_VERSION,
-        )
+        async with in_transaction():
+            # 동시에 들어온 추천 요청이 draft 를 두 개 만들지 않게 사용자 단위로 직렬화한다
+            await lock_user(user_id)
+            current = await self.get_current(user_id)
+            if current is not None:
+                return current
+            target = await self.select_target(user_id)
+            if target is None:
+                return None
+            return await UserAttackCycle.create(
+                user_id=user_id,
+                target_user_monster_id=target.id,
+                status=AttackCycleStatus.DRAFT,
+                policy_version=CYCLE_POLICY_VERSION,
+            )
 
     async def target_monster(self, cycle: UserAttackCycle) -> Monster:
         user_monster = await UserMonster.get(id=cycle.target_user_monster_id)

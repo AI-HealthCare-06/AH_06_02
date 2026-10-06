@@ -47,6 +47,17 @@ PHASE1_EXCLUDED_CODES = frozenset(
         # 보너스. factor_key 가 없어 캐릭터에 매핑되지 않는다
         "CH_WATER_8",
         "CH_SLEEP_7H",
+        # 예정 이용일을 받는 계약이 없어 시작할 수 없다. 마스터 행·난이도는 그대로 두고 계약이 생기면 다시 넣는다
+        "CH_WALK_ONE_STOP",
+    }
+)
+
+#: 추천 적용 보류 factor. 진단자·미진단자 공통으로 후보에서 뺀다.
+#: 위협도나 예측값을 0 으로 덮어쓰지 않고 후보에서만 제외한다.
+HELD_FACTORS = frozenset(
+    {
+        # 범주별 SHAP 부호가 섞여 단조 risk condition 이 없다 (factor-scales.md 65·74행)
+        "sodium_behavior",
     }
 )
 
@@ -64,7 +75,6 @@ CONDITION_PENDING_FACTORS = frozenset(
         "physical_activity_low",  # 수치 cutoff 와 걷기 시간 병행 여부 미정
         "strength_activity_low",  # 수치 cutoff 미정
         "sedentary_time_high",  # 수치 cutoff 미정
-        "sodium_behavior",  # 자동 추천 적용 보류
         "vegetable_intake_low",  # 제품 입력 미확정
     }
 )
@@ -118,10 +128,11 @@ def monster_diseases(monster: Monster) -> list[Disease]:
 
 
 async def phase1_candidates() -> list[Challenge]:
+    """1단계 운영 후보. 비활성·제외 카드와 보류 factor 의 카드를 뺀다. 두 추천 경로가 같은 후보를 쓴다."""
     return [
         challenge
         for challenge in await Challenge.filter(is_enabled=True, factor_key__isnull=False).order_by("id")
-        if challenge.code not in PHASE1_EXCLUDED_CODES
+        if challenge.code not in PHASE1_EXCLUDED_CODES and challenge.factor_key not in HELD_FACTORS
     ]
 
 
@@ -326,7 +337,10 @@ class RecommendationService:
         cooldown_choice: CooldownChoice | None,
         now: datetime | None = None,
     ) -> ChallengeRecommendation:
-        """CHLG-03. 3회 연속 거절이면 재추천 시점을 사용자가 고른다 (REQ-CHLG-006)."""
+        """CHLG-03. 3회 연속 거절이면 재추천 시점을 사용자가 고른다 (REQ-CHLG-006).
+
+        해당없음은 직접 다시 켤 때까지 추천에서 빼고, 연속 거절 집계에는 넣지 않는다.
+        """
         current = now or datetime.now(config.TIMEZONE)
         row = await ChallengeRecommendation.get_or_none(id=recommendation_id, user_id=user.id)
         if row is None:
@@ -334,9 +348,13 @@ class RecommendationService:
         if row.action is not None:
             raise AppError(ErrorCode.VALIDATION_ERROR, message="이미 응답한 추천 카드입니다.")
 
+        # 해당없음은 연속 거절을 늘리지도 끊지도 않는다. 거절과 수락만 본다
         previous = (
             await ChallengeRecommendation.filter(
-                user_id=user.id, challenge_id=row.challenge_id, action__isnull=False, id__not=row.id
+                user_id=user.id,
+                challenge_id=row.challenge_id,
+                action__in=[RecommendationAction.REJECTED, RecommendationAction.ACCEPTED],
+                id__not=row.id,
             )
             .order_by("-acted_at", "-id")
             .first()
@@ -355,7 +373,7 @@ class RecommendationService:
         row.cooldown_choice = cooldown_choice
         if cooldown_choice in COOLDOWN_DAYS:
             row.exclude_until = current + timedelta(days=COOLDOWN_DAYS[cooldown_choice])
-        if cooldown_choice == CooldownChoice.UNTIL_MANUAL:
+        if cooldown_choice == CooldownChoice.UNTIL_MANUAL or action == RecommendationAction.NOT_APPLICABLE:
             row.suppressed_until_manual = True
         await row.save()
         return row
