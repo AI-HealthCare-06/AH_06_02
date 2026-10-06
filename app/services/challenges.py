@@ -426,12 +426,10 @@ class ChallengeCoreService:
     @staticmethod
     async def _grant_xp(user_id: int, amount: int) -> tuple[bool, int | None]:
         """경험치는 A 의 grant_xp() 로 요청한다. 레벨 판정도 A 쪽 결과를 그대로 쓴다."""
-        repo = UserRepository()
-        before = await repo.get_user(user_id)
-        after = await repo.grant_xp(user_id, amount)
-        if before is None or after is None:
+        result = await UserRepository().grant_xp(user_id, amount)
+        if result is None:
             return False, None
-        return after.level > before.level, after.level
+        return result.level_up, result.new_level
 
     async def list_user_challenges(
         self, *, user_id: int, status: UserChallengeStatus, page: int, size: int, now: datetime | None = None
