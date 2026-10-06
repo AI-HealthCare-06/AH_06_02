@@ -95,8 +95,17 @@ line-ending = "auto"
 [tool.mypy]
 # scripts/model 은 __init__.py 없이 scripts.model.* 로 import 되므로 경로 기준으로 모듈 이름을 정한다
 explicit_package_bases = true
+# scripts/model 은 app 의존성에 없는 numpy·pandas 로 돌아간다.
+# CI 도 uv run --with 로 따로 실행하므로 app 타입 검사 대상에서 뺀다.
+exclude = "^scripts/model/"
 
 [[tool.mypy.overrides]]
-# 타입 정보를 내보내지 않는 학습·문서 스크립트용 서드파티
-module = ["pandas.*", "pyreadstat.*", "joblib.*", "shap.*", "sklearn.*", "openpyxl.*"]
+# tests/model_contract 가 import 하는 바람에 exclude 를 타고 들어오는 학습 스크립트
+module = ["scripts.model.*"]
+follow_imports = "skip"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# 타입 정보를 내보내지 않는 문서 스크립트용 서드파티
+module = ["openpyxl.*"]
 ignore_missing_imports = true
