@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -17,15 +18,18 @@ from app.models.challenges import (
     Monster,
     OccurrenceStatus,
     RecommendationAction,
+    Reward,
     UserAttackCycle,
     UserChallenge,
     UserChallengeOccurrence,
     UserChallengeStatus,
     UserMonster,
+    UserReward,
     VerificationMethod,
     VerificationStatus,
     VerificationType,
 )
+from app.models.users import User
 from app.repositories.user_repository import UserRepository
 from app.services.attack_cycles import (
     EXTRA_FROM_DAY,
@@ -38,6 +42,12 @@ from app.services.attack_cycles import (
     today_kst,
 )
 from app.services.recommendations import target_monster_body
+
+logger = logging.getLogger(__name__)
+
+#: 첫 인정 완료 1회로 해금되는 보상. unlock_condition 은 자유 문장이라 코드로 판정하지 않고 여기 명시한다.
+#: gluco_blade: '식후 걷기 인정 수행 1회 누적' · linked_challenge_code CH_WALK_AFTER_MEAL (reward-master.csv)
+FIRST_COMPLETION_REWARD_CODES = ("gluco_blade",)
 
 #: 시작할 수 있는 추천 카드 응답 상태. 아직 응답하지 않은 카드만 시작한다
 STARTABLE_ACTIONS: tuple[RecommendationAction | None, ...] = (None,)
@@ -323,6 +333,7 @@ class ChallengeCoreService:
                 level_up, new_level = await self._grant_xp(user_id, xp)
                 log.xp_granted = xp
                 await log.save(update_fields=["xp_granted"])
+            await self._grant_first_completion_rewards(user_id, challenge, current)
 
             updated = await self.add_weekly_progress(
                 user_id=user_id,
@@ -422,6 +433,31 @@ class ChallengeCoreService:
             return daily_xp
         # goal_config_snapshot 이 없는 레거시 행만 마스터 값으로 되돌아간다
         return challenge.reward_xp
+
+    @staticmethod
+    async def _grant_first_completion_rewards(user_id: int, challenge: Challenge, now: datetime) -> None:
+        """연결된 챌린지를 인정 완료하면 보상을 준다. 두 번째부터는 (user_id, reward_id) 유니크로 조용히 넘어간다.
+
+        보상은 인증의 부산물이라 여기서 문제가 생겨도 인증은 성공해야 한다.
+        중첩 트랜잭션(SAVEPOINT)으로 보상 쓰기만 되돌리고 바깥 인증 트랜잭션은 그대로 둔다.
+        """
+        try:
+            async with in_transaction():
+                rewards = await Reward.filter(
+                    code__in=FIRST_COMPLETION_REWARD_CODES, linked_challenge_code=challenge.code, is_enabled=True
+                )
+                if not rewards:
+                    return
+                user = await User.get(id=user_id)
+                for reward in rewards:
+                    # REQ-RECO-001 은 사용자가 고른 보상 유형에 맞는 보상을 준다고 한다.
+                    # 1단계 보상 마스터는 성장형(grow) 아이템 하나뿐이라, 다른 유형을 고른 사용자에게는 주지 않는다.
+                    # D 의 1단계 보상 범위 문서를 읽고 A 가 정한 해석이다. 지급하지 않았을 때는 응답에도 남기지 않는다.
+                    if str(reward.motivation_type) != str(user.motivation_type):
+                        continue
+                    await UserReward.get_or_create(user_id=user_id, reward_id=reward.id, defaults={"acquired_at": now})
+        except Exception:
+            logger.exception("보상 지급 실패 · user_id=%s challenge=%s", user_id, challenge.code)
 
     @staticmethod
     async def _grant_xp(user_id: int, amount: int) -> tuple[bool, int | None]:
