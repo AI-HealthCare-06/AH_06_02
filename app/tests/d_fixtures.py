@@ -86,17 +86,22 @@ def fake_artifact(
     model_version: str = TEST_MODEL_VERSION,
     status: str = "trained",
 ) -> ModelArtifact:
-    """ai_worker/model_contract.py 형식의 가짜 아티팩트. 숫자는 테스트용이다."""
+    """ai_worker/model_contract.py 형식의 가짜 아티팩트. 숫자는 테스트용이다.
+
+    실제 아티팩트처럼 질환마다 age 가 늘 들어 있다. 빈 섹션은 parse_artifact 가 거부하기 때문이다.
+    테스트 캐릭터는 age 에 매핑되지 않아 추천 점수에는 영향이 없다.
+    """
     diseases: dict[str, Any] = {}
     for disease in ("diabetes", "hypertension"):
+        scores = {"age": 100.0, **(global_scores or {}).get(disease, {})}
+        scales = {"age": 0.03, **(p95 or {}).get(disease, {})}
         diseases[disease] = {
             "global_importance": [
                 {"factor_key": key, "normalized_score": value, "importance": value / 1000, "rank": rank}
-                for rank, (key, value) in enumerate((global_scores or {}).get(disease, {}).items(), 1)
+                for rank, (key, value) in enumerate(scores.items(), 1)
             ],
             "positive_shap_p95_training_reference": {
-                key: {"positive_shap_p95": value, "threat_eligible": True}
-                for key, value in (p95 or {}).get(disease, {}).items()
+                key: {"positive_shap_p95": value, "threat_eligible": True} for key, value in scales.items()
             },
         }
     artifact = parse_artifact({"status": status, "model_version": model_version, "diseases": diseases})
