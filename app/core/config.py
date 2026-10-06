@@ -36,3 +36,6 @@ class Config(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_MINUTES: int = 14 * 24 * 60
     JWT_LEEWAY: int = 5
+
+    # 배포 모델 아티팩트. data/ 는 .gitignore 대상이라 저장소에 올라가지 않는다
+    MODEL_ARTIFACT_PATH: str = "data/model/artifact.json"
