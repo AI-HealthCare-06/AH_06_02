@@ -323,4 +323,4 @@ erDiagram
 
 ## 날짜 필드
 
-`start_date` · `end_date` · `scheduled_date` · `progress_week_start` · `log_date` 는 KST 달력 날짜라 DATE로 저장합니다. UTC로 변환해 하루를 밀지 않습니다. 그 밖의 시각은 모두 UTC DATETIME입니다.
+`start_date` · `end_date` · `scheduled_date` · `progress_week_start` · `log_date` 는 KST 달력 날짜라 DATE로 저장합니다. UTC로 변환해 하루를 밀지 않습니다. 그 밖의 시각은 KST(Asia/Seoul) naive DATETIME입니다. `TORTOISE_ORM` 이 `timezone: Asia/Seoul` 이고 `use_tz` 를 켜지 않아 저장 단계에서 UTC로 변환하지 않습니다.
