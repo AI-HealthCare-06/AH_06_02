@@ -175,6 +175,7 @@ class Challenge(models.Model):
 
     class Meta:
         table = "challenges"
+        indexes = (("factor_key", "is_enabled"),)
 
 
 class UserChallenge(models.Model):
