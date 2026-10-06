@@ -401,11 +401,11 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음.
+- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음. ※ A 제안 — 10/6. 응답 최상위에 model_version, model_experimental 추가. model_version은 이 추천을 만든 모델 버전으로 predictions.model_version과 같은 값이며 CharField(64)를 넘지 않는다. model_experimental은 boolean으로, 아직 독립 검증을 통과하지 않은 실험 아티팩트로 만든 추천이면 true다. 화면은 true일 때 실험 모델임을 표시한다. 추천 가능 여부와 factor_score 계산에는 영향을 주지 않는다. 추천 카드 조회(CHLG-02)에는 넣지 않았다. 생성 당시 실험 여부를 저장할 컬럼이 없어 지금 아티팩트 기준으로 붙이면 다른 모델로 만든 카드에 틀린 표시가 붙기 때문이다. D 확인 필요
 - **주요 에러**: CHLG_RECOMMENDATION_UNAVAILABLE, PRED_NOT_FOUND, UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-001·002
 - **사용 테이블**: predictions·prediction_contributions 읽기 / challenges 읽기 / challenge_recommendations 쓰기 / user_attack_cycles·user_monsters·monsters 읽기
-- **상태**: 수용안 — 집중 공략·주기 FK. 팀 확정 전·DB/API 미반영
+- **상태**: 수용안 — 집중 공략·주기 FK. 팀 확정 전·DB/API 미반영, A 제안 — 10/6. 응답에 model_version·model_experimental 추가. D 확인 필요
 
 ### CHLG-02 · 추천 카드 조회
 
