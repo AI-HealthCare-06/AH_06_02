@@ -33,12 +33,18 @@ def test_csv_has_19_rows_with_unique_codes() -> None:
     assert len({row["code"] for row in rows}) == CSV_ROWS
 
 
-def test_missing_operational_values_are_refused_without_flag(capsys: pytest.CaptureFixture[str]) -> None:
+def test_operational_values_are_filled_by_the_10_6_agreement() -> None:
     rows = read_csv(DEFAULT_CSV)
 
-    missing = missing_operational_values(rows)
-    assert len(missing["reward_xp"]) == CSV_ROWS
-    assert len(missing["manual_fallback_allowed"]) == CSV_ROWS
+    # 10/6 A·D 합의로 19행 모두 채워져 플래그 없이 진행한다
+    assert missing_operational_values(rows) == {}
+    assert check_operational_values(rows, allow_missing=False) is True
+
+
+def test_missing_operational_values_are_refused_without_flag(capsys: pytest.CaptureFixture[str]) -> None:
+    rows = [{**row, "reward_xp": ""} for row in read_csv(DEFAULT_CSV)]
+
+    assert len(missing_operational_values(rows)["reward_xp"]) == CSV_ROWS
     assert check_operational_values(rows, allow_missing=False) is False
     assert "운영 값 미정" in capsys.readouterr().out
     assert check_operational_values(rows, allow_missing=True) is True
@@ -51,9 +57,10 @@ def test_blank_cells_are_not_filled_with_invented_values() -> None:
     # NULL 허용 컬럼은 None
     assert first["description"] is None
     assert first["personalization_policy"] is None
+
+    blank_xp = parse_rows([{**row, "reward_xp": ""} for row in read_csv(DEFAULT_CSV)])[0]
     # NOT NULL 컬럼은 값을 넣지 않고 기본값에 맡긴다
-    assert "reward_xp" not in first
-    assert "manual_fallback_allowed" not in first
+    assert "reward_xp" not in blank_xp
 
 
 def test_unknown_column_is_rejected(tmp_path: Path) -> None:
@@ -91,10 +98,14 @@ class TestUpsertChallenges(TestCase):
         disabled = await Challenge.filter(is_enabled=False).values_list("code", flat=True)
         assert sorted(disabled) == ["CH_SLOW_EAT_20", "CH_VEGGIE_FIRST"]
 
-    async def test_blank_not_null_columns_take_db_defaults(self) -> None:
+    async def test_xp_and_fallback_follow_the_10_6_agreement(self) -> None:
         await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
 
+        # 하루 총 XP 는 난이도별 easy 12 · normal 24 · challenge 36
+        expected_xp = {"easy": 12, "normal": 24, "challenge": 36}
+        for challenge in await Challenge.all():
+            assert challenge.reward_xp == expected_xp[str(challenge.difficulty)]
+            # 수동 대체는 photo 만 허용한다
+            assert challenge.manual_fallback_allowed is (str(challenge.verification_type) == "photo")
         walk = await Challenge.get(code="CH_WALK_AFTER_MEAL")
-        assert walk.reward_xp == 0
-        assert walk.manual_fallback_allowed is True
         assert walk.description is None
