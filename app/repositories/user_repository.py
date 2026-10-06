@@ -1,7 +1,11 @@
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from tortoise.transactions import in_transaction
+
 from app.core import config
+from app.core.leveling import level_for_xp
 from app.models.users import MotivationType, Sex, User, UserStatus
 
 ALLOWED_UPDATE_FIELDS = [
@@ -24,6 +28,15 @@ LOGIN_LOCK_MINUTES = 10
 
 #: 탈퇴 후 이 기간이 지나면 식별정보와 업로드 사진을 지운다 (REQ-USER-009 · NFR-SEC-005)
 PURGE_AFTER_DAYS = 30
+
+
+@dataclass(frozen=True)
+class XpGrant:
+    """grant_xp() 반환값. API 명세서 '모듈 간 호출 규약' 의 { level_up, new_level, total_xp } 이다."""
+
+    level_up: bool
+    new_level: int
+    total_xp: int
 
 
 class UserRepository:
@@ -100,17 +113,23 @@ class UserRepository:
             update_fields.append(UPDATED_AT_FIELD)
             await user.save(update_fields=update_fields)
 
-    async def grant_xp(self, user_id: int, amount: int) -> User | None:
+    async def grant_xp(self, user_id: int, amount: int) -> XpGrant | None:
         """경험치 지급. D가 직접 users를 쓰지 않고 이 함수를 부른다.
 
-        레벨 공식은 4주차에 정한다. 지금은 누적만 한다.
+        누적 경험치에 따라 레벨을 다시 계산한다 (REQ-RECO-003). 레벨 판정은 여기 한 곳에서만 한다.
+        곡선은 app/core/leveling.py 의 임시값을 따른다.
         """
-        user = await self.get_user(user_id)
-        if user is None:
-            return None
-        user.total_xp += amount
-        await user.save(update_fields=["total_xp", UPDATED_AT_FIELD])
-        return user
+        async with in_transaction():
+            # 같은 사용자의 수행 기록이 겹쳐 들어와도 누적이 빠지지 않게 행을 잠근다
+            user = await self._model.select_for_update().get_or_none(id=user_id)
+            if user is None:
+                return None
+            before = level_for_xp(user.total_xp)
+            user.total_xp += amount
+            after = level_for_xp(user.total_xp)
+            user.level = after
+            await user.save(update_fields=["total_xp", "level", UPDATED_AT_FIELD])
+        return XpGrant(level_up=after > before, new_level=after, total_xp=user.total_xp)
 
     async def update_diagnosis(
         self,
