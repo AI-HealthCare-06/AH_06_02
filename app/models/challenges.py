@@ -329,9 +329,7 @@ class ChallengeRecommendation(models.Model):
     cooldown_choice = fields.CharEnumField(CooldownChoice, null=True)
     exclude_until = fields.DatetimeField(null=True)
     suppressed_until_manual = fields.BooleanField(default=False)
-    conversation_snapshot: dict[str, object] | None = fields.JSONField(
-        null=True, description="개인정보는 담지 않는다"
-    )
+    conversation_snapshot: dict[str, object] | None = fields.JSONField(null=True, description="개인정보는 담지 않는다")
     llm_model_version = fields.CharField(max_length=32, null=True)
     evidence_card_ids: list[str] | None = fields.JSONField(null=True, description="승인 근거 카드 ID 배열")
     proposed_goal: dict[str, object] | None = fields.JSONField(null=True, description="서버 검증을 통과한 개인 목표")
