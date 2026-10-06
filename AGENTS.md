@@ -8,10 +8,10 @@
 
 ## 시작하기 전에 읽을 것
 
-**화면을 만든다면 반드시 [`docs/design.md`](docs/design.md)를 먼저 읽습니다.**
+**화면을 만든다면 반드시 [`docs/02_team/design.md`](docs/02_team/design.md)를 먼저 읽습니다.**
 색·간격·타이포·상태 표현 규칙이 거기 있습니다. 읽지 않고 만들면 팀원 넷의 화면이 제각각이 됩니다.
 
-시각적 기준은 Figma `Hi-Fi v1`입니다. Figma와 `docs/design.md`가 다르면 Figma가 맞습니다. `docs/design.md`를 손으로 고치지 말고 팀에 확인하세요.
+시각적 기준은 Figma `Hi-Fi v1`입니다. Figma와 `docs/02_team/design.md`가 다르면 Figma가 맞습니다. 이 파일을 손으로 고치지 말고 팀에 확인하세요.
 
 ---
 
@@ -53,11 +53,21 @@ DB 스키마의 원본은 **구글 시트 테이블 명세서**입니다. 저장
 
 순서는 이렇습니다. 시트를 고친다 → 팀에 알린다 → ERD와 DDL을 다시 뽑는다 → migration을 쓴다 → 코드를 고친다.
 
-사본은 [`docs/01_planning`](docs/01_planning)에 있습니다. [`erd.md`](docs/01_planning/erd.md)가 다이어그램, [`erd.sql`](docs/01_planning/erd.sql)이 DDL 기준입니다. 시트와 사본이 다르면 시트가 맞습니다. 사본은 `python scripts/sync_specs.py`로 다시 뽑습니다.
+사본은 [`docs/01_planning`](docs/01_planning)에 있습니다. [`erd.md`](docs/01_planning/erd.md)가 다이어그램, [`erd.sql`](docs/01_planning/erd.sql)이 DDL 기준입니다. 시트와 사본이 다르면 시트가 맞습니다. 사본은 `uv run scripts/sync_specs.py`로 다시 뽑습니다.
 
 migration은 한 사람이 돌립니다. 번호가 겹치면 머지할 때 충돌하니, 새로 만들기 전에 main에 올라온 마지막 번호를 확인하세요.
 
 현재 기준은 14테이블 222컬럼 FK 23입니다. 실제 DB에 걸린 FK는 그중 일부입니다. `health_records` · `user_attack_cycles` · `user_challenge_occurrences` 가 들어온 뒤 한 번에 겁니다.
+
+---
+
+## 시간대
+
+DATETIME은 KST(Asia/Seoul) naive로 저장합니다. `TORTOISE_ORM` 이 `timezone: Asia/Seoul` 이고 `use_tz` 를 켜지 않았으며, 앱 코드도 `datetime.now(config.TIMEZONE)` 으로 통일되어 있습니다. 단일 시간대 서비스라 저장 단계에서 UTC로 변환하지 않습니다.
+
+`start_date` · `end_date` · `scheduled_date` · `progress_week_start` · `log_date` 는 KST 달력 날짜라 DATE로 저장합니다. UTC로 변환해 하루를 밀지 않습니다.
+
+API 응답 표기는 별도입니다. 시트의 공통 규칙을 따르세요.
 
 ---
 
@@ -143,7 +153,7 @@ SHAP 값을 두 가지로 나눠 씁니다. 섞지 마세요.
 ## 어디에 붙이나
 
 - API 추가: `app/apis/v1/` 아래 라우터를 만들고 `app/apis/v1/__init__.py`에 등록
-- 테이블 추가: `app/models/`에 Tortoise 모델을 쓰고 `app/db/databases.py`의 `MODELS`에 등록
+- 테이블 추가: `app/models/`에 Tortoise 모델을 쓰고 `app/core/db/databases.py`의 `TORTOISE_APP_MODELS`에 등록
 - 추론 로직 추가: `ai_worker/tasks/`에 작성하고 `ai_worker/main.py`에서 호출
 
 추론과 SHAP 계산은 `ai_worker`에서만 합니다. `app`에서 직접 돌리면 응답 P95 3초를 못 지킵니다. `app`은 큐에 넣고 `job_id`와 함께 202를 반환합니다.

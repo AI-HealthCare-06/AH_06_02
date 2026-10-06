@@ -4,7 +4,7 @@
 
 ## 공통 계약
 
-Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 토큰에서만 얻는다. body/query/path에 user_id를 받지 않는다. 원본 공통 규칙에 따라 성공은 `{"success":true,"data":{...}}`, 실패는 `{"success":false,"error":{"code":"...","message":"..."}}`로 반환한다. 반대쪽 data/error의 null 키는 추가하지 않는다. 모든 응답 헤더에 `X-Request-Id`를 넣는다. 시각은 UTC ISO 8601, JSON 키는 snake_case, 확률은 0~1, 결과 변화량은 percentage points다. 잘못된 JSON·요청 형식·필수값·범위 검증은 공통 규칙의 `VALIDATION_ERROR` 400을 사용한다.
+Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 토큰에서만 얻는다. body/query/path에 user_id를 받지 않는다. 원본 공통 규칙에 따라 성공은 `{"success":true,"data":{...}}`, 실패는 `{"success":false,"error":{"code":"...","message":"..."}}`로 반환한다. 반대쪽 data/error의 null 키는 추가하지 않는다. 모든 응답 헤더에 `X-Request-Id`를 넣는다. 시각은 KST(Asia/Seoul) ISO 8601로 +09:00 오프셋을 붙인다, JSON 키는 snake_case, 확률은 0~1, 결과 변화량은 percentage points다. 잘못된 JSON·요청 형식·필수값·범위 검증은 공통 규칙의 `VALIDATION_ERROR` 400을 사용한다.
 
 | ID | Method | Endpoint | 목적 | 성공 |
 |---|---|---|---|---|

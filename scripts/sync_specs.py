@@ -9,6 +9,7 @@
        당고킬러_테이블명세서 · 당고킬러_요구사항정의서 · 당고킬러_API 명세서
     2. uv run scripts/sync_specs.py
        기본값은 ~/Downloads 에서 가장 최근 파일을 찾는다. 이름에 (1) (2) 가 붙어도 된다.
+       파일 이름 앞부분은 그대로 두어야 한다. 바꾸면 못 찾는다.
     3. git diff 로 바뀐 데만 확인하고 커밋한다.
 
     다른 폴더에 받았으면  uv run scripts/sync_specs.py --src ~/바탕화면
@@ -32,11 +33,12 @@ from openpyxl.worksheet.worksheet import Worksheet
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUT_DIR = REPO_ROOT / "docs" / "01_planning"
 
-# 파일 이름에 이 조각이 들어 있으면 해당 문서로 본다
+# 파일 이름이 이 조각으로 시작해야 해당 문서로 본다.
+# '테이블' 처럼 느슨하게 잡으면 Downloads 에 있는 남의 자료나 옛날 초안이 걸린다.
 SOURCES = {
-    "table": ("테이블", "table-spec.md", "당고킬러_테이블명세서"),
-    "req": ("요구사항", "requirements.md", "당고킬러_요구사항정의서"),
-    "api": ("API", "api-spec.md", "당고킬러_API 명세서"),
+    "table": ("당고킬러_테이블명세서", "table-spec.md", "당고킬러_테이블명세서"),
+    "req": ("당고킬러_요구사항정의서", "requirements.md", "당고킬러_요구사항정의서"),
+    "api": ("당고킬러_API", "api-spec.md", "당고킬러_API 명세서"),
 }
 
 
@@ -258,8 +260,14 @@ def build_api_spec(wb: Any, today: str) -> str:
 
 
 def newest(src: Path, needle: str) -> Path | None:
-    hits = [p for p in src.glob("*.xlsx") if needle in p.name and not p.name.startswith("~$")]
-    return max(hits, key=lambda p: p.stat().st_mtime) if hits else None
+    """이름이 needle 로 시작하는 xlsx 중 가장 최근 것. 여러 개면 나머지도 알려준다."""
+    hits = [p for p in src.glob("*.xlsx") if p.name.startswith(needle) and not p.name.startswith("~$")]
+    if not hits:
+        return None
+    hits.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    for other in hits[1:]:
+        print(f"  건너뜀: {other.name}", file=sys.stderr)
+    return hits[0]
 
 
 def main() -> int:
@@ -278,7 +286,7 @@ def main() -> int:
         needle, out_name, sheet_name = SOURCES[key]
         path = newest(args.src, needle)
         if path is None:
-            missing.append(f"  {sheet_name} — {args.src}에서 '{needle}'이 들어간 xlsx를 못 찾음")
+            missing.append(f"  {sheet_name} — {args.src}에서 '{needle}'로 시작하는 xlsx를 못 찾음")
             continue
 
         workbook = load_workbook(path, data_only=True, read_only=True)

@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-05 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-06 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -327,7 +327,7 @@
 | 1 | id | BIGINT | NN | PK | AUTO_INCREMENT | 예정 기회 식별자. UNIQUE(user_challenge_id, scheduled_date, slot_code, sequence_no)로 같은 기회 중복 완료를 막는다 | 신규 — 10/3 A 결정 |
 | 2 | user_challenge_id | BIGINT | NN | FK |  | → user_challenges.id | 신규 — 10/3 A 결정 |
 | 3 | scheduled_date | DATE | NN |  |  | 예정 날짜. KST 달력 날짜로 저장하며 UTC로 변환하지 않는다 | 신규 — 10/3 A 결정 |
-| 4 | slot_code | VARCHAR(20) | NN |  |  | 식사 슬롯 lunch·dinner 등. 독립 회차는 빈 문자열. NULL은 유니크 제약이 걸리지 않아 쓰지 않는다 | 신규 — 10/3 A 결정 |
+| 4 | slot_code | VARCHAR(20) | NN |  | '' | 식사 슬롯 lunch·dinner 등. 독립 회차는 빈 문자열. NULL은 유니크 제약이 걸리지 않아 쓰지 않는다 | 신규 — 10/3 A 결정 |
 | 5 | sequence_no | TINYINT | NN |  | 1 | 같은 날 독립 회차 번호. 움직임 휴식 2회차면 2 | 신규 — 10/3 A 결정 |
 | 6 | status | ENUM('planned','completed','skipped','missed') | NN |  | planned | completed만 수행률 분자에 넣고 skipped·missed는 분모에만 남긴다 | 신규 — 10/3 A 결정 |
 | 7 | completed_log_id | BIGINT | NULL | FK |  | → challenge_logs.id. 이 기회를 인정한 수행 기록 | 신규 — 10/3 A 결정 |
@@ -373,7 +373,7 @@
 | FK | {단수형}_id. user_id · challenge_id · prediction_id |
 | 공통 컬럼 | created_at · updated_at 전 테이블 필수 |
 | 삭제 | soft delete. 탈퇴 데이터 30일 보관 때문에 물리 삭제하지 않음 |
-| 시각 | UTC DATETIME으로 저장. 화면에 보일 때만 KST 변환 |
+| 시각 | KST(Asia/Seoul) naive DATETIME으로 저장. use_tz를 켜지 않는다 |
 | 날짜 | 공략 주기의 start_date·end_date처럼 KST 달력 날짜를 뜻하는 필드는 DATE로 저장한다. UTC 변환으로 하루를 밀지 않는다 |
 | 불리언 | BOOLEAN. is_ 접두사는 마스터 테이블의 is_enabled에만 사용 |
 | 금액·비율 | 확률은 DECIMAL(5,4) 0~1로 저장. 화면에서 %로 변환 |
