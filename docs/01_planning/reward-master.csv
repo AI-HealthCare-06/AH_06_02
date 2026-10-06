@@ -1,0 +1,2 @@
+﻿code,name,motivation_type,reward_kind,unlock_condition,required_level,linked_challenge_code,is_enabled
+gluco_blade,글루코 블레이드,grow,item,식후 걷기 인정 수행 1회 누적,,CH_WALK_AFTER_MEAL,True

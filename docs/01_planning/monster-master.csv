@@ -1,0 +1,5 @@
+﻿code,no,name,title,factor_keys,disease_scope,default_impact_source,is_enabled
+spike,1,스파이크,혈당의 파동,[],diabetes,measured,True
+alde,2,알데,술잔의 잔향,"[""alcohol_frequency"", ""alcohol_amount""]",common,contribution,True
+cotinine,3,코티니,연기의 잔상,"[""smoking_current""]",common,contribution,True
+viscera,4,비세라,움직임의 빈틈,"[""bmi_high"", ""waist_high"", ""physical_activity_low"", ""strength_activity_low"", ""sedentary_time_high""]",common,contribution,True
