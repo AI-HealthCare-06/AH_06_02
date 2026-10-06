@@ -81,7 +81,23 @@ class ContextSlot(StrEnum):
 class UserChallengeStatus(StrEnum):
     ACTIVE = "active"
     COMPLETED = "completed"
+    # D28 경계에서 끝난 레거시 상태명. 화면에는 "기간 종료"로 표시하고 습관 졸업을 뜻하지 않는다
+    GRADUATED = "graduated"
     ABANDONED = "abandoned"
+
+
+class AttackCycleStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class OccurrenceStatus(StrEnum):
+    PLANNED = "planned"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"
+    MISSED = "missed"
 
 
 class Monster(models.Model):
@@ -150,11 +166,16 @@ class Challenge(models.Model):
     progress_value = fields.SmallIntField(default=10)
     is_enabled = fields.BooleanField(default=True)
     safety_check_required = fields.BooleanField(default=False)
+    context_priority = fields.SmallIntField(null=True, description="같은 factor 안의 후보 순위")
+    personalization_policy: dict[str, object] | None = fields.JSONField(
+        null=True, description="NULL이면 기존 고정 원형"
+    )
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
     class Meta:
         table = "challenges"
+        indexes = (("factor_key", "is_enabled"),)
 
 
 class UserChallenge(models.Model):
@@ -163,6 +184,7 @@ class UserChallenge(models.Model):
     challenge_id = fields.BigIntField()
     recommendation_id = fields.BigIntField(null=True)
     source_prediction_id = fields.BigIntField(null=True)
+    cycle_id = fields.BigIntField(null=True, db_index=True, description="레거시·주기 밖 미션만 NULL")
     status = fields.CharEnumField(UserChallengeStatus, default=UserChallengeStatus.ACTIVE)
     start_date = fields.DateField()
     end_date = fields.DateField()
@@ -172,6 +194,15 @@ class UserChallenge(models.Model):
     completed_at = fields.DatetimeField(null=True)
     stopped_at = fields.DatetimeField(null=True)
     stop_reason = fields.CharField(max_length=100, null=True)
+    habit_established = fields.BooleanField(null=True, default=None, description="1단계는 판정 유예. NULL=미평가")
+    goal_config_snapshot: dict[str, object] | None = fields.JSONField(
+        null=True, description="예정 기회 배열은 담지 않는다"
+    )
+    completed_occurrence_count = fields.SmallIntField(null=True, description="종료 시점 인정 완료 기회 수")
+    planned_occurrence_count = fields.SmallIntField(null=True, description="종료 시점 예정 기회 수. 수행률 분모")
+    completion_rate = fields.DecimalField(max_digits=5, decimal_places=4, null=True, description="분모 0이면 NULL")
+    summary_computed_at = fields.DatetimeField(null=True)
+    summary_policy_version = fields.CharField(max_length=20, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -180,12 +211,58 @@ class UserChallenge(models.Model):
         indexes = (("user_id", "status"),)
 
 
+class UserAttackCycle(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user_id = fields.BigIntField()
+    # 같은 사용자 소유인지는 DDL의 복합 FK (target_user_monster_id, user_id)가 강제한다.
+    # active_user_id 생성 컬럼과 그 유니크도 Tortoise가 만들지 못해 migration에서 raw SQL로 건다.
+    target_user_monster_id = fields.BigIntField(description="같은 사용자 소유의 공략 대상")
+    start_date = fields.DateField(null=True, description="draft에서는 NULL. KST D0")
+    end_date = fields.DateField(null=True, description="start_date+27. 마지막 수행 가능 날짜 포함")
+    status = fields.CharEnumField(AttackCycleStatus, default=AttackCycleStatus.DRAFT)
+    extra_added_count = fields.SmallIntField(default=0, description="2주차 이후 추가 횟수 0 또는 1")
+    policy_version = fields.CharField(max_length=32)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "user_attack_cycles"
+        indexes = (("user_id", "status"),)
+
+
+class UserChallengeOccurrence(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user_challenge_id = fields.BigIntField()
+    scheduled_date = fields.DateField(db_index=True, description="KST 달력 날짜")
+    slot_code = fields.CharField(
+        max_length=20,
+        default="",
+        description="lunch·dinner 등. 독립 회차는 빈 문자열. NULL은 유니크가 걸리지 않아 쓰지 않는다",
+    )
+    sequence_no = fields.SmallIntField(default=1, description="같은 날 독립 회차 번호")
+    status = fields.CharEnumField(
+        OccurrenceStatus,
+        default=OccurrenceStatus.PLANNED,
+        description="completed만 수행률 분자. skipped·missed는 분모에만 남는다",
+    )
+    completed_log_id = fields.BigIntField(null=True, unique=True, description="이 기회를 인정한 수행 기록")
+    completed_at = fields.DatetimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "user_challenge_occurrences"
+        unique_together = (("user_challenge_id", "scheduled_date", "slot_code", "sequence_no"),)
+        indexes = (("user_challenge_id", "status"),)
+
+
 # ---- D persistence models: recommendation / logs / rewards ----
 
 
 class RecommendationSourceType(StrEnum):
     PREDICTION_PERSONAL = "prediction_personal"
     DIAGNOSIS_GLOBAL = "diagnosis_global"
+    CONVERSATION = "conversation"
 
 
 class RecommendationAction(StrEnum):
@@ -241,6 +318,7 @@ class ChallengeRecommendation(models.Model):
     id = fields.BigIntField(primary_key=True)
     user_id = fields.BigIntField()
     challenge_id = fields.BigIntField()
+    cycle_id = fields.BigIntField(null=True, description="추천을 만든 주기. 지난 주기 추천으로 시작 금지")
     source_type = fields.CharEnumField(RecommendationSourceType)
     factor_key = fields.CharField(max_length=50)
     factor_score = fields.DecimalField(max_digits=8, decimal_places=5, null=True)
@@ -252,6 +330,10 @@ class ChallengeRecommendation(models.Model):
     cooldown_choice = fields.CharEnumField(CooldownChoice, null=True)
     exclude_until = fields.DatetimeField(null=True)
     suppressed_until_manual = fields.BooleanField(default=False)
+    conversation_snapshot: dict[str, object] | None = fields.JSONField(null=True, description="개인정보는 담지 않는다")
+    llm_model_version = fields.CharField(max_length=32, null=True)
+    evidence_card_ids: list[str] | None = fields.JSONField(null=True, description="승인 근거 카드 ID 배열")
+    proposed_goal: dict[str, object] | None = fields.JSONField(null=True, description="서버 검증을 통과한 개인 목표")
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
