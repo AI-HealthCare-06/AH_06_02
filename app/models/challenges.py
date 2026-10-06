@@ -81,7 +81,22 @@ class ContextSlot(StrEnum):
 class UserChallengeStatus(StrEnum):
     ACTIVE = "active"
     COMPLETED = "completed"
+    GRADUATED = "graduated"
     ABANDONED = "abandoned"
+
+
+class AttackCycleStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class OccurrenceStatus(StrEnum):
+    PLANNED = "planned"
+    COMPLETED = "completed"
+    SKIPPED = "skipped"
+    MISSED = "missed"
 
 
 class Monster(models.Model):
@@ -150,11 +165,35 @@ class Challenge(models.Model):
     progress_value = fields.SmallIntField(default=10)
     is_enabled = fields.BooleanField(default=True)
     safety_check_required = fields.BooleanField(default=False)
+    context_priority = fields.SmallIntField(null=True)
+    personalization_policy: dict[str, object] | None = fields.JSONField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
     class Meta:
         table = "challenges"
+        indexes = (("factor_key", "is_enabled"),)
+
+
+class UserAttackCycle(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user_id = fields.BigIntField()
+    target_user_monster_id = fields.BigIntField()
+    # REQ-RECO-006: a draft does not start the KST calendar period.
+    start_date = fields.DateField(null=True)
+    end_date = fields.DateField(null=True)
+    status = fields.CharEnumField(AttackCycleStatus, default=AttackCycleStatus.DRAFT)
+    extra_added_count = fields.SmallIntField(default=0)
+    policy_version = fields.CharField(max_length=32)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "user_attack_cycles"
+        indexes = (("user_id", "status"),)
+
+    # The DDL-owned generated active_user_id and composite ownership FK
+    # are installed by A's raw SQL migration, not by ORM relationship fields.
 
 
 class UserChallenge(models.Model):
@@ -163,6 +202,7 @@ class UserChallenge(models.Model):
     challenge_id = fields.BigIntField()
     recommendation_id = fields.BigIntField(null=True)
     source_prediction_id = fields.BigIntField(null=True)
+    cycle_id = fields.BigIntField(null=True)
     status = fields.CharEnumField(UserChallengeStatus, default=UserChallengeStatus.ACTIVE)
     start_date = fields.DateField()
     end_date = fields.DateField()
@@ -172,12 +212,39 @@ class UserChallenge(models.Model):
     completed_at = fields.DatetimeField(null=True)
     stopped_at = fields.DatetimeField(null=True)
     stop_reason = fields.CharField(max_length=100, null=True)
+    # REQ-CHLG-011: NULL means unevaluated; phase one has no habit verdict.
+    habit_established = fields.BooleanField(null=True)
+    goal_config_snapshot: dict[str, object] | None = fields.JSONField(null=True)
+    completed_occurrence_count = fields.SmallIntField(null=True)
+    planned_occurrence_count = fields.SmallIntField(null=True)
+    completion_rate = fields.DecimalField(max_digits=5, decimal_places=4, null=True)
+    summary_computed_at = fields.DatetimeField(null=True)
+    summary_policy_version = fields.CharField(max_length=20, null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
     class Meta:
         table = "user_challenges"
-        indexes = (("user_id", "status"),)
+        indexes = (("user_id", "status"), ("cycle_id",))
+
+
+class UserChallengeOccurrence(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user_challenge_id = fields.BigIntField()
+    scheduled_date = fields.DateField()
+    # Empty string keeps independent repetitions inside the composite UNIQUE.
+    slot_code = fields.CharField(max_length=20, default="")
+    sequence_no = fields.SmallIntField(default=1)
+    status = fields.CharEnumField(OccurrenceStatus, default=OccurrenceStatus.PLANNED)
+    completed_log_id = fields.BigIntField(null=True, unique=True)
+    completed_at = fields.DatetimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "user_challenge_occurrences"
+        unique_together = (("user_challenge_id", "scheduled_date", "slot_code", "sequence_no"),)
+        indexes = (("user_challenge_id", "status"), ("scheduled_date",))
 
 
 # ---- D persistence models: recommendation / logs / rewards ----
@@ -186,6 +253,7 @@ class UserChallenge(models.Model):
 class RecommendationSourceType(StrEnum):
     PREDICTION_PERSONAL = "prediction_personal"
     DIAGNOSIS_GLOBAL = "diagnosis_global"
+    CONVERSATION = "conversation"
 
 
 class RecommendationAction(StrEnum):
@@ -241,6 +309,7 @@ class ChallengeRecommendation(models.Model):
     id = fields.BigIntField(primary_key=True)
     user_id = fields.BigIntField()
     challenge_id = fields.BigIntField()
+    cycle_id = fields.BigIntField(null=True)
     source_type = fields.CharEnumField(RecommendationSourceType)
     factor_key = fields.CharField(max_length=50)
     factor_score = fields.DecimalField(max_digits=8, decimal_places=5, null=True)
@@ -252,6 +321,11 @@ class ChallengeRecommendation(models.Model):
     cooldown_choice = fields.CharEnumField(CooldownChoice, null=True)
     exclude_until = fields.DatetimeField(null=True)
     suppressed_until_manual = fields.BooleanField(default=False)
+    # REQ-CHLG-012: persistence only; recommendation validation is a later step.
+    conversation_snapshot: dict[str, object] | None = fields.JSONField(null=True)
+    llm_model_version = fields.CharField(max_length=32, null=True)
+    evidence_card_ids: list[str] | None = fields.JSONField(null=True)
+    proposed_goal: dict[str, object] | None = fields.JSONField(null=True)
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
