@@ -4,7 +4,7 @@
 
 code 기준 upsert 라 다시 돌려도 행이 늘지 않는다.
 CSV 빈 칸은 임의 값으로 채우지 않는다. NULL 허용 컬럼은 None, NOT NULL 컬럼은 모델·DB 기본값에 맡긴다.
-monsters·rewards 는 마스터 값이 아직 없어 다루지 않는다.
+read_csv · parse_rows · upsert_by_code 는 seed_monsters · seed_rewards 도 같이 쓴다.
 """
 
 import argparse
@@ -17,7 +17,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
-from tortoise import Tortoise, fields
+from tortoise import Tortoise, fields, models
 from tortoise.transactions import in_transaction
 
 from app.models.challenges import Challenge
@@ -76,13 +76,13 @@ def _convert(field: fields.Field[Any], column: str, raw: str) -> Any:
     return raw
 
 
-def parse_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
-    """CSV 행을 Challenge 필드 값으로 바꾼다. DB 에 쓰기 전에 전 행을 먼저 검사한다."""
-    fields_map = Challenge._meta.fields_map
+def parse_rows(rows: list[dict[str, str]], model: type[models.Model] = Challenge) -> list[dict[str, Any]]:
+    """CSV 행을 모델 필드 값으로 바꾼다. DB 에 쓰기 전에 전 행을 먼저 검사한다."""
+    fields_map = model._meta.fields_map
     if rows:
         unknown = set(rows[0]) - set(fields_map)
         if unknown:
-            raise SeedError(f"challenges 에 없는 컬럼입니다: {sorted(unknown)}")
+            raise SeedError(f"{model._meta.db_table} 에 없는 컬럼입니다: {sorted(unknown)}")
 
     parsed: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -108,12 +108,16 @@ def parse_rows(rows: list[dict[str, str]]) -> list[dict[str, Any]]:
 
 
 async def upsert_challenges(parsed: list[dict[str, Any]]) -> SeedResult:
+    return await upsert_by_code(Challenge, parsed)
+
+
+async def upsert_by_code(model: type[models.Model], parsed: list[dict[str, Any]]) -> SeedResult:
     """code 기준 upsert. 한 트랜잭션으로 묶어 중간에 실패하면 아무것도 남기지 않는다."""
     created = updated = 0
     async with in_transaction():
         for values in parsed:
             defaults = {key: value for key, value in values.items() if key != "code"}
-            _, was_created = await Challenge.update_or_create(code=values["code"], defaults=defaults)
+            _, was_created = await model.update_or_create(code=values["code"], defaults=defaults)
             if was_created:
                 created += 1
             else:

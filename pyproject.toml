@@ -60,6 +60,8 @@ src_folder = "./."
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
+# CI 와 같은 범위. tests/model_contract 는 CI 에서 pandas 를 붙여 unittest 로 따로 돈다
+testpaths = ["app"]
 
 [tool.ruff]
 # 기본 라인 길이 설정
