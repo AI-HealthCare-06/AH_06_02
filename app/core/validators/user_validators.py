@@ -43,7 +43,12 @@ def validate_birth_year(birth_year: int) -> int:
     return birth_year
 
 
+#: 키 허용 범위. REQ-HLTH-003 기준이다
+MIN_HEIGHT_CM = 100
+MAX_HEIGHT_CM = 250
+
+
 def validate_height_cm(height_cm: float) -> float:
-    if not 50 <= height_cm <= 250:
-        raise ValueError("키는 50cm 이상 250cm 이하로 입력해주세요.")
+    if not MIN_HEIGHT_CM <= height_cm <= MAX_HEIGHT_CM:
+        raise ValueError(f"키는 {MIN_HEIGHT_CM}cm 이상 {MAX_HEIGHT_CM}cm 이하로 입력해주세요.")
     return height_cm
