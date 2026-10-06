@@ -12,11 +12,13 @@ from app.models.challenges import (
     Monster,
     RecommendationAction,
     RecommendationSourceType,
+    UserAttackCycle,
     UserChallenge,
     UserChallengeStatus,
     UserMonster,
 )
 from app.services.challenges import ChallengeCoreService, progress_rate, week_start_for
+from app.tests.d_fixtures import make_cycle
 
 KST = ZoneInfo("Asia/Seoul")
 
@@ -47,9 +49,14 @@ async def make_recommendation(
     challenge: Challenge,
     rank: int = 1,
 ) -> ChallengeRecommendation:
+    # 추천은 현재 주기에 연결돼야 시작할 수 있다. 사용자당 draft 주기 하나를 만들어 쓴다
+    cycle = await UserAttackCycle.filter(user_id=user_id).first() or await make_cycle(
+        user_id, ["smoking_current", "physical_activity_low"]
+    )
     return await ChallengeRecommendation.create(
         user_id=user_id,
         challenge_id=challenge.id,
+        cycle_id=cycle.id,
         source_type=RecommendationSourceType.PREDICTION_PERSONAL,
         factor_key=challenge.factor_key or "bonus",
         rank=rank,
@@ -85,8 +92,9 @@ class TestChallengeCoreService(TestCase):
         item = created[0]
         assert item.status == UserChallengeStatus.ACTIVE
         assert item.start_date == date(2026, 9, 30)
-        assert item.end_date == date(2026, 10, 13)
-        assert item.duration_days_snapshot == 14
+        # 마스터 duration_days 가 아니라 주기 공통 종료일 D0+27 (REQ-CHLG-011)
+        assert item.end_date == date(2026, 10, 27)
+        assert item.duration_days_snapshot == 28
         assert item.daily_target_count_snapshot == challenge.daily_target_count
 
         await recommendation.refresh_from_db()
