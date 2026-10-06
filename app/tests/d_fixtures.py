@@ -84,6 +84,7 @@ def fake_artifact(
     p95: dict[str, dict[str, float]] | None = None,
     *,
     model_version: str = TEST_MODEL_VERSION,
+    status: str = "trained",
 ) -> ModelArtifact:
     """ai_worker/model_contract.py 형식의 가짜 아티팩트. 숫자는 테스트용이다."""
     diseases: dict[str, Any] = {}
@@ -98,7 +99,7 @@ def fake_artifact(
                 for key, value in (p95 or {}).get(disease, {}).items()
             },
         }
-    artifact = parse_artifact({"status": "trained", "model_version": model_version, "diseases": diseases})
+    artifact = parse_artifact({"status": status, "model_version": model_version, "diseases": diseases})
     assert artifact is not None
     return artifact
 
