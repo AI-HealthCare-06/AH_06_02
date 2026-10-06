@@ -91,3 +91,12 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.mypy]
+# scripts/model 은 __init__.py 없이 scripts.model.* 로 import 되므로 경로 기준으로 모듈 이름을 정한다
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+# 타입 정보를 내보내지 않는 학습·문서 스크립트용 서드파티
+module = ["pandas.*", "pyreadstat.*", "joblib.*", "shap.*", "sklearn.*", "openpyxl.*"]
+ignore_missing_imports = true
