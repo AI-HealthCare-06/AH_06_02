@@ -16,6 +16,7 @@ app 이미지에는 ai_worker 가 들어가지 않아 import 하지 않고, 위�
 """
 
 import json
+import logging
 import math
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -23,6 +24,8 @@ from pathlib import Path
 from typing import Any
 
 from app.core import config
+
+logger = logging.getLogger(__name__)
 
 DEPLOYABLE_STATUS = "trained"
 #: scripts/model/run_baseline.py 가 쓰는 실험 표시. 2024 자료로 후보를 고르고 같은 2024 로 성능을 쟀으므로
@@ -50,29 +53,58 @@ class ModelArtifact:
 
 
 def parse_artifact(raw: Mapping[str, Any]) -> ModelArtifact | None:
-    """배포용과 실험용 아티팩트를 받는다. 그 밖의 status 나 model_version 이 없으면 None."""
+    """배포용과 실험용 아티팩트를 받는다. 형식이 맞지 않으면 이유를 로그에 남기고 None.
+
+    점수나 P95 기준이 빈 아티팩트를 받아들이면 추천이 왜 안 나오는지 알 수 없으므로 읽는 단계에서 거부한다.
+    """
     status = raw.get("status")
-    if status not in ACCEPTED_STATUSES or not raw.get("model_version"):
+    if status not in ACCEPTED_STATUSES:
+        _log_rejection(f"status {status!r} 는 받지 않는다 (허용: {sorted(ACCEPTED_STATUSES)})")
         return None
+    if not raw.get("model_version"):
+        _log_rejection("model_version 이 없다")
+        return None
+    diseases = raw.get("diseases")
+    if not isinstance(diseases, Mapping) or not diseases:
+        # run_baseline.py 의 질환별 산출물은 global_importance 를 최상위에 둔다.
+        # scripts/model/build_serving_artifact.py 로 합친 파일을 넣어야 한다
+        _log_rejection("diseases 가 없거나 비어 있다. 질환별 실험 산출물은 build_serving_artifact.py 로 합쳐야 한다")
+        return None
+
     global_scores: dict[str, dict[str, float]] = {}
     references: dict[str, dict[str, FactorReference]] = {}
-    for disease, body in (raw.get("diseases") or {}).items():
-        global_scores[disease] = {
-            item["factor_key"]: float(item["normalized_score"]) for item in body.get("global_importance", [])
-        }
-        references[disease] = {
-            factor: FactorReference(
-                positive_shap_p95=float(item["positive_shap_p95"]),
-                threat_eligible=bool(item["threat_eligible"]),
-            )
-            for factor, item in (body.get("positive_shap_p95_training_reference") or {}).items()
-        }
+    try:
+        for disease, body in diseases.items():
+            importance = body.get("global_importance") or []
+            reference = body.get("positive_shap_p95_training_reference") or {}
+            if not importance:
+                _log_rejection(f"{disease} 의 global_importance 가 비어 있다")
+                return None
+            if not reference:
+                _log_rejection(f"{disease} 의 positive_shap_p95_training_reference 가 비어 있다")
+                return None
+            global_scores[disease] = {item["factor_key"]: float(item["normalized_score"]) for item in importance}
+            references[disease] = {
+                factor: FactorReference(
+                    positive_shap_p95=float(item["positive_shap_p95"]),
+                    threat_eligible=bool(item["threat_eligible"]),
+                )
+                for factor, item in reference.items()
+            }
+    except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        _log_rejection(f"항목 형식이 맞지 않다: {exc!r}")
+        return None
+
     return ModelArtifact(
         model_version=str(raw["model_version"]),
         global_scores=global_scores,
         references=references,
         experimental=ACCEPTED_STATUSES[status],
     )
+
+
+def _log_rejection(reason: str) -> None:
+    logger.warning("모델 아티팩트 거부: %s", reason)
 
 
 class ArtifactLoader:
