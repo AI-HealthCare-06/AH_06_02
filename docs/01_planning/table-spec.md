@@ -181,10 +181,10 @@
 | 14 | relation_type | ENUM('direct','supporting','general') | NN |  | 'supporting' | direct=서비스 입력값을 직접 바꿈 · supporting=관련 행동 · general=모델 비연계 | 신규 — 9/28 김이경 Mapping v0 |
 | 15 | exclude_condition | VARCHAR(200) | NULL |  |  | 추천 제외 조건 설명. 시스템 판정이 가능한 것만 코드로 구현 | 신규 — 9/28 김이경 Mapping v0 |
 | 16 | context_label | VARCHAR(40) | NULL |  |  | 화면 표시용 맥락 문구. 기상 후 · 음주 이벤트 · 좌식 중 등 | 신규 — 9/28 김이경 Mapping v0 |
-| 17 | manual_fallback_allowed | BOOLEAN | NN |  | TRUE |  | 확정 |
+| 17 | manual_fallback_allowed | BOOLEAN | NN |  | TRUE | 1단계 마스터는 verification_type='photo'인 경우만 TRUE, 나머지는 FALSE를 명시한다. 기존 manual 인증은 그대로 manual을 사용하며 timer·value 등의 수동 대체는 1단계에서 허용하지 않는다. DB 기본값 TRUE에 의존하지 않는다. | 정합화 — 10/6 A·D photo만 수동 대체 허용 합의 |
 | 18 | context_type | ENUM('none','meal','event') | NN |  | 'none' | 시각이 아닌 맥락. event는 음주·흡연처럼 기회가 생긴 날에만 수행 가능 | 변경 — 9/28 김이경 Mapping v0 |
 | 19 | context_slots | JSON | NULL |  |  | ['lunch','dinner'] | 확정 |
-| 20 | reward_xp | SMALLINT | NN |  | 0 | 1회 수행당 지급 경험치 | 신규 — 9/24 레벨 도입 결정 |
+| 20 | reward_xp | SMALLINT | NN |  | 0 | 해당 챌린지의 기본 난이도로 하루 목표를 모두 완료했을 때 받는 총 경험치. easy 12·normal 24·challenge 36. 수행 1회마다 하루 총 XP를 개인 목표 횟수로 나누어 지급한다 (REQ-RECO-003). 개인화 시 선택 난이도의 하루 XP를 적용하며 시작 시 보존 방식은 A·D 확인 후 구현한다. | 개정 — 10/6 A·D 하루 총 XP 12·24·36 합의 |
 | 21 | progress_value | SMALLINT | NN |  | 10 | 인정된 수행 1회당 쌓이는 공략 점수. MVP는 전 챌린지 동일 값. factor_key가 NULL이면 반드시 0 (마스터 데이터 규칙, REQ-PRED-011) | 변경 — 9/28 용어 치환 |
 | 22 | is_enabled | BOOLEAN | NN |  | TRUE | 운영 중인 정의인지 | 확정 |
 | 23 | safety_check_required | BOOLEAN | NN |  | False | 운동 전 안전 확인이 필요한 챌린지 여부. TRUE이면 챌린지 시작 요청에서 safety_confirmed=true를 서버가 검증한다. safety_confirmed 응답값 자체는 저장하지 않는다. category='activity' 전체가 아니라 마스터 데이터에서 필요한 챌린지만 TRUE로 지정한다. (REQ-CHLG-010) | 신규 — 9/30 REQ-CHLG-010 안전확인 판정 |
