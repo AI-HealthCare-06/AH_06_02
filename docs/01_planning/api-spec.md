@@ -452,12 +452,12 @@
 
 - **인증**: 필요
 - **요청 파라미터**: —
-- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean. 시작 목표는 본인 추천의 검증된 proposed_goal에서 읽고 허용 조합·슬롯·기회를 재검증한다. 초기 진행 합계 최대 2개, 2주차부터 적합 후보와 사용자 희망일 때 주기당 1개 추가, 기존 포함 최대 3개. safety_check_required=true인 마스터만 사용자가 직접 safety_confirmed=true로 확인; LLM 생성값 불인정. ※ 공략 미션은 본인 주기와 연결한다. 첫 시작은 draft→active 전환을 함께 검증하고, 추가 시작은 기존 active 주기만 허용한다. 추천의 cycle_id가 그 주기와 같아야 하며 challenge.factor_key가 대상 monsters.factor_keys에 포함되어야 한다. LLM이 대상/주기를 바꾸지 않는다.
+- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean. 시작 목표는 본인 추천의 검증된 proposed_goal에서 읽고 허용 조합·슬롯·기회를 재검증한다. 초기 진행 합계 최대 2개, 2주차부터 적합 후보와 사용자 희망일 때 주기당 1개 추가, 기존 포함 최대 3개. safety_check_required=true인 마스터만 사용자가 직접 safety_confirmed=true로 확인; LLM 생성값 불인정. ※ 공략 미션은 본인 주기와 연결한다. 첫 시작은 draft→active 전환을 함께 검증하고, 추가 시작은 기존 active 주기만 허용한다. 추천의 cycle_id가 그 주기와 같아야 하며 challenge.factor_key가 대상 monsters.factor_keys에 포함되어야 한다. LLM이 대상/주기를 바꾸지 않는다. 기존 + scheduled_dates: ["YYYY-MM-DD", ...] 예정 이용일을 사용자가 확인해야 하는 챌린지에 쓴다. CH_WALK_ONE_STOP 처럼 발생 시점을 추정할 수 없는 카드가 해당한다. 평일·매일로 추정하지 않는다.
 - **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, cycle_id, status, start_date, end_date, daily_target_count, target_value, duration_days, goal_config_snapshot }], active_count } ※ 목표는 개인 snapshot. 같은 공략 주기 D28 00:00 KST 종료, end_date는 마지막 수행일(D0+27) 포함. D7 추가 duration_days=21. 공통 마스터를 사용자별로 덮어쓰지 않는다. ※ 응답 cycle_id는 연결 주기 ID. 주기 end_date로 공통 종료·실제 일수를 snapshot 저장. 상대 주차는 주기 시작일로 계산. 추가 시작은 주기 잠금 후 extra_added_count≤1 검증. ※ 첫 사용자 확인 때 draft 주기→active와 D0/D28을 함께 확정. 추천 조회로 기간을 시작하지 않음. 미션 생성·주기 전환은 동일 트랜잭션.
 - **주요 에러**: CHLG_LIMIT_EXCEEDED, CHLG_RECOMMENDATION_NOT_FOUND, CHLG_ALREADY_ACTIVE, CHLG_SAFETY_CONFIRMATION_REQUIRED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-002 · REQ-CHLG-010 · REQ-CHLG-011 · REQ-CHLG-012
 - **사용 테이블**: challenge_recommendations 쓰기(accepted·거절횟수 초기화) / challenges 읽기 / user_challenges 쓰기 / user_attack_cycles 읽기·추가 횟수 갱신
-- **상태**: 수용안 — 동일 주기·대상 일치·공통 종료·추가 횟수 검증. 팀 확정 후 구현
+- **상태**: 수용안 — 동일 주기·대상 일치·공통 종료·추가 횟수 검증. 팀 확정 후 구현, A 제안 — 10/6. 예정 이용일 입력 필드 보완. D 확인 필요
 
 ### CHLG-06 · 진행 중 챌린지 조회
 
@@ -536,3 +536,16 @@
 - **관련 요구사항**: REQ-RECO-001·002·004
 - **사용 테이블**: user_rewards·rewards 읽기
 - **상태**: 작성
+
+### CHLG-10 · 공략 대상 변경
+
+`PATCH /api/v1/attack-cycles/current/target`
+
+- **인증**: 필요
+- **요청 파라미터**: —
+- **요청 본문**: { user_monster_id }
+- **응답 (성공)**: { cycle_id, target_user_monster_id, monster: { monster_id, code, name } }
+- **주요 에러**: VALIDATION_ERROR, UNAUTHORIZED, CHLG_NOT_FOUND, CHLG_NOT_ACTIVE
+- **관련 요구사항**: REQ-RECO-006
+- **사용 테이블**: user_attack_cycles 쓰기, user_monsters 읽기 (본인 소유만)
+- **상태**: A 제안 — 10/6. REQ-RECO-006에 "사용자가 도감에서 직접 변경할 수 있다"가 있으나 엔드포인트가 없어 추가 제안. D 확인 필요
