@@ -8,6 +8,9 @@ global normalized_score 와 positive_shap_p95 는 DB 가 아니라 모델 아티
                                "positive_shap_p95_training_reference": {factor: {"positive_shap_p95",
                                                                                   "threat_eligible", ...}}}}}
 
+status 는 배포용 "trained" 와 실험용 "experiment_only_not_deployable" 만 받는다.
+실험 아티팩트는 1단계 시연용으로 받되 experimental=True 로 표시해 응답까지 전한다.
+
 app 이미지에는 ai_worker 가 들어가지 않아 import 하지 않고, 위협도 식만 같은 규칙으로 옮겼다.
 두 구현이 어긋나지 않는지는 테스트가 확인한다.
 """
@@ -22,6 +25,11 @@ from typing import Any
 from app.core import config
 
 DEPLOYABLE_STATUS = "trained"
+#: scripts/model/run_baseline.py 가 쓰는 실험 표시. 2024 자료로 후보를 고르고 같은 2024 로 성능을 쟀으므로
+#: 독립 일반화 성능이 아니다 (docs/03_ai_data/experiment.md · submission-status.md)
+EXPERIMENTAL_STATUS = "experiment_only_not_deployable"
+#: 받는 status → 실험 모델 여부. 그 밖의 status 는 거부한다
+ACCEPTED_STATUSES = {DEPLOYABLE_STATUS: False, EXPERIMENTAL_STATUS: True}
 
 
 @dataclass(frozen=True)
@@ -37,11 +45,14 @@ class ModelArtifact:
     global_scores: dict[str, dict[str, float]]
     #: disease -> factor_key -> 개인 위협도 기준
     references: dict[str, dict[str, FactorReference]]
+    #: 실험 아티팩트면 True. 이 값으로 낸 점수는 응답에 실험 모델임을 함께 싣는다
+    experimental: bool
 
 
 def parse_artifact(raw: Mapping[str, Any]) -> ModelArtifact | None:
-    """배포 가능한 아티팩트만 받는다. 실험 산출물(status 가 trained 가 아님)은 None."""
-    if raw.get("status") != DEPLOYABLE_STATUS or not raw.get("model_version"):
+    """배포용과 실험용 아티팩트를 받는다. 그 밖의 status 나 model_version 이 없으면 None."""
+    status = raw.get("status")
+    if status not in ACCEPTED_STATUSES or not raw.get("model_version"):
         return None
     global_scores: dict[str, dict[str, float]] = {}
     references: dict[str, dict[str, FactorReference]] = {}
@@ -56,7 +67,12 @@ def parse_artifact(raw: Mapping[str, Any]) -> ModelArtifact | None:
             )
             for factor, item in (body.get("positive_shap_p95_training_reference") or {}).items()
         }
-    return ModelArtifact(model_version=str(raw["model_version"]), global_scores=global_scores, references=references)
+    return ModelArtifact(
+        model_version=str(raw["model_version"]),
+        global_scores=global_scores,
+        references=references,
+        experimental=ACCEPTED_STATUSES[status],
+    )
 
 
 class ArtifactLoader:

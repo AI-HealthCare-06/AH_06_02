@@ -149,6 +149,8 @@ class GeneratedRecommendations:
     cycle: UserAttackCycle
     monster: Monster
     model_version: str
+    #: 실험 아티팩트로 낸 점수인지. 추천 가능 여부에는 영향을 주지 않고 표시만 한다
+    model_experimental: bool
 
 
 class RecommendationService:
@@ -220,6 +222,7 @@ class RecommendationService:
             cycle=cycle,
             monster=monster,
             model_version=artifact.model_version,
+            model_experimental=artifact.experimental,
         )
 
     async def _factor_scores(
