@@ -166,6 +166,10 @@ class Challenge(models.Model):
     progress_value = fields.SmallIntField(default=10)
     is_enabled = fields.BooleanField(default=True)
     safety_check_required = fields.BooleanField(default=False)
+    context_priority = fields.SmallIntField(null=True, description="같은 factor 안의 후보 순위")
+    personalization_policy: dict[str, object] | None = fields.JSONField(
+        null=True, description="NULL이면 기존 고정 원형"
+    )
     created_at = fields.DatetimeField(auto_now_add=True)
     updated_at = fields.DatetimeField(auto_now=True)
 
@@ -257,6 +261,7 @@ class UserChallengeOccurrence(models.Model):
 class RecommendationSourceType(StrEnum):
     PREDICTION_PERSONAL = "prediction_personal"
     DIAGNOSIS_GLOBAL = "diagnosis_global"
+    CONVERSATION = "conversation"
 
 
 class RecommendationAction(StrEnum):
@@ -312,6 +317,7 @@ class ChallengeRecommendation(models.Model):
     id = fields.BigIntField(primary_key=True)
     user_id = fields.BigIntField()
     challenge_id = fields.BigIntField()
+    cycle_id = fields.BigIntField(null=True, description="추천을 만든 주기. 지난 주기 추천으로 시작 금지")
     source_type = fields.CharEnumField(RecommendationSourceType)
     factor_key = fields.CharField(max_length=50)
     factor_score = fields.DecimalField(max_digits=8, decimal_places=5, null=True)
@@ -323,6 +329,12 @@ class ChallengeRecommendation(models.Model):
     cooldown_choice = fields.CharEnumField(CooldownChoice, null=True)
     exclude_until = fields.DatetimeField(null=True)
     suppressed_until_manual = fields.BooleanField(default=False)
+    conversation_snapshot: dict[str, object] | None = fields.JSONField(
+        null=True, description="개인정보는 담지 않는다"
+    )
+    llm_model_version = fields.CharField(max_length=32, null=True)
+    evidence_card_ids: list[str] | None = fields.JSONField(null=True, description="승인 근거 카드 ID 배열")
+    proposed_goal: dict[str, object] | None = fields.JSONField(null=True, description="서버 검증을 통과한 개인 목표")
     created_at = fields.DatetimeField(auto_now_add=True)
 
     class Meta:
