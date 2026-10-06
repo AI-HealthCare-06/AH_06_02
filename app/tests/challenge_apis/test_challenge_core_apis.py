@@ -16,6 +16,7 @@ from app.models.challenges import (
 )
 from app.models.users import User
 from app.tests.auth_apis.test_signup_api import signup_body
+from app.tests.d_fixtures import make_cycle
 
 PASSWORD = "dango1234"
 
@@ -47,9 +48,11 @@ async def _challenge(code: str, *, safety: bool = False) -> Challenge:
 
 
 async def _recommendation(*, user_id: int, challenge_id: int, rank: int = 1) -> ChallengeRecommendation:
+    cycle = await make_cycle(user_id, ["physical_activity_low"])
     return await ChallengeRecommendation.create(
         user_id=user_id,
         challenge_id=challenge_id,
+        cycle_id=cycle.id,
         source_type=RecommendationSourceType.PREDICTION_PERSONAL,
         factor_key="physical_activity_low",
         rank=rank,

@@ -1,18 +1,41 @@
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from decimal import Decimal
+from typing import Any
+
+from tortoise.transactions import in_transaction
 
 from app.core import config
 from app.core.errors import AppError, ErrorCode
 from app.models.challenges import (
+    AttackCycleStatus,
     Challenge,
+    ChallengeLog,
     ChallengeRecommendation,
+    ContextType,
     Monster,
+    OccurrenceStatus,
     RecommendationAction,
+    UserAttackCycle,
     UserChallenge,
+    UserChallengeOccurrence,
     UserChallengeStatus,
     UserMonster,
+    VerificationMethod,
+    VerificationStatus,
+    VerificationType,
 )
-
-MAX_ACTIVE_CHALLENGES = 3
+from app.repositories.user_repository import UserRepository
+from app.services.attack_cycles import (
+    EXTRA_FROM_DAY,
+    MAX_ACTIVE_CHALLENGES,
+    AttackCycleService,
+    cycle_day,
+    cycle_end_for,
+    cycle_week,
+    today_kst,
+)
+from app.services.recommendations import target_monster_body
 
 
 def week_start_for(value: date | datetime) -> date:
@@ -29,8 +52,50 @@ def progress_rate(completed_count: int, daily_target_count: int) -> float:
     return round(capped / daily_target_count * 100, 1)
 
 
+def xp_for_completion(daily_xp: int, daily_target: int, completed_today: int) -> int:
+    """인정 완료 1회의 XP (REQ-RECO-003 · 10/6 A·D 합의).
+
+    하루 총 XP 를 개인 목표 횟수로 나눠 버림으로 지급하고, 나머지는 그날 목표 횟수를 채우는
+    마지막 인정 완료에 더한다. 특정 슬롯 번호가 아니라 N번째 인정 완료 기준이다.
+    """
+    if daily_target <= 0 or completed_today > daily_target:
+        return 0
+    base, remainder = divmod(daily_xp, daily_target)
+    return base + remainder if completed_today == daily_target else base
+
+
+def plan_occurrences(challenge: Challenge, start: date, end: date) -> list[tuple[date, str, int]]:
+    """예정 기회 (날짜, slot_code, sequence_no). 수행률 분모가 된다.
+
+    식사 슬롯이 정해진 챌린지는 슬롯마다, 아니면 하루 목표 횟수만큼 독립 회차로 만든다.
+    """
+    slots = list(challenge.context_slots or [])
+    if slots and len(slots) != challenge.daily_target_count:
+        raise AppError(ErrorCode.VALIDATION_ERROR, message="하루 목표 횟수와 식사 슬롯 수가 맞지 않습니다.")
+    planned: list[tuple[date, str, int]] = []
+    day = start
+    while day <= end:
+        if slots:
+            planned.extend((day, slot, 1) for slot in slots)
+        else:
+            planned.extend((day, "", seq) for seq in range(1, challenge.daily_target_count + 1))
+        day += timedelta(days=1)
+    return planned
+
+
+@dataclass
+class LogResult:
+    log: ChallengeLog
+    weekly_progress: int | None
+    level_up: bool
+    new_level: int | None
+
+
 class ChallengeCoreService:
-    """챌린지 시작·중단·공략 점수 누적 핵심 규칙."""
+    """챌린지 시작·수행·조회·중단 핵심 규칙."""
+
+    def __init__(self) -> None:
+        self.cycles = AttackCycleService()
 
     async def start_from_recommendations(
         self,
@@ -40,71 +105,365 @@ class ChallengeCoreService:
         safety_confirmed: bool | None = None,
         now: datetime | None = None,
     ) -> list[UserChallenge]:
+        """CHLG-05. 첫 시작은 draft 주기를 active 로 바꾸고 D0·D28 을 함께 확정한다 (REQ-CHLG-002·011)."""
         if not 1 <= len(recommendation_ids) <= MAX_ACTIVE_CHALLENGES:
             raise AppError(ErrorCode.VALIDATION_ERROR)
         if len(set(recommendation_ids)) != len(recommendation_ids):
             raise AppError(ErrorCode.VALIDATION_ERROR)
 
-        recommendations = await ChallengeRecommendation.filter(
-            id__in=recommendation_ids,
-            user_id=user_id,
-        ).all()
-        if len(recommendations) != len(recommendation_ids):
-            raise AppError(ErrorCode.CHLG_RECOMMENDATION_NOT_FOUND)
+        current = now or datetime.now(config.TIMEZONE)
+        today = today_kst(current)
+        await self.cycles.close_expired(user_id, today, current)
 
-        by_id = {item.id: item for item in recommendations}
-        ordered_recommendations = [by_id[item_id] for item_id in recommendation_ids]
-        challenge_ids = [item.challenge_id for item in ordered_recommendations]
-
-        challenges = await Challenge.filter(id__in=challenge_ids, is_enabled=True).all()
-        if len(challenges) != len(set(challenge_ids)):
-            raise AppError(ErrorCode.CHLG_RECOMMENDATION_NOT_FOUND)
-        challenge_by_id = {item.id: item for item in challenges}
-        ordered_challenges = [challenge_by_id[item.challenge_id] for item in ordered_recommendations]
-
-        if len(set(challenge_ids)) != len(challenge_ids):
-            raise AppError(ErrorCode.CHLG_ALREADY_ACTIVE)
-
-        active_count = await UserChallenge.filter(
-            user_id=user_id,
-            status=UserChallengeStatus.ACTIVE,
-        ).count()
-        if active_count + len(ordered_challenges) > MAX_ACTIVE_CHALLENGES:
-            raise AppError(ErrorCode.CHLG_LIMIT_EXCEEDED)
-
-        already_active = await UserChallenge.filter(
-            user_id=user_id,
-            challenge_id__in=challenge_ids,
-            status=UserChallengeStatus.ACTIVE,
-        ).exists()
-        if already_active:
-            raise AppError(ErrorCode.CHLG_ALREADY_ACTIVE)
-
+        cycle, ordered_recommendations, ordered_challenges = await self._load_start_targets(user_id, recommendation_ids)
         if any(ch.safety_check_required for ch in ordered_challenges) and safety_confirmed is not True:
             raise AppError(ErrorCode.CHLG_SAFETY_CONFIRMATION_REQUIRED)
 
-        current = now or datetime.now(config.TIMEZONE)
-        start_date = current.date()
         created: list[UserChallenge] = []
-        for recommendation, challenge in zip(ordered_recommendations, ordered_challenges, strict=True):
-            user_challenge = await UserChallenge.create(
-                user_id=user_id,
-                challenge_id=challenge.id,
-                recommendation_id=recommendation.id,
-                source_prediction_id=None,
-                status=UserChallengeStatus.ACTIVE,
-                start_date=start_date,
-                end_date=start_date + timedelta(days=challenge.duration_days - 1),
-                daily_target_count_snapshot=challenge.daily_target_count,
-                target_value_snapshot=challenge.target_value,
-                duration_days_snapshot=challenge.duration_days,
+        async with in_transaction():
+            # 추가 시작은 주기 잠금 뒤 남은 슬롯과 추가 횟수를 검증한다
+            locked = await UserAttackCycle.select_for_update().get(id=cycle.id)
+            active = UserChallenge.filter(user_id=user_id, status=UserChallengeStatus.ACTIVE)
+            slots = self.cycles.remaining_slots(
+                locked,
+                active_in_cycle=await active.filter(cycle_id=locked.id).count(),
+                active_total=await active.count(),
+                today=today,
             )
-            created.append(user_challenge)
-            recommendation.action = RecommendationAction.ACCEPTED
-            recommendation.acted_at = current
-            recommendation.consecutive_reject_count = 0
-            await recommendation.save(update_fields=["action", "acted_at", "consecutive_reject_count"])
+            if len(ordered_challenges) > slots:
+                raise AppError(ErrorCode.CHLG_LIMIT_EXCEEDED)
+
+            if locked.status == AttackCycleStatus.DRAFT:
+                locked.status = AttackCycleStatus.ACTIVE
+                locked.start_date = today
+                locked.end_date = cycle_end_for(today)
+                await locked.save(update_fields=["status", "start_date", "end_date", "updated_at"])
+            elif (cycle_day(locked, today) or 0) >= EXTRA_FROM_DAY:
+                locked.extra_added_count += len(ordered_challenges)
+                await locked.save(update_fields=["extra_added_count", "updated_at"])
+
+            end_date = locked.end_date
+            if end_date is None:
+                raise AppError(ErrorCode.INTERNAL_ERROR)
+            for recommendation, challenge in zip(ordered_recommendations, ordered_challenges, strict=True):
+                mission = await UserChallenge.create(
+                    user_id=user_id,
+                    challenge_id=challenge.id,
+                    recommendation_id=recommendation.id,
+                    source_prediction_id=None,
+                    cycle_id=locked.id,
+                    status=UserChallengeStatus.ACTIVE,
+                    start_date=today,
+                    # 투입 시점과 관계없이 주기 공통 종료일. 초기 28일, D7 추가 21일
+                    end_date=end_date,
+                    daily_target_count_snapshot=challenge.daily_target_count,
+                    target_value_snapshot=challenge.target_value,
+                    duration_days_snapshot=(end_date - today).days + 1,
+                    # 시작 시 하루 XP 를 고정한다. 진행 중 마스터가 바뀌어도 다시 계산하지 않는다
+                    goal_config_snapshot={"difficulty": str(challenge.difficulty), "daily_xp": challenge.reward_xp},
+                )
+                await UserChallengeOccurrence.bulk_create(
+                    [
+                        UserChallengeOccurrence(
+                            user_challenge_id=mission.id, scheduled_date=day, slot_code=slot, sequence_no=seq
+                        )
+                        for day, slot, seq in plan_occurrences(challenge, today, end_date)
+                    ]
+                )
+                created.append(mission)
+                recommendation.action = RecommendationAction.ACCEPTED
+                recommendation.acted_at = current
+                recommendation.consecutive_reject_count = 0
+                await recommendation.save(update_fields=["action", "acted_at", "consecutive_reject_count"])
         return created
+
+    async def _load_start_targets(
+        self, user_id: int, recommendation_ids: list[int]
+    ) -> tuple[UserAttackCycle, list[ChallengeRecommendation], list[Challenge]]:
+        """시작할 추천과 챌린지를 검증한다. 현재 주기의 추천이고 공략 대상과 연결돼야 한다."""
+        recommendations = await ChallengeRecommendation.filter(id__in=recommendation_ids, user_id=user_id)
+        if len(recommendations) != len(recommendation_ids):
+            raise AppError(ErrorCode.CHLG_RECOMMENDATION_NOT_FOUND)
+        by_id = {item.id: item for item in recommendations}
+        ordered_recommendations = [by_id[item_id] for item_id in recommendation_ids]
+
+        # 지난 주기나 다른 주기의 추천으로 시작하지 않는다
+        cycle = await self.cycles.get_current(user_id)
+        if cycle is None or any(item.cycle_id != cycle.id for item in ordered_recommendations):
+            raise AppError(ErrorCode.CHLG_RECOMMENDATION_NOT_FOUND)
+
+        challenge_ids = [item.challenge_id for item in ordered_recommendations]
+        if len(set(challenge_ids)) != len(challenge_ids):
+            raise AppError(ErrorCode.CHLG_ALREADY_ACTIVE)
+        challenges = await Challenge.filter(id__in=challenge_ids, is_enabled=True)
+        if len(challenges) != len(challenge_ids):
+            raise AppError(ErrorCode.CHLG_RECOMMENDATION_NOT_FOUND)
+        challenge_by_id = {item.id: item for item in challenges}
+        ordered_challenges = [challenge_by_id[item_id] for item_id in challenge_ids]
+
+        monster = await self.cycles.target_monster(cycle)
+        if any(challenge.factor_key not in monster.factor_keys for challenge in ordered_challenges):
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="이번 공략 대상과 연결되지 않은 챌린지입니다.")
+        if any(challenge.context_type == ContextType.EVENT for challenge in ordered_challenges):
+            # 예정 기회는 사용자가 확인한 이용일로만 만든다. 이용일을 받는 경로가 아직 없다
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="예정 이용일을 확인한 뒤에 시작할 수 있습니다.")
+
+        if await UserChallenge.filter(
+            user_id=user_id, challenge_id__in=challenge_ids, status=UserChallengeStatus.ACTIVE
+        ).exists():
+            raise AppError(ErrorCode.CHLG_ALREADY_ACTIVE)
+        return cycle, ordered_recommendations, ordered_challenges
+
+    async def record_log(
+        self,
+        *,
+        user_id: int,
+        user_challenge_id: int,
+        occurred_at: datetime,
+        context_slot: str | None,
+        value: Decimal | None,
+        verification_method: VerificationMethod,
+        evidence_url: str | None,
+        now: datetime | None = None,
+    ) -> LogResult:
+        """CHLG-07. 공략 점수만 즉시 올리고 위협도는 건드리지 않는다 (REQ-CHLG-007)."""
+        current = now or datetime.now(config.TIMEZONE)
+        await self.cycles.close_expired(user_id, today_kst(current), current)
+
+        mission, cycle = await self._active_mission(user_id, user_challenge_id)
+        occurred = self._occurred_in_period(mission, occurred_at, current)
+        log_date = occurred.date()
+        challenge = await Challenge.get(id=mission.challenge_id)
+        status = self._verify(challenge, mission, verification_method, value, evidence_url)
+        self._check_slot(challenge, context_slot)
+
+        async with in_transaction():
+            same_day = ChallengeLog.filter(user_challenge_id=mission.id, log_date=log_date)
+            if context_slot is not None and await same_day.filter(context_slot=context_slot).exists():
+                raise AppError(ErrorCode.CHLG_LOG_DUPLICATED)
+
+            occurrence = (
+                await UserChallengeOccurrence.filter(
+                    user_challenge_id=mission.id,
+                    scheduled_date=log_date,
+                    slot_code=context_slot or "",
+                    status=OccurrenceStatus.PLANNED,
+                )
+                .order_by("sequence_no")
+                .first()
+            )
+            log = await ChallengeLog.create(
+                user_challenge_id=mission.id,
+                log_date=log_date,
+                occurred_at=occurred,
+                sequence_no=1 if context_slot else await same_day.count() + 1,
+                context_slot=context_slot,
+                value=value,
+                unit=challenge.unit if value is not None else None,
+                verification_method=verification_method,
+                verification_status=status,
+                evidence_url=evidence_url,
+                # 목표를 넘긴 수행은 저장하되 진행률과 보상에는 넣지 않는다 (REQ-CHLG-003)
+                reward_eligible=occurrence is not None,
+                xp_granted=0,
+            )
+            if occurrence is None:
+                return LogResult(log=log, weekly_progress=None, level_up=False, new_level=None)
+
+            occurrence.status = OccurrenceStatus.COMPLETED
+            occurrence.completed_log_id = log.id
+            occurrence.completed_at = current
+            await occurrence.save(update_fields=["status", "completed_log_id", "completed_at", "updated_at"])
+
+            completed_today = await UserChallengeOccurrence.filter(
+                user_challenge_id=mission.id, scheduled_date=log_date, status=OccurrenceStatus.COMPLETED
+            ).count()
+            xp = xp_for_completion(
+                self._daily_xp(mission, challenge), mission.daily_target_count_snapshot, completed_today
+            )
+            level_up, new_level = False, None
+            if xp > 0:
+                level_up, new_level = await self._grant_xp(user_id, xp)
+                log.xp_granted = xp
+                await log.save(update_fields=["xp_granted"])
+
+            updated = await self.add_weekly_progress(
+                user_id=user_id,
+                factor_key=challenge.factor_key,
+                progress_value=challenge.progress_value,
+                occurred_at=current,
+            )
+        target_id = cycle.target_user_monster_id if cycle else None
+        progress = next((item.weekly_progress for item in updated if item.id == target_id), None)
+        if progress is None and updated:
+            progress = updated[0].weekly_progress
+        return LogResult(log=log, weekly_progress=progress, level_up=level_up, new_level=new_level)
+
+    @staticmethod
+    async def _active_mission(user_id: int, user_challenge_id: int) -> tuple[UserChallenge, UserAttackCycle | None]:
+        mission = await UserChallenge.get_or_none(id=user_challenge_id, user_id=user_id)
+        if mission is None:
+            raise AppError(ErrorCode.CHLG_NOT_FOUND)
+        if mission.status != UserChallengeStatus.ACTIVE:
+            raise AppError(ErrorCode.CHLG_NOT_ACTIVE)
+        if mission.cycle_id is None:
+            return mission, None
+        cycle = await UserAttackCycle.get_or_none(id=mission.cycle_id)
+        if cycle is None or cycle.status != AttackCycleStatus.ACTIVE:
+            raise AppError(ErrorCode.CHLG_NOT_ACTIVE)
+        return mission, cycle
+
+    @staticmethod
+    def _occurred_in_period(mission: UserChallenge, occurred_at: datetime, now: datetime) -> datetime:
+        """수행 시각을 KST 로 맞추고 미션 기간 안인지 본다. log_date 는 KST 달력 날짜다."""
+        occurred = (occurred_at if occurred_at.tzinfo else occurred_at.replace(tzinfo=config.TIMEZONE)).astimezone(
+            config.TIMEZONE
+        )
+        if occurred > now:
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="아직 오지 않은 시각은 기록할 수 없습니다.")
+        if occurred.date() > mission.end_date:
+            # 종료 이후 기록·보상은 막는다 (REQ-CHLG-011)
+            raise AppError(ErrorCode.CHLG_NOT_ACTIVE)
+        if occurred.date() < mission.start_date:
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="챌린지 시작 전 날짜는 기록할 수 없습니다.")
+        return occurred
+
+    @staticmethod
+    def _check_slot(challenge: Challenge, context_slot: str | None) -> None:
+        slots = list(challenge.context_slots or [])
+        if slots and context_slot not in slots:
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="선택한 식사 슬롯이 아닙니다.")
+        if not slots and context_slot is not None:
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="슬롯이 없는 챌린지입니다.")
+
+    def _verify(
+        self,
+        challenge: Challenge,
+        mission: UserChallenge,
+        method: VerificationMethod,
+        value: Decimal | None,
+        evidence_url: str | None,
+    ) -> VerificationStatus:
+        """인증 방식은 챌린지당 하나. 수동 대체는 허용된 챌린지만 (REQ-CHLG-008)."""
+        if method == VerificationMethod.MANUAL_FALLBACK:
+            if not challenge.manual_fallback_allowed:
+                raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
+            return VerificationStatus.SELF_CONFIRMED
+        if str(method) != str(challenge.verification_type):
+            raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
+
+        if challenge.verification_type == VerificationType.MANUAL:
+            return VerificationStatus.SELF_CONFIRMED
+        if challenge.verification_type == VerificationType.TIMER:
+            # 회차별로 목표 이상이어야 한다. 부족분을 다른 회차로 환산하지 않는다
+            target = mission.target_value_snapshot
+            if value is None or (target is not None and value < target):
+                raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
+            return VerificationStatus.PASS
+        if challenge.verification_type == VerificationType.PHOTO:
+            # AI 판별 없이 업로드 여부만 본다
+            if not evidence_url:
+                raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
+            return VerificationStatus.PASS
+        # value·time·system 은 1단계 후보에 없고 완료 판정 규칙이 승인되지 않았다
+        raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED, message="아직 지원하지 않는 인증 방식입니다.")
+
+    @staticmethod
+    def _daily_xp(mission: UserChallenge, challenge: Challenge) -> int:
+        snapshot = mission.goal_config_snapshot or {}
+        daily_xp = snapshot.get("daily_xp")
+        if isinstance(daily_xp, int):
+            return daily_xp
+        # goal_config_snapshot 이 없는 레거시 행만 마스터 값으로 되돌아간다
+        return challenge.reward_xp
+
+    @staticmethod
+    async def _grant_xp(user_id: int, amount: int) -> tuple[bool, int | None]:
+        """경험치는 A 의 grant_xp() 로 요청한다. 레벨 판정도 A 쪽 결과를 그대로 쓴다."""
+        repo = UserRepository()
+        before = await repo.get_user(user_id)
+        after = await repo.grant_xp(user_id, amount)
+        if before is None or after is None:
+            return False, None
+        return after.level > before.level, after.level
+
+    async def list_user_challenges(
+        self, *, user_id: int, status: UserChallengeStatus, page: int, size: int, now: datetime | None = None
+    ) -> tuple[list[dict[str, Any]], int]:
+        """CHLG-06. 진행률은 인정 완료 기회 ÷ 예정 기회이고 공략 점수와 별개다."""
+        current = now or datetime.now(config.TIMEZONE)
+        today = today_kst(current)
+        await self.cycles.close_expired(user_id, today, current)
+
+        query = UserChallenge.filter(user_id=user_id, status=status)
+        total = await query.count()
+        missions = await query.order_by("-start_date", "-id").offset((page - 1) * size).limit(size)
+        challenges = {item.id: item for item in await Challenge.filter(id__in=[m.challenge_id for m in missions])}
+        cycles = {
+            item.id: item
+            for item in await UserAttackCycle.filter(id__in=[m.cycle_id for m in missions if m.cycle_id is not None])
+        }
+        targets: dict[int, dict[str, Any]] = {}
+        for linked in cycles.values():
+            targets[linked.id] = target_monster_body(await self.cycles.target_monster(linked))
+
+        items = []
+        for mission in missions:
+            challenge = challenges[mission.challenge_id]
+            cycle = cycles.get(mission.cycle_id) if mission.cycle_id else None
+            occurrences = UserChallengeOccurrence.filter(user_challenge_id=mission.id)
+            scheduled = await occurrences.count()
+            completed = await occurrences.filter(status=OccurrenceStatus.COMPLETED).count()
+            snapshot = mission.goal_config_snapshot or {}
+            items.append(
+                {
+                    "user_challenge_id": mission.id,
+                    "challenge_id": challenge.id,
+                    "title": challenge.title,
+                    "factor_key": challenge.factor_key,
+                    "difficulty": snapshot.get("difficulty", str(challenge.difficulty)),
+                    "verification_type": challenge.verification_type,
+                    "context_type": challenge.context_type,
+                    "context_label": challenge.context_label,
+                    "cycle_id": mission.cycle_id,
+                    "cycle_week": cycle_week(cycle, today) if cycle else None,
+                    "target_monster": targets.get(cycle.id) if cycle else None,
+                    "start_date": mission.start_date,
+                    "end_date": mission.end_date,
+                    "completed_count": completed,
+                    "daily_target_count": mission.daily_target_count_snapshot,
+                    "target_value": float(mission.target_value_snapshot)
+                    if mission.target_value_snapshot is not None
+                    else None,
+                    "goal_config_snapshot": mission.goal_config_snapshot,
+                    "scheduled_opportunity_count": scheduled,
+                    "progress_rate": round(completed / scheduled, 4) if scheduled else None,
+                    "habit_established": mission.habit_established,
+                }
+            )
+        return items, total
+
+    async def list_logs(
+        self,
+        *,
+        user_id: int,
+        user_challenge_id: int,
+        start_date: date | None,
+        end_date: date | None,
+        page: int,
+        size: int,
+    ) -> tuple[list[ChallengeLog], int]:
+        """CHLG-08. 본인 미션의 기록만."""
+        if not await UserChallenge.filter(id=user_challenge_id, user_id=user_id).exists():
+            raise AppError(ErrorCode.CHLG_NOT_FOUND)
+        query = ChallengeLog.filter(user_challenge_id=user_challenge_id)
+        if start_date is not None:
+            query = query.filter(log_date__gte=start_date)
+        if end_date is not None:
+            query = query.filter(log_date__lte=end_date)
+        total = await query.count()
+        logs = await query.order_by("-log_date", "-occurred_at", "-id").offset((page - 1) * size).limit(size)
+        return logs, total
 
     async def stop(
         self,
