@@ -16,6 +16,7 @@ from app.models.challenges import (
     ChallengeLog,
     CooldownChoice,
     RecommendationAction,
+    Reward,
     UserChallenge,
     UserChallengeStatus,
 )
@@ -185,10 +186,15 @@ async def record_challenge_log(
             "weekly_progress": result.weekly_progress,
             "level_up": result.level_up,
             "new_level": result.new_level,
-            # 레벨업 보상은 rewards 마스터 값이 없어 지급하지 않는다
-            "reward": None,
+            # 이번 기록으로 새로 받은 보상만 싣는다. 이미 가졌거나 지급하지 않았으면 null
+            "reward": _reward_body(result.reward) if result.reward else None,
         }
     )
+
+
+def _reward_body(reward: Reward) -> dict[str, Any]:
+    """획득 안내에 필요한 최소한. 이름은 문구, 종류는 표현 방식, code 는 화면 자산 키, id 는 RWRD-01 과 연결한다."""
+    return {"reward_id": reward.id, "code": reward.code, "name": reward.name, "reward_kind": reward.reward_kind}
 
 
 def _log_body(log: ChallengeLog) -> dict[str, Any]:

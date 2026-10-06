@@ -106,6 +106,8 @@ class LogResult:
     weekly_progress: int | None
     level_up: bool
     new_level: int | None
+    #: 이번 기록으로 새로 지급한 보상. 이미 가진 보상이나 성향이 달라 주지 않은 경우는 None
+    reward: Reward | None = None
 
 
 class ChallengeCoreService:
@@ -333,7 +335,7 @@ class ChallengeCoreService:
                 level_up, new_level = await self._grant_xp(user_id, xp)
                 log.xp_granted = xp
                 await log.save(update_fields=["xp_granted"])
-            await self._grant_first_completion_rewards(user_id, challenge, current)
+            reward = await self._grant_first_completion_rewards(user_id, challenge, current)
 
             updated = await self.add_weekly_progress(
                 user_id=user_id,
@@ -345,7 +347,7 @@ class ChallengeCoreService:
         progress = next((item.weekly_progress for item in updated if item.id == target_id), None)
         if progress is None and updated:
             progress = updated[0].weekly_progress
-        return LogResult(log=log, weekly_progress=progress, level_up=level_up, new_level=new_level)
+        return LogResult(log=log, weekly_progress=progress, level_up=level_up, new_level=new_level, reward=reward)
 
     @staticmethod
     async def _complete(occurrence: UserChallengeOccurrence, log: ChallengeLog, now: datetime) -> bool:
@@ -435,19 +437,21 @@ class ChallengeCoreService:
         return challenge.reward_xp
 
     @staticmethod
-    async def _grant_first_completion_rewards(user_id: int, challenge: Challenge, now: datetime) -> None:
+    async def _grant_first_completion_rewards(user_id: int, challenge: Challenge, now: datetime) -> Reward | None:
         """연결된 챌린지를 인정 완료하면 보상을 준다. 두 번째부터는 (user_id, reward_id) 유니크로 조용히 넘어간다.
 
         보상은 인증의 부산물이라 여기서 문제가 생겨도 인증은 성공해야 한다.
         중첩 트랜잭션(SAVEPOINT)으로 보상 쓰기만 되돌리고 바깥 인증 트랜잭션은 그대로 둔다.
+        이번에 새로 만든 보상만 돌려준다. 거짓 획득 안내를 만들지 않도록 A·D 가 합의했다.
         """
+        granted: Reward | None = None
         try:
             async with in_transaction():
                 rewards = await Reward.filter(
                     code__in=FIRST_COMPLETION_REWARD_CODES, linked_challenge_code=challenge.code, is_enabled=True
                 )
                 if not rewards:
-                    return
+                    return None
                 user = await User.get(id=user_id)
                 for reward in rewards:
                     # REQ-RECO-001 은 사용자가 고른 보상 유형에 맞는 보상을 준다고 한다.
@@ -455,9 +459,16 @@ class ChallengeCoreService:
                     # D 의 1단계 보상 범위 문서를 읽고 A 가 정한 해석이다. 지급하지 않았을 때는 응답에도 남기지 않는다.
                     if str(reward.motivation_type) != str(user.motivation_type):
                         continue
-                    await UserReward.get_or_create(user_id=user_id, reward_id=reward.id, defaults={"acquired_at": now})
+                    _, created = await UserReward.get_or_create(
+                        user_id=user_id, reward_id=reward.id, defaults={"acquired_at": now}
+                    )
+                    if created and granted is None:
+                        granted = reward
         except Exception:
+            # SAVEPOINT 가 되돌려졌으므로 지급하지 않은 것으로 본다
             logger.exception("보상 지급 실패 · user_id=%s challenge=%s", user_id, challenge.code)
+            return None
+        return granted
 
     @staticmethod
     async def _grant_xp(user_id: int, amount: int) -> tuple[bool, int | None]:
