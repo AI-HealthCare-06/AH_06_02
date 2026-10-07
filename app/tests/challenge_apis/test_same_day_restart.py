@@ -35,6 +35,7 @@ from app.models.challenges import (
     UserMonster,
     UserReward,
     VerificationMethod,
+    VerificationStatus,
     VerificationType,
 )
 from app.models.users import User
@@ -104,6 +105,71 @@ class _RestartCase(TestCase):
 
 
 class TestSlotCardRestart(_RestartCase):
+    async def test_timer_rejection_has_no_log_and_can_retry_without_restart(self) -> None:
+        user, _, old = await self._begin("restart-retry@example.com", "CH_WALK_AFTER_MEAL", "physical_activity_low")
+        await _expect(ErrorCode.CHLG_VERIFICATION_FAILED, self._log(old, slot="lunch", value="9"))
+        assert await ChallengeLog.filter(user_challenge_id=old.id).count() == 0
+        assert (await User.get(id=user.id)).total_xp == 0
+
+        result = await self._log(old, slot="lunch", value="10")
+        assert result.log.xp_granted == 18
+        assert (
+            await UserChallengeOccurrence.filter(
+                user_challenge_id=old.id, slot_code="lunch", status=OccurrenceStatus.COMPLETED
+            ).count()
+            == 1
+        )
+
+    async def test_timer_rejection_then_restart_leaves_both_slots_available(self) -> None:
+        user, cycle, old = await self._begin(
+            "restart-rejected@example.com", "CH_WALK_AFTER_MEAL", "physical_activity_low"
+        )
+        await _expect(ErrorCode.CHLG_VERIFICATION_FAILED, self._log(old, slot="lunch", value="9"))
+        new = await self._restart(user, cycle, old)
+
+        assert await self._planned(new, TODAY) == [("dinner", 1), ("lunch", 1)]
+        assert (await self._log(new, slot="lunch", value="10")).log.xp_granted == 18
+        assert (await self._log(new, slot="dinner", value="10")).log.xp_granted == 18
+        assert (await User.get(id=user.id)).total_xp == 36
+
+    async def test_stored_unaccepted_old_log_does_not_block_restarted_slot(self) -> None:
+        user, cycle, old = await self._begin(
+            "restart-old-fail@example.com", "CH_WALK_AFTER_MEAL", "physical_activity_low"
+        )
+        # 레거시/가져온 미인정 로그를 재현한다. 현재 타이머 미달 API는 이 행을 쓰지 않는다.
+        failed = await ChallengeLog.create(
+            user_challenge_id=old.id,
+            log_date=TODAY,
+            occurred_at=NOW - timedelta(hours=1),
+            context_slot="lunch",
+            value=Decimal("9"),
+            verification_method=VerificationMethod.TIMER,
+            verification_status=VerificationStatus.FAIL,
+            reward_eligible=False,
+            xp_granted=0,
+        )
+        new = await self._restart(user, cycle, old)
+
+        assert await self._planned(new, TODAY) == [("dinner", 1), ("lunch", 1)]
+        assert (await self._log(new, slot="lunch", value="10")).log.xp_granted == 18
+        await _expect(ErrorCode.CHLG_LOG_DUPLICATED, self._log(new, slot="lunch", value="10"))
+        await failed.refresh_from_db()
+        assert failed.verification_status == VerificationStatus.FAIL
+        assert failed.reward_eligible is False
+        assert failed.xp_granted == 0
+        assert (await User.get(id=user.id)).total_xp == 18
+        assert await ChallengeLog.filter(user_challenge_id__in=[old.id, new.id], context_slot="lunch").count() == 2
+
+    async def test_completed_slot_with_zero_xp_still_blocks_restart_duplicate(self) -> None:
+        user, cycle, old = await self._begin(
+            "restart-zero-xp@example.com", "CH_WALK_AFTER_MEAL", "physical_activity_low", reward_xp=0
+        )
+        completed = await self._log(old, slot="lunch", value="10")
+        assert completed.log.xp_granted == 0
+        new = await self._restart(user, cycle, old)
+        assert await self._planned(new, TODAY) == [("dinner", 1)]
+        await _expect(ErrorCode.CHLG_LOG_DUPLICATED, self._log(new, slot="lunch", value="10"))
+
     async def test_lunch_done_then_restart_leaves_only_dinner_today(self) -> None:
         user, cycle, old = await self._begin("restart-lunch@example.com", "CH_WALK_AFTER_MEAL", "physical_activity_low")
         lunch = await self._log(old, slot="lunch", value="10")

@@ -317,10 +317,21 @@ class ChallengeCoreService:
             self._check_slot(challenge, context_slot)
 
             siblings = await self._sibling_mission_ids(user_id, mission.challenge_id)
-            # 인스턴스를 넘어 같은 날 같은 슬롯은 한 번만 기록한다
+            # 인스턴스를 넘는 중복 기준은 로그 존재가 아니라 인정 완료한 예정 기회다.
+            # 이전 인스턴스의 미인정 로그는 새 인스턴스의 남은 기회를 막지 않는다.
             same_day = ChallengeLog.filter(user_challenge_id__in=siblings, log_date=log_date)
-            if context_slot is not None and await same_day.filter(context_slot=context_slot).exists():
-                raise AppError(ErrorCode.CHLG_LOG_DUPLICATED)
+            if context_slot is not None:
+                completed_slot = await UserChallengeOccurrence.filter(
+                    user_challenge_id__in=siblings,
+                    scheduled_date=log_date,
+                    slot_code=context_slot,
+                    status=OccurrenceStatus.COMPLETED,
+                ).exists()
+                # 같은 인스턴스의 슬롯 로그는 DB 유니크 계약을 유지한다. 현재 타이머 미달은
+                # _verify에서 저장 전에 거절되므로 정상적인 재시도를 막는 행이 생기지 않는다.
+                existing_here = await same_day.filter(user_challenge_id=mission.id, context_slot=context_slot).exists()
+                if completed_slot or existing_here:
+                    raise AppError(ErrorCode.CHLG_LOG_DUPLICATED)
 
             occurrence = (
                 await UserChallengeOccurrence.select_for_update()
