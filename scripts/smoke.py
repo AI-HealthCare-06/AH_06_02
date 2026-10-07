@@ -4,11 +4,13 @@
     uv run python -m scripts.seed.seed_challenges
     uv run python -m scripts.seed.seed_monsters
     uv run python -m scripts.seed.seed_rewards
-    uv run python -m scripts.smoke [--base-url http://localhost:8000]
+    uv run python -m scripts.smoke [--base-url http://localhost:8000] [--profile all|undiagnosed|diagnosed]
 
 단위 테스트가 아니라 실제 서버에 HTTP 요청을 보낸다. 실행할 때마다 새 계정을 만든다.
 한 단계가 실패해도 멈추지 않고 이유를 적은 뒤 다음 단계로 간다. 값을 우회하거나 지어내지 않는다.
 앞 단계 결과가 없어 요청 자체를 만들 수 없는 단계는 BLOCKED 로 표시한다.
+
+미진단 계정과 진단자 계정으로 같은 10 단계를 돌고 어느 쪽이 어디까지 가는지 나란히 보여준다.
 """
 
 import argparse
@@ -30,6 +32,40 @@ KST = ZoneInfo("Asia/Seoul")
 PASSWORD = "smoke1234"
 
 PASS, FAIL, BLOCKED = "PASS", "FAIL", "BLOCKED"
+
+
+@dataclass(frozen=True)
+class Profile:
+    key: str
+    label: str
+    dm_diagnosed: bool
+    htn_diagnosed: bool
+    smoking_current: bool
+    why: str
+
+
+PROFILES = {
+    "undiagnosed": Profile(
+        "undiagnosed",
+        "미진단",
+        dm_diagnosed=False,
+        htn_diagnosed=False,
+        smoking_current=False,
+        why="기존 흐름. 위협도는 예측과 개인 SHAP 이 있어야 나온다",
+    ),
+    "diagnosed": Profile(
+        "diagnosed",
+        "진단자",
+        dm_diagnosed=True,
+        htn_diagnosed=True,
+        smoking_current=True,
+        why=(
+            "당뇨·고혈압 모두 진단, 현재 흡연. 위협도는 예측 없이 global_scores × behavior_weight 로 낸다. "
+            "캐릭터가 common 범위라 한 질환만 진단이면 나머지 질환의 예측이 없어 점수가 나오지 않는다. "
+            "behavior_weight 조건이 1단계에 확정된 factor 는 smoking_current 하나다"
+        ),
+    ),
+}
 
 
 @dataclass
@@ -61,9 +97,10 @@ class Context:
 
 
 class Smoke:
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, profile: Profile) -> None:
         self.client = httpx.Client(base_url=base_url, timeout=15)
-        self.ctx = Context(email=f"smoke+{time.strftime('%Y%m%d%H%M%S')}@example.com")
+        self.profile = profile
+        self.ctx = Context(email=f"smoke+{profile.key}+{time.strftime('%Y%m%d%H%M%S')}@example.com")
         self.steps: list[Step] = []
 
     # ------------------------------------------------------------ 공통
@@ -120,7 +157,7 @@ class Smoke:
         ]:
             step = Step(name)
             self.steps.append(step)
-            print(f"\n=== {name}")
+            print(f"\n=== [{self.profile.label}] {name}")
             try:
                 action(step)
             except Exception as exc:  # 스모크는 끝까지 돈다
@@ -133,7 +170,10 @@ class Smoke:
 
     def summary(self) -> int:
         print("\n" + "=" * 60)
-        print(f"요약 · 계정 {self.ctx.email} · {datetime.now(KST).isoformat(timespec='seconds')}")
+        print(
+            f"요약 [{self.profile.label}] · 계정 {self.ctx.email} · {datetime.now(KST).isoformat(timespec='seconds')}"
+        )
+        print(f"프로필: {self.profile.why}")
         print("=" * 60)
         for step in self.steps:
             mark = {PASS: "✓", FAIL: "✗", BLOCKED: "–"}[step.outcome]
@@ -160,8 +200,9 @@ class Smoke:
             "height_cm": 164.0,
             # 글루코 블레이드(grow 아이템) 지급 조건을 보려고 성장형을 고른다
             "motivation_type": "grow",
-            "dm_diagnosed": False,
-            "htn_diagnosed": False,
+            # 진단 여부는 가입 본문(users.dm_diagnosed·htn_diagnosed)으로 넣는다
+            "dm_diagnosed": self.profile.dm_diagnosed,
+            "htn_diagnosed": self.profile.htn_diagnosed,
             "dm_medication": False,
             "htn_medication": False,
             "disclaimer_agreed": True,
@@ -188,7 +229,7 @@ class Smoke:
             "input_mode": "simple",
             "weight_kg": 62.0,
             "waist_cm": 80.0,
-            "smoking_current": False,
+            "smoking_current": self.profile.smoking_current,
             "alcohol_frequency": 3,
             "alcohol_amount": 2,
             "walking_days": 2,
@@ -380,11 +421,37 @@ class Smoke:
         return None
 
 
+def compare(runs: list[Smoke]) -> None:
+    """프로필별 단계 결과를 나란히 보여준다."""
+    print("\n" + "=" * 60)
+    print("프로필 비교")
+    print("=" * 60)
+    header = f"{'단계':<14}" + "".join(f"{run.profile.label:<16}" for run in runs)
+    print(header)
+    for index, step in enumerate(runs[0].steps):
+        cells = []
+        for run in runs:
+            item = run.steps[index]
+            mark = {PASS: "✓", FAIL: "✗", BLOCKED: "–"}[item.outcome]
+            cells.append(f"{mark} {item.outcome} {item.status if item.status is not None else '-'}".ljust(16))
+        print(f"{step.name:<14}" + "".join(cells))
+    print(
+        "PASS 수".ljust(14)
+        + "".join(f"{sum(item.outcome == PASS for item in run.steps)}/{len(run.steps)}".ljust(16) for run in runs)
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="로컬 API 전체 흐름 스모크")
     parser.add_argument("--base-url", default="http://localhost:8000")
+    parser.add_argument("--profile", choices=["all", *PROFILES], default="all")
     args = parser.parse_args()
-    sys.exit(Smoke(args.base_url).run())
+    keys = list(PROFILES) if args.profile == "all" else [args.profile]
+    runs = [Smoke(args.base_url, PROFILES[key]) for key in keys]
+    codes = [run.run() for run in runs]
+    if len(runs) > 1:
+        compare(runs)
+    sys.exit(max(codes))
 
 
 if __name__ == "__main__":
