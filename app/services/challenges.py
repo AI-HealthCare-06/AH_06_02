@@ -29,7 +29,6 @@ from app.models.challenges import (
     VerificationStatus,
     VerificationType,
 )
-from app.models.users import User
 from app.repositories.user_repository import UserRepository
 from app.services.attack_cycles import (
     EXTRA_FROM_DAY,
@@ -452,13 +451,12 @@ class ChallengeCoreService:
                 )
                 if not rewards:
                     return None
-                user = await User.get(id=user_id)
+                # REQ-RECO-001 은 사용자가 고른 보상 유형에 맞는 보상을 준다고 하지만, 1단계는 그 예외로
+                # users.motivation_type 과 관계없이 모두에게 준다 (10/07 A·D 수정안).
+                # 1단계 보상은 글루코 블레이드 하나뿐이고 motivation_type 기본값이 collect 라,
+                # 유형으로 거르면 성향을 바꾸지 않은 사용자는 보상을 영영 받지 못한다.
+                # reward.motivation_type(grow)은 성장형 아이템 분류로만 남기고 지급 자격에는 쓰지 않는다.
                 for reward in rewards:
-                    # REQ-RECO-001 은 사용자가 고른 보상 유형에 맞는 보상을 준다고 한다.
-                    # 1단계 보상 마스터는 성장형(grow) 아이템 하나뿐이라, 다른 유형을 고른 사용자에게는 주지 않는다.
-                    # D 의 1단계 보상 범위 문서를 읽고 A 가 정한 해석이다. 지급하지 않았을 때는 응답에도 남기지 않는다.
-                    if str(reward.motivation_type) != str(user.motivation_type):
-                        continue
                     _, created = await UserReward.get_or_create(
                         user_id=user_id, reward_id=reward.id, defaults={"acquired_at": now}
                     )
