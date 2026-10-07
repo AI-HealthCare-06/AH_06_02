@@ -63,13 +63,23 @@ class TestGlucoBlade(TestCase):
         assert owned.item_level == 1
         assert owned.acquired_at == NOW
 
-    async def test_collect_user_gets_nothing(self) -> None:
-        mission = await self._walking_mission("blade-collect@example.com", MotivationType.COLLECT)
+    async def _assert_gets_the_blade_once(self, email: str, motivation: MotivationType) -> None:
+        mission = await self._walking_mission(email, motivation)
 
-        result = await self._walk(mission, "lunch")
+        first = await self._walk(mission, "lunch")
+        second = await self._walk(mission, "dinner")
 
-        assert result.reward is None
-        assert await UserReward.filter(user_id=mission.user_id).count() == 0
+        assert first.reward is not None
+        assert first.reward.code == "gluco_blade"
+        assert second.reward is None
+        assert await UserReward.filter(user_id=mission.user_id).count() == 1
+
+    async def test_collect_user_also_gets_the_blade(self) -> None:
+        # 1단계는 보상 취향과 관계없이 모두에게 준다 (10/07 A·D 수정안). collect 는 가입 기본값이다
+        await self._assert_gets_the_blade_once("blade-collect@example.com", MotivationType.COLLECT)
+
+    async def test_decorate_user_also_gets_the_blade(self) -> None:
+        await self._assert_gets_the_blade_once("blade-decorate@example.com", MotivationType.DECORATE)
 
     async def test_reward_failure_does_not_roll_back_the_log(self) -> None:
         mission = await self._walking_mission("blade-fail@example.com", MotivationType.GROW)
