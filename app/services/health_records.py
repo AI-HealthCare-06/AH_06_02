@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
@@ -16,6 +17,9 @@ from app.dtos.health_records import (
 from app.models.health_records import HealthRecord, InputMode
 from app.models.users import User
 from app.repositories.health_record_repository import HealthRecordRepository
+from app.services.impacts import refresh_impact_from_health_record
+
+logger = logging.getLogger(__name__)
 
 #: 조회 가능한 기간의 상한. 기본값이 아니라 이보다 앞선 날짜는 받지 않는다 (REQ-HLTH-005)
 LOOKBACK_MONTHS = 12
@@ -90,8 +94,14 @@ class HealthRecordService:
             input_mode=data.input_mode,
             **values,
         )
-        # 명세상 daily 를 뺀 저장 뒤 D 의 refresh_impact_from_health_record() 를 부른다.
-        # D 가 아직 함수를 제공하지 않아 호출하지 않는다.
+        # 위협도 갱신은 건강기록 저장이 커밋된 뒤에 부른다. repo.create 는 트랜잭션 밖이라 반환 시점에 이미 커밋돼 있다.
+        # 갱신은 D 가 소유한 부수 작업이라, 실패해도 사용자가 입력한 기록을 되돌리지 않는다.
+        # 예외는 삼키고 로그만 남긴다 (A·D 합의 계약). 다음 입력이나 재예측 때 다시 갱신된다.
+        # daily 입력은 impacts.py 가 안에서 거르므로 여기서 따로 분기하지 않는다.
+        try:
+            await refresh_impact_from_health_record(user.id, record.id)
+        except Exception:
+            logger.exception("위협도 갱신 실패 · user_id=%s health_record_id=%s", user.id, record.id)
         return record
 
     async def list_records(
