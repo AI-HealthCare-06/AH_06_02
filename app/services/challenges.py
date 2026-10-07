@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -189,7 +190,7 @@ class ChallengeCoreService:
                         UserChallengeOccurrence(
                             user_challenge_id=mission.id, scheduled_date=day, slot_code=slot, sequence_no=seq
                         )
-                        for day, slot, seq in plan_occurrences(challenge, today, end_date)
+                        for day, slot, seq in await self._plan_new_instance(user_id, challenge, today, end_date)
                     ]
                 )
                 created.append(mission)
@@ -198,6 +199,37 @@ class ChallengeCoreService:
                 recommendation.consecutive_reject_count = 0
                 await recommendation.save(update_fields=["action", "acted_at", "consecutive_reject_count"])
         return created
+
+    @staticmethod
+    async def _sibling_mission_ids(user_id: int, challenge_id: int) -> list[int]:
+        """같은 사용자·같은 챌린지의 모든 인스턴스. 하루 단위 계산은 이 묶음과 KST 날짜로 한다.
+
+        중단한 챌린지를 같은 날 다시 시작해도 이미 인정 완료한 기회와 XP 가 다시 생기지 않게 한다 (10/07 A·D 합의).
+        """
+        missions = await UserChallenge.filter(user_id=user_id, challenge_id=challenge_id).only("id")
+        return [mission.id for mission in missions]
+
+    async def _plan_new_instance(
+        self, user_id: int, challenge: Challenge, start: date, end: date
+    ) -> list[tuple[date, str, int]]:
+        """새 인스턴스의 예정 기회. 이전 인스턴스에서 이미 인정 완료한 기회는 뺀다.
+
+        슬롯이 있으면 완료한 (날짜, slot_code) 를 빼고, 없으면 완료한 회차 수만큼 그날 앞 회차를 뺀다.
+        회차 번호는 1 부터 다시 세지 않는다. 그날 목표를 다 채웠으면 그날은 0 개다.
+        시작일 이전 날짜는 계획에 없으므로 지난 미완료 기회를 소급해 다시 배정하지 않는다.
+        """
+        planned = plan_occurrences(challenge, start, end)
+        siblings = await self._sibling_mission_ids(user_id, challenge.id)
+        done = await UserChallengeOccurrence.filter(
+            user_challenge_id__in=siblings, status=OccurrenceStatus.COMPLETED, scheduled_date__gte=start
+        ).values_list("scheduled_date", "slot_code")
+        if not done:
+            return planned
+        if challenge.context_slots:
+            done_slots = {(day, slot) for day, slot in done}
+            return [item for item in planned if (item[0], item[1]) not in done_slots]
+        done_counts = Counter(day for day, _ in done)
+        return [item for item in planned if item[2] > done_counts[item[0]]]
 
     async def _lock_start_recommendations(
         self, user_id: int, recommendation_ids: list[int]
@@ -275,6 +307,8 @@ class ChallengeCoreService:
         await self.cycles.close_expired(user_id, today_kst(current), current)
 
         async with in_transaction():
+            # 시작·중단과 같은 순서로 사용자 → 미션 → 주기 → 기회를 잠그고, 잠금 안에서 다시 검사한다
+            await lock_user(user_id)
             mission, cycle = await self._active_mission(user_id, user_challenge_id)
             occurred = self._occurred_in_period(mission, occurred_at, current)
             log_date = occurred.date()
@@ -282,7 +316,9 @@ class ChallengeCoreService:
             status = self._verify(challenge, mission, verification_method, value, evidence_url)
             self._check_slot(challenge, context_slot)
 
-            same_day = ChallengeLog.filter(user_challenge_id=mission.id, log_date=log_date)
+            siblings = await self._sibling_mission_ids(user_id, mission.challenge_id)
+            # 인스턴스를 넘어 같은 날 같은 슬롯은 한 번만 기록한다
+            same_day = ChallengeLog.filter(user_challenge_id__in=siblings, log_date=log_date)
             if context_slot is not None and await same_day.filter(context_slot=context_slot).exists():
                 raise AppError(ErrorCode.CHLG_LOG_DUPLICATED)
 
@@ -323,8 +359,9 @@ class ChallengeCoreService:
                     await log.save(update_fields=["reward_eligible"])
                 return LogResult(log=log, weekly_progress=None, level_up=False, new_level=None)
 
+            # 이전 인스턴스의 인정 완료까지 합친 그날 N 번째인지로 XP 를 나눈다
             completed_today = await UserChallengeOccurrence.filter(
-                user_challenge_id=mission.id, scheduled_date=log_date, status=OccurrenceStatus.COMPLETED
+                user_challenge_id__in=siblings, scheduled_date=log_date, status=OccurrenceStatus.COMPLETED
             ).count()
             xp = xp_for_completion(
                 self._daily_xp(mission, challenge), mission.daily_target_count_snapshot, completed_today
@@ -562,21 +599,24 @@ class ChallengeCoreService:
         stop_reason: str | None = None,
         now: datetime | None = None,
     ) -> UserChallenge:
-        item = await UserChallenge.get_or_none(id=user_challenge_id, user_id=user_id)
-        if item is None:
-            raise AppError(ErrorCode.CHLG_NOT_FOUND)
-        if item.status != UserChallengeStatus.ACTIVE:
-            raise AppError(ErrorCode.CHLG_NOT_ACTIVE)
-        item.status = UserChallengeStatus.ABANDONED
-        item.stopped_at = now or datetime.now(config.TIMEZONE)
+        async with in_transaction():
+            # 수행 기록·재시작과 같은 순서로 사용자 → 미션을 잠그고 잠금 안에서 상태를 본다
+            await lock_user(user_id)
+            item = await UserChallenge.select_for_update().get_or_none(id=user_challenge_id, user_id=user_id)
+            if item is None:
+                raise AppError(ErrorCode.CHLG_NOT_FOUND)
+            if item.status != UserChallengeStatus.ACTIVE:
+                raise AppError(ErrorCode.CHLG_NOT_ACTIVE)
+            item.status = UserChallengeStatus.ABANDONED
+            item.stopped_at = now or datetime.now(config.TIMEZONE)
 
-        update_fields = ["status", "stopped_at", "updated_at"]
+            update_fields = ["status", "stopped_at", "updated_at"]
 
-        if stop_reason is not None:
-            item.stop_reason = stop_reason
-            update_fields.append("stop_reason")
+            if stop_reason is not None:
+                item.stop_reason = stop_reason
+                update_fields.append("stop_reason")
 
-        await item.save(update_fields=update_fields)
+            await item.save(update_fields=update_fields)
         return item
 
     async def add_weekly_progress(
