@@ -12,7 +12,7 @@ Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 �
 | PRED-02 | GET | /api/v1/predictions/{prediction_id} | 작업 상태·결과 조회·폴링 | 200 |
 | PRED-03 | GET | /api/v1/predictions/{prediction_id}/contributions | 질환별 기여도 조회 | 200 |
 
-서버가 건강기록과 예측의 소유자를 검증한다. 존재하는 타인 리소스는 요구사항 NFR-SEC-002에 따라 403, 존재하지 않는 ID는 404다. 인증 오류를 먼저 검사한다. 작업ID를 알더라도 소유권 검사를 생략하지 않는다. 인증 없는 캐시와 개인별 응답 공유를 금지한다.
+서버가 건강기록과 예측의 소유자를 검증한다. 타인 리소스는 존재 여부와 상관없이 404다. 403을 주면 그 ID가 있다는 사실이 드러나 건강 데이터가 샌다. 인증 오류를 먼저 검사한다. 작업ID를 알더라도 소유권 검사를 생략하지 않는다. 인증 없는 캐시와 개인별 응답 공유를 금지한다.
 
 ## PRED-01 예측 접수
 
@@ -36,10 +36,9 @@ HTTP 요청 재시도는 별도 예측을 만들 수 있다. 클라이언트는 
 | 코드 | HTTP | 조건 |
 |---|---|---|
 | UNAUTHORIZED | 401 | 토큰 없음·만료·무효 |
-| FORBIDDEN | 403 | 타인 건강기록·예측 |
 | PRED_ALL_DIAGNOSED | 400 | 당뇨·고혈압이 모두 진단·복약 상태여서 예측 대상 없음 |
 | PRED_DIAGNOSIS_HISTORY_REQUIRED | 400 | 해당 질환의 진단·약물 이력 미확인 |
-| NOT_FOUND | 404 | 기록·예측 없음 |
+| NOT_FOUND | 404 | 기록·예측 없음, 타인 리소스 포함 |
 | PRED_INPUT_INSUFFICIENT | 400 | 필수 모델 입력 누락; message에 누락 목록 |
 | VALIDATION_ERROR | 400 | JSON·path·query 필수값·형식·범위 오류 |
 | PRED_MODEL_UNAVAILABLE / PRED_QUEUE_UNAVAILABLE | 500 | 서버 모델·큐 준비 오류 |
@@ -101,7 +100,7 @@ query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. diseas
 | 사례 | 기대 결과 |
 |---|---|
 | 본인 정상 입력 | 202 pending, job_id + prediction_id |
-| 타인 record/예측 | 403, 큐·개인결과 접근 없음 |
+| 타인 record/예측 | 404, 큐·개인결과 접근 없음 |
 | 한 질환 진단/복약 | 해당 질환만 결과에서 생략, 다른 미진단 질환은 예측 |
 | 두 질환 모두 진단/복약 | 400 PRED_ALL_DIAGNOSED, prediction 생성 없음 |
 | 필수 누락 | PRED_INPUT_INSUFFICIENT, 누락 목록, 추론 없음 |
