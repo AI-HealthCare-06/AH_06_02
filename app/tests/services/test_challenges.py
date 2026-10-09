@@ -299,12 +299,12 @@ class TestChallengeCoreService(TestCase):
         # 2026-10-04 15:30 UTC == 2026-10-05 00:30 KST
         assert week_start_for(datetime(2026, 10, 4, 15, 30, tzinfo=utc)) == date(2026, 10, 5)
 
-    async def test_weekly_progress_caps_at_100(self) -> None:
+    async def test_weekly_progress_accumulates_beyond_display_goal(self) -> None:
         service = ChallengeCoreService()
         monster = await Monster.create(
-            code="TEST-MON-CAP",
+            code="TEST-MON-GOAL",
             no=9110,
-            name="CAP",
+            name="GOAL",
             factor_keys=["physical_activity_low"],
         )
         row = await UserMonster.create(
@@ -314,7 +314,7 @@ class TestChallengeCoreService(TestCase):
             progress_week_start=date(2026, 9, 28),
         )
 
-        for _ in range(2):
+        for expected in (110, 125):
             updated = await service.add_weekly_progress(
                 user_id=9110,
                 factor_key="physical_activity_low",
@@ -323,6 +323,6 @@ class TestChallengeCoreService(TestCase):
             )
 
             assert len(updated) == 1
-            assert updated[0].weekly_progress == 100
+            assert updated[0].weekly_progress == expected
             await row.refresh_from_db()
-            assert row.weekly_progress == 100
+            assert row.weekly_progress == expected

@@ -60,6 +60,11 @@ class Prediction(models.Model):
         null=True, description="예측 당시 모델 입력 스냅샷. 전처리 전 canonical 값·단위·결측 여부 (REQ-PRED-003)"
     )
 
+    failure: dict[str, object] | None = fields.JSONField(
+        null=True,
+        description="작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 그대로 나간다 (NFR-REL-001)",
+    )
+
     predicted_at = fields.DatetimeField(null=True, description="추론 완료 시각")
     created_at = fields.DatetimeField(auto_now_add=True, description="요청 접수 시각")
     updated_at = fields.DatetimeField(auto_now=True)

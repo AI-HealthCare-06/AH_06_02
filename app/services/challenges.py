@@ -651,10 +651,8 @@ class ChallengeCoreService:
             if user_monster.progress_week_start != week_start:
                 user_monster.weekly_progress = 0
                 user_monster.progress_week_start = week_start
-            user_monster.weekly_progress = min(
-                100,
-                user_monster.weekly_progress + progress_value,
-            )
+            # 100은 화면의 주간 목표이며 저장값의 상한이 아니다 (design.md §7).
+            user_monster.weekly_progress += progress_value
             await user_monster.save(update_fields=["weekly_progress", "progress_week_start", "updated_at"])
             updated.append(user_monster)
         return updated
