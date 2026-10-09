@@ -75,7 +75,7 @@ probability는 계약 형식을 보이는 가상 수치다. 이 응답에는 팀
 
 failed:
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","failure":{"code":"PRED_INFERENCE_FAILED","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","failure":{"code":"INTERNAL_ERROR","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}}}
 ```
 조회 자체는 성공했으므로 HTTP 200/success=true이고 작업 실패는 failure로 전달한다. worker exception stack·경로·원시 건강값은 노출하지 않는다. `failure` 상세 저장 위치는 기존 ERD에 없으므로 Redis 보존 정책 또는 B 컬럼 확장을 A/C와 협의한다. 30초는 추론 목표이며 곧바로 실패로 바꾸는 하드 timeout 값은 아니다. 별도 hard timeout·복구 작업 설정을 운영 계약에 둔다.
 
