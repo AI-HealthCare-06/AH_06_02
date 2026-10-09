@@ -37,13 +37,12 @@ HTTP 요청 재시도는 별도 예측을 만들 수 있다. 클라이언트는 
 |---|---|---|
 | UNAUTHORIZED | 401 | 토큰 없음·만료·무효 |
 | PRED_ALL_DIAGNOSED | 400 | 당뇨·고혈압이 모두 진단·복약 상태여서 예측 대상 없음 |
-| PRED_DIAGNOSIS_HISTORY_REQUIRED | 400 | 해당 질환의 진단·약물 이력 미확인 |
-| NOT_FOUND | 404 | 기록·예측 없음, 타인 리소스 포함 |
+| HLTH_RECORD_NOT_FOUND | 404 | 지정한 health_record 가 없음 |
+| NOT_FOUND | 404 | 예측이 없음, 타인 리소스 포함 |
 | PRED_NOT_FOUND | 404 | PRED-03 에서 지정한 disease 의 결과가 그 예측에 없음 |
-| PRED_INPUT_INSUFFICIENT | 400 | 필수 모델 입력 누락; message에 누락 목록 |
+| PRED_INPUT_INSUFFICIENT | 400 | 필수 모델 입력 누락; message에 누락 목록. 진단·약물 이력 미확인도 누락 목록에 담는다 |
 | VALIDATION_ERROR | 400 | JSON·path·query 필수값·형식·범위 오류 |
-| PRED_MODEL_UNAVAILABLE / PRED_QUEUE_UNAVAILABLE | 500 | 서버 모델·큐 준비 오류 |
-| INTERNAL_ERROR | 500 | 그 외 서버 오류 |
+| INTERNAL_ERROR | 500 | 모델·큐 준비 오류를 포함한 그 외 서버 오류 |
 
 
 누락 예시:
