@@ -33,6 +33,10 @@ DEPLOYABLE_STATUS = "trained"
 EXPERIMENTAL_STATUS = "experiment_only_not_deployable"
 #: 받는 status → 실험 모델 여부. 그 밖의 status 는 거부한다
 ACCEPTED_STATUSES = {DEPLOYABLE_STATUS: False, EXPERIMENTAL_STATUS: True}
+#: 모델이 바꿀 수 없다고 보는 factor. ai_worker/model_contract.py IMMUTABLE_FACTORS 와 같은 값이어야 한다
+IMMUTABLE_FACTORS = frozenset({"age", "sex", "family_history_dm", "family_history_htn"})
+#: 기여요인 사전 버전. PRED-03 응답의 factor_dictionary_version 으로 나간다
+FACTOR_DICTIONARY_VERSION = "v0.1-sedentary"
 
 
 @dataclass(frozen=True)
@@ -139,3 +143,12 @@ def personal_threat_score(signed_shap: float, reference: FactorReference) -> int
     if scale == 0:
         return 0
     return math.floor(100.0 * min(max(value, 0.0) / scale, 1.0) + 0.5)
+
+
+def is_modifiable(factor_key: str) -> bool:
+    """PRED-03 응답의 modifiable. ai_worker/model_contract.py rank_contributions 와 같은 규칙이다.
+
+    prediction_contributions 에는 컬럼이 없다. 불변 factor 목록은 모델 계약이지 사용자 데이터가 아니므로
+    행마다 저장하지 않고 응답을 만들 때 판단한다.
+    """
+    return factor_key not in IMMUTABLE_FACTORS
