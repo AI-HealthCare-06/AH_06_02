@@ -39,6 +39,7 @@ HTTP 요청 재시도는 별도 예측을 만들 수 있다. 클라이언트는 
 | PRED_ALL_DIAGNOSED | 400 | 당뇨·고혈압이 모두 진단·복약 상태여서 예측 대상 없음 |
 | PRED_DIAGNOSIS_HISTORY_REQUIRED | 400 | 해당 질환의 진단·약물 이력 미확인 |
 | NOT_FOUND | 404 | 기록·예측 없음, 타인 리소스 포함 |
+| PRED_NOT_FOUND | 404 | PRED-03 에서 지정한 disease 의 결과가 그 예측에 없음 |
 | PRED_INPUT_INSUFFICIENT | 400 | 필수 모델 입력 누락; message에 누락 목록 |
 | VALIDATION_ERROR | 400 | JSON·path·query 필수값·형식·범위 오류 |
 | PRED_MODEL_UNAVAILABLE / PRED_QUEUE_UNAVAILABLE | 500 | 서버 모델·큐 준비 오류 |
@@ -81,12 +82,12 @@ failed:
 
 ## PRED-03 기여도 조회
 
-query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. disease를 생략하면 예측에 포함된 모든 미진단 질환의 기여도를 반환한다. 요청한 prediction이 pending 또는 failed이면 200으로 현재 상태를 반환하고 items를 생략한다. done이면 저장된 결과를 반환한다.
+query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. 응답은 언제나 `diseases` 배열이다. disease를 생략하면 예측에 포함된 모든 미진단 질환을 담고, 지정하면 길이 1 배열로 같은 모양을 쓴다. `limit`은 질환마다 따로 적용한다. `rank`도 질환 안에서 매긴다. 진단·복약 이력이 있어 예측에서 빠진 질환을 disease로 지정하면 404 PRED_NOT_FOUND다. 빈 배열을 주면 아직 끝나지 않은 것과 구분되지 않는다. 요청한 prediction이 pending 또는 failed이면 200으로 현재 상태를 반환하고 diseases를 생략한다. done이면 저장된 결과를 반환한다.
 
 ```json
-{"success":true,"data":{"prediction_id":501,"status":"done","disease":"diabetes","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}}
+{"success":true,"data":{"prediction_id":501,"status":"done","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","diseases":[{"disease":"diabetes","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}]}}
 ```
-값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 [모델 계약](../03_ai_data/model.md)을 따른다. 지원되는 매핑 factor 전량을 0 포함 저장한다. `limit=3`이면 상위 3개만 응답할 수 있지만 기본 limit=100은 D 추천에 전체 근거를 제공한다. top3 합이 전체 확률과 같다고 해석하지 않는다. 위협도나 공략 점수는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
+값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 [모델 계약](../03_ai_data/model.md)을 따른다. 지원되는 매핑 factor 전량을 0 포함 저장한다. `limit=3`이면 질환마다 상위 3개씩 응답할 수 있지만 기본 limit=100은 D 추천에 전체 근거를 제공한다. top3 합이 전체 확률과 같다고 해석하지 않는다. 위협도나 공략 점수는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
 
 ## 저장·워커 계약
 
@@ -107,6 +108,7 @@ query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. diseas
 | 두 질환 모두 진단/복약 | 400 PRED_ALL_DIAGNOSED, prediction 생성 없음 |
 | 필수 누락 | PRED_INPUT_INSUFFICIENT, 누락 목록, 추론 없음 |
 | pending 조회 | 200 pending, results 없음 |
+| 제외된 질환을 disease 로 지정 | 404 PRED_NOT_FOUND, 빈 배열 아님 |
 | 같은 job 중복 소비 | 결과·기여도 한 세트 |
 | worker 오류 | failed, 이전 성공 이력 보존 |
 | D 위협도 갱신 오류 | prediction done 유지, 갱신 재시도 |

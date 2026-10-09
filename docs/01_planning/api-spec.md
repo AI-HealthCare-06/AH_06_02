@@ -58,7 +58,7 @@
 | HLTH | HLTH_RECORD_NOT_FOUND | 404 | 해당 health_record가 없음 | B · PRED-01 (초안) |  |  |  |  |  |
 | PRED | PRED_ALL_DIAGNOSED | 400 | 두 질환 모두 진단이라 예측 대상 없음 | B · PRED-01 (초안) |  |  |  |  |  |
 | PRED | PRED_INPUT_INSUFFICIENT | 400 | 모델 입력 항목이 모자람 (REQ-PRED-008) | B (초안) |  |  |  |  |  |
-| PRED | PRED_NOT_FOUND | 404 | 완료된 예측이 없음 | B · D · CHLG-01 |  |  |  |  |  |
+| PRED | PRED_NOT_FOUND | 404 | 완료된 예측이 없음 | B · D · CHLG-01 · PRED-03 |  |  |  |  |  |
 | CHLG | CHLG_LIMIT_EXCEEDED | 409 | 동시 진행 챌린지 3개 초과 | D · CHLG-05 |  |  |  |  |  |
 | CHLG | CHLG_ALREADY_ACTIVE | 409 | 이미 진행 중인 같은 챌린지 | D · CHLG-05 |  |  |  |  |  |
 | CHLG | CHLG_SAFETY_CONFIRMATION_REQUIRED | 400 | 운동형 챌린지인데 safety_confirmed 누락 (REQ-CHLG-010) | D · CHLG-05 |  |  |  |  |  |
@@ -300,13 +300,13 @@
 `GET /api/v1/predictions/{prediction_id}/contributions`
 
 - **인증**: 필요
-- **요청 파라미터**: prediction_id(양의 정수), disease=diabetes\|hypertension(선택), limit=1~100(기본 100; 화면은 3 지정)
+- **요청 파라미터**: prediction_id(양의 정수), disease=diabetes\|hypertension(선택), limit=1~100(기본 100; 화면은 3 지정). limit은 질환마다 따로 적용한다
 - **요청 본문**: —
-- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, status:"pending"\|"done"\|"failed", disease, model_version, factor_dictionary_version, contribution_unit:"probability", items:[{ factor_key, contribution, direction, rank, modifiable }] } }. pending/failed 상태에는 items 생략; done이면 지원 factor 전량(0 포함). disease 생략 시 예측에 포함된 모든 미진단 질환 반환
-- **주요 에러**: NOT_FOUND(404), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
+- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, status:"pending"\|"done"\|"failed", model_version, factor_dictionary_version, contribution_unit:"probability", diseases:[{ disease, items:[{ factor_key, contribution, direction, rank, modifiable }] }] } }. pending/failed 상태에는 diseases 생략; done이면 질환별로 지원 factor 전량(0 포함). disease 생략 시 예측에 포함된 모든 미진단 질환을 담고, disease 지정 시에도 길이 1 배열로 같은 모양을 쓴다. rank는 질환 안에서 매긴다
+- **주요 에러**: NOT_FOUND(404), PRED_NOT_FOUND(404 · disease를 지정했는데 그 질환 결과가 없음), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
 - **관련 요구사항**: REQ-PRED-005 · REQ-CHLG-001 · NFR-MODL-002
 - **사용 테이블**: predictions 읽기 / prediction_contributions 읽기
-- **상태**: 확정 — 홍서윤 10/1
+- **상태**: 확정 — 홍서윤 10/1 / 응답 형태·limit 범위·제외 질환 오류 수정 — 2026.10.09 배수빈, 최병주 확인 대기
 
 ## C · 건강정보·대시보드 · 6개
 
