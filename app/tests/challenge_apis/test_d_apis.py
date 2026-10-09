@@ -11,6 +11,7 @@ from app.models.challenges import Challenge, UserMonster
 from app.models.health_records import HealthRecord
 from app.models.users import User
 from app.services.attack_cycles import today_kst
+from app.services.challenges import week_start_for
 from app.services.recommendations import RecommendationService
 from app.tests.auth_apis.test_signup_api import signup_body
 from app.tests.d_fixtures import fake_artifact, make_card, make_cycle, make_target
@@ -142,3 +143,34 @@ class TestDChallengeAPIs(TestCase):
             response = await client.get("/api/v1/monsters/me", headers=headers)
 
         assert response.json()["data"]["items"][0]["weekly_progress"] == 0
+
+    async def test_score_over_goal_survives_log_and_monster_book_responses(self) -> None:
+        challenges = await _seed()
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            user, headers = await _login(client, "api-over-goal@example.com")
+            cycle = await make_cycle(user.id, ["smoking_current"])
+            await UserMonster.filter(id=cycle.target_user_monster_id).update(
+                weekly_progress=100, progress_week_start=week_start_for(today_kst())
+            )
+            card = await make_card(user.id, challenges["CH_NO_SMOKE_TODAY"], cycle)
+            started = await client.post(
+                "/api/v1/user-challenges", json={"recommendation_ids": [card.id]}, headers=headers
+            )
+            assert started.status_code == status.HTTP_201_CREATED
+            mission_id = started.json()["data"]["items"][0]["user_challenge_id"]
+            payload = {"occurred_at": today_kst().isoformat() + "T00:00:01+09:00", "verification_method": "manual"}
+            logged = await client.post(f"/api/v1/user-challenges/{mission_id}/logs", json=payload, headers=headers)
+            duplicate = await client.post(f"/api/v1/user-challenges/{mission_id}/logs", json=payload, headers=headers)
+            book = await client.get("/api/v1/monsters/me", headers=headers)
+        assert logged.status_code == status.HTTP_201_CREATED
+        assert logged.json()["data"]["weekly_progress"] == 110
+        assert logged.json()["data"]["xp_granted"] == 36
+        # 완료 뒤 추가 기록은 허용하되 XP와 공략 점수는 다시 지급하지 않는다.
+        assert duplicate.status_code == status.HTTP_201_CREATED
+        assert duplicate.json()["data"]["xp_granted"] == 0
+        assert duplicate.json()["data"]["reward_eligible"] is False
+        [monster] = book.json()["data"]["items"]
+        assert monster["weekly_progress"] == 110
+        assert monster["impact_score"] == 80
+        assert monster["seal_progress"] is None
+        assert (await User.get(id=user.id)).total_xp == 36
