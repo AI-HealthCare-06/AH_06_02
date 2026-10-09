@@ -1,6 +1,6 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-06 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-09 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -44,7 +44,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 공통 | VALIDATION_ERROR | 400 | 요청 값이 형식·범위를 벗어남 | 전원 |  |  |  |  |  |
 | 공통 | UNAUTHORIZED | 401 | 토큰이 없거나 만료됨 | 전원 |  |  |  |  |  |
-| 공통 | FORBIDDEN | 403 | 토큰은 유효하지만 남의 리소스 | 전원 |  |  |  |  |  |
+| 공통 | FORBIDDEN | 403 | 인증은 됐지만 허용되지 않은 동작. 소유권 위반은 404 | 전원 |  |  |  |  |  |
 | 공통 | NOT_FOUND | 404 | 대상 리소스가 없음 | 전원 |  |  |  |  |  |
 | 공통 | INTERNAL_ERROR | 500 | 서버 내부 오류 | 전원 |  |  |  |  |  |
 | AUTH | AUTH_EMAIL_DUPLICATED | 409 | 이미 가입된 이메일 | A · AUTH-02 |  |  |  |  |  |
@@ -58,7 +58,7 @@
 | HLTH | HLTH_RECORD_NOT_FOUND | 404 | 해당 health_record가 없음 | B · PRED-01 (초안) |  |  |  |  |  |
 | PRED | PRED_ALL_DIAGNOSED | 400 | 두 질환 모두 진단이라 예측 대상 없음 | B · PRED-01 (초안) |  |  |  |  |  |
 | PRED | PRED_INPUT_INSUFFICIENT | 400 | 모델 입력 항목이 모자람 (REQ-PRED-008) | B (초안) |  |  |  |  |  |
-| PRED | PRED_NOT_FOUND | 404 | 완료된 예측이 없음 | B · D · CHLG-01 |  |  |  |  |  |
+| PRED | PRED_NOT_FOUND | 404 | 완료된 예측이 없음 | B · D · CHLG-01 · PRED-03 |  |  |  |  |  |
 | CHLG | CHLG_LIMIT_EXCEEDED | 409 | 동시 진행 챌린지 3개 초과 | D · CHLG-05 |  |  |  |  |  |
 | CHLG | CHLG_ALREADY_ACTIVE | 409 | 이미 진행 중인 같은 챌린지 | D · CHLG-05 |  |  |  |  |  |
 | CHLG | CHLG_SAFETY_CONFIRMATION_REQUIRED | 400 | 운동형 챌린지인데 safety_confirmed 누락 (REQ-CHLG-010) | D · CHLG-05 |  |  |  |  |  |
@@ -276,11 +276,11 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: health_record_id(필수). 서버가 소유권과 질환별 진단·약물 이력을 확인하고, 미진단 질환만 큐에 넣는다. 둘 다 진단이면 PRED_ALL_DIAGNOSED. 입력은 불변 health_records에서 읽는다
-- **응답 (성공)**: HTTP 202 { success:true, data:{ prediction_id, job_id, status:"pending", model_version, poll_url:"/api/v1/predictions/{prediction_id}" } }. 폴링은 PRED-02 사용
+- **응답 (성공)**: HTTP 202 { success:true, data:{ prediction_id, job_id, status:"pending", model_version, model_experimental, poll_url:"/api/v1/predictions/{prediction_id}" } }. 폴링은 PRED-02 사용
 - **주요 에러**: PRED_ALL_DIAGNOSED(400), HLTH_RECORD_NOT_FOUND(404), HLTH_PROFILE_INCOMPLETE(400), PRED_INPUT_INSUFFICIENT(400), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
 - **관련 요구사항**: REQ-PRED-001·002·007·008 · NFR-PERF-002
 - **사용 테이블**: users 읽기 / health_records 읽기 / predictions 쓰기 / Redis enqueue
-- **상태**: 확정 — 홍서윤 10/1
+- **상태**: 확정 — 홍서윤 10/1 / model_experimental 추가 — 2026.10.09 배수빈, 최병주 확인 대기
 
 ### PRED-02 · 예측 상태·결과 조회
 
@@ -289,24 +289,24 @@
 - **인증**: 필요
 - **요청 파라미터**: prediction_id(양의 정수)
 - **요청 본문**: —
-- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, job_id, status:"pending"\|"done"\|"failed", model_version, results?: [{ disease, probability }], failure?: { code, message, retryable } } }. pending일 때 results 필드 생략. 완료 결과는 미진단 질환만 포함. grade 경계는 팀 검증 후 확정
+- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, job_id, status:"pending"\|"done"\|"failed", model_version, model_experimental, results?: [{ disease, probability }], failure?: { code, message, retryable } } }. pending·failed 일 때 results 생략, failed 가 아니면 failure 생략. 완료 결과는 미진단 질환만 포함. grade 경계는 팀 검증 후 확정
 - **주요 에러**: NOT_FOUND(404), UNAUTHORIZED(401), INTERNAL_ERROR(500)
 - **관련 요구사항**: REQ-PRED-002·003·004·006·007·009 · NFR-REL-001
 - **사용 테이블**: predictions 읽기 / users·health_records 읽기 (본인 소유·진단 분기)
-- **상태**: 확정 — 홍서윤 10/1
+- **상태**: 확정 — 홍서윤 10/1 / model_experimental 추가, failure 생략 규칙 명시 — 2026.10.09 배수빈, 최병주 확인 대기
 
 ### PRED-03 · 기여요인 조회
 
 `GET /api/v1/predictions/{prediction_id}/contributions`
 
 - **인증**: 필요
-- **요청 파라미터**: prediction_id(양의 정수), disease=diabetes\|hypertension(선택), limit=1~100(기본 100; 화면은 3 지정)
+- **요청 파라미터**: prediction_id(양의 정수), disease=diabetes\|hypertension(선택), limit=1~100(기본 100; 화면은 3 지정). limit은 질환마다 따로 적용한다
 - **요청 본문**: —
-- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, status:"pending"\|"done"\|"failed", disease, model_version, factor_dictionary_version, contribution_unit:"probability", items:[{ factor_key, contribution, direction, rank, modifiable }] } }. pending/failed 상태에는 items 생략; done이면 지원 factor 전량(0 포함). disease 생략 시 예측에 포함된 모든 미진단 질환 반환
-- **주요 에러**: NOT_FOUND(404), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
+- **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, status:"pending"\|"done"\|"failed", model_version, model_experimental, factor_dictionary_version, contribution_unit:"probability", diseases:[{ disease, items:[{ factor_key, contribution, direction, rank, modifiable }] }] } }. pending/failed 상태에는 diseases 생략; done이면 질환별로 지원 factor 전량(0 포함). disease 생략 시 예측에 포함된 모든 미진단 질환을 담고, disease 지정 시에도 길이 1 배열로 같은 모양을 쓴다. rank는 질환 안에서 매긴다
+- **주요 에러**: NOT_FOUND(404), PRED_NOT_FOUND(404 · disease를 지정했는데 그 질환 결과가 없음), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
 - **관련 요구사항**: REQ-PRED-005 · REQ-CHLG-001 · NFR-MODL-002
 - **사용 테이블**: predictions 읽기 / prediction_contributions 읽기
-- **상태**: 확정 — 홍서윤 10/1
+- **상태**: 확정 — 홍서윤 10/1 / 응답 형태·limit 범위·제외 질환 오류 수정, model_experimental 추가 — 2026.10.09 배수빈, 최병주 확인 대기
 
 ## C · 건강정보·대시보드 · 6개
 

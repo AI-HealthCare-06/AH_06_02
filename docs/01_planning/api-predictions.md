@@ -12,7 +12,7 @@ Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 �
 | PRED-02 | GET | /api/v1/predictions/{prediction_id} | 작업 상태·결과 조회·폴링 | 200 |
 | PRED-03 | GET | /api/v1/predictions/{prediction_id}/contributions | 질환별 기여도 조회 | 200 |
 
-서버가 건강기록과 예측의 소유자를 검증한다. 존재하는 타인 리소스는 요구사항 NFR-SEC-002에 따라 403, 존재하지 않는 ID는 404다. 인증 오류를 먼저 검사한다. 작업ID를 알더라도 소유권 검사를 생략하지 않는다. 인증 없는 캐시와 개인별 응답 공유를 금지한다.
+서버가 건강기록과 예측의 소유자를 검증한다. 타인 리소스는 존재 여부와 상관없이 404다. 403을 주면 그 ID가 있다는 사실이 드러나 건강 데이터가 샌다. 인증 오류를 먼저 검사한다. 작업ID를 알더라도 소유권 검사를 생략하지 않는다. 인증 없는 캐시와 개인별 응답 공유를 금지한다.
 
 ## PRED-01 예측 접수
 
@@ -36,14 +36,13 @@ HTTP 요청 재시도는 별도 예측을 만들 수 있다. 클라이언트는 
 | 코드 | HTTP | 조건 |
 |---|---|---|
 | UNAUTHORIZED | 401 | 토큰 없음·만료·무효 |
-| FORBIDDEN | 403 | 타인 건강기록·예측 |
 | PRED_ALL_DIAGNOSED | 400 | 당뇨·고혈압이 모두 진단·복약 상태여서 예측 대상 없음 |
-| PRED_DIAGNOSIS_HISTORY_REQUIRED | 400 | 해당 질환의 진단·약물 이력 미확인 |
-| NOT_FOUND | 404 | 기록·예측 없음 |
-| PRED_INPUT_INSUFFICIENT | 400 | 필수 모델 입력 누락; message에 누락 목록 |
+| HLTH_RECORD_NOT_FOUND | 404 | 지정한 health_record 가 없음 |
+| NOT_FOUND | 404 | 예측이 없음, 타인 리소스 포함 |
+| PRED_NOT_FOUND | 404 | PRED-03 에서 지정한 disease 의 결과가 그 예측에 없음 |
+| PRED_INPUT_INSUFFICIENT | 400 | 필수 모델 입력 누락; message에 누락 목록. 진단·약물 이력 미확인도 누락 목록에 담는다 |
 | VALIDATION_ERROR | 400 | JSON·path·query 필수값·형식·범위 오류 |
-| PRED_MODEL_UNAVAILABLE / PRED_QUEUE_UNAVAILABLE | 500 | 서버 모델·큐 준비 오류 |
-| INTERNAL_ERROR | 500 | 그 외 서버 오류 |
+| INTERNAL_ERROR | 500 | 모델·큐 준비 오류를 포함한 그 외 서버 오류 |
 
 
 누락 예시:
@@ -54,16 +53,18 @@ HTTP 요청 재시도는 별도 예측을 만들 수 있다. 클라이언트는 
 
 ## PRED-02 상태와 결과 조회
 
+값이 없는 필드는 null 로 싣지 않고 아예 뺀다. pending·failed 응답에 results 를, pending·done 응답에 failure 를 넣지 않는다.
+
 path: prediction_id(양의 정수). poll 간격은 최초 1초, 장기 pending은 점진적 증가를 권고한다. 상태 ENUM은 ERD와 같은 pending/done/failed 세 가지다. worker 실행 중에도 pending이다.
 
 pending:
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","results":null,"failure":null}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION"}}
 ```
 
 done(모든 수치는 설명용 가상 예시; 미확정 등급은 응답하지 않음):
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","health_record_id":101,"status":"done","model_version":"MODEL_VERSION","predicted_at":"2026-09-28T05:00:02Z","results":[{"disease":"diabetes","probability":0.31},{"disease":"hypertension","probability":0.22}],"failure":null,"notice":"의료 진단이 아닌 참고용입니다."}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","health_record_id":101,"status":"done","model_version":"MODEL_VERSION","predicted_at":"2026-09-28T05:00:02Z","results":[{"disease":"diabetes","probability":0.31},{"disease":"hypertension","probability":0.22}],"notice":"의료 진단이 아닌 참고용입니다."}}
 ```
 
 probability는 계약 형식을 보이는 가상 수치다. 이 응답에는 팀이 정하지 않은 등급, 직전값·변화량, 이력 및 대사증후군 결과를 추가하지 않는다. 값이 필요해지면 정책과 응답 필드를 API 시트에서 먼저 확정한다.
@@ -74,18 +75,18 @@ probability는 계약 형식을 보이는 가상 수치다. 이 응답에는 팀
 
 failed:
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","results":null,"failure":{"code":"PRED_INFERENCE_FAILED","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","failure":{"code":"INTERNAL_ERROR","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}}}
 ```
 조회 자체는 성공했으므로 HTTP 200/success=true이고 작업 실패는 failure로 전달한다. worker exception stack·경로·원시 건강값은 노출하지 않는다. `failure` 상세 저장 위치는 기존 ERD에 없으므로 Redis 보존 정책 또는 B 컬럼 확장을 A/C와 협의한다. 30초는 추론 목표이며 곧바로 실패로 바꾸는 하드 timeout 값은 아니다. 별도 hard timeout·복구 작업 설정을 운영 계약에 둔다.
 
 ## PRED-03 기여도 조회
 
-query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. disease를 생략하면 예측에 포함된 모든 미진단 질환의 기여도를 반환한다. 요청한 prediction이 pending 또는 failed이면 200으로 현재 상태를 반환하고 items를 생략한다. done이면 저장된 결과를 반환한다.
+query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. 응답은 언제나 `diseases` 배열이다. disease를 생략하면 예측에 포함된 모든 미진단 질환을 담고, 지정하면 길이 1 배열로 같은 모양을 쓴다. `limit`은 질환마다 따로 적용한다. `rank`도 질환 안에서 매긴다. 진단·복약 이력이 있어 예측에서 빠진 질환을 disease로 지정하면 404 PRED_NOT_FOUND다. 빈 배열을 주면 아직 끝나지 않은 것과 구분되지 않는다. 요청한 prediction이 pending 또는 failed이면 200으로 현재 상태를 반환하고 diseases를 생략한다. done이면 저장된 결과를 반환한다.
 
 ```json
-{"success":true,"data":{"prediction_id":501,"status":"done","disease":"diabetes","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}}
+{"success":true,"data":{"prediction_id":501,"status":"done","model_version":"MODEL_VERSION","factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","diseases":[{"disease":"diabetes","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}]}}
 ```
-값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 [모델 계약](../03_ai_data/model.md)을 따른다. 지원되는 매핑 factor 전량을 0 포함 저장한다. `limit=3`이면 상위 3개만 응답할 수 있지만 기본 limit=100은 D 추천에 전체 근거를 제공한다. top3 합이 전체 확률과 같다고 해석하지 않는다. 위협도나 공략 점수는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
+값은 형식 설명용이며 학습 결과가 아니다. SHAP 산식·direction/rank는 [모델 계약](../03_ai_data/model.md)을 따른다. 지원되는 매핑 factor 전량을 0 포함 저장한다. `limit=3`이면 질환마다 상위 3개씩 응답할 수 있지만 기본 limit=100은 D 추천에 전체 근거를 제공한다. top3 합이 전체 확률과 같다고 해석하지 않는다. 위협도나 공략 점수는 이 API의 raw contribution에 섞지 않는다. global importance는 진단자 내부 추천용 함수이며 별도의 공개 위험도 API로 만들지 않는다.
 
 ## 저장·워커 계약
 
@@ -101,11 +102,12 @@ query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. diseas
 | 사례 | 기대 결과 |
 |---|---|
 | 본인 정상 입력 | 202 pending, job_id + prediction_id |
-| 타인 record/예측 | 403, 큐·개인결과 접근 없음 |
+| 타인 record/예측 | 404, 큐·개인결과 접근 없음 |
 | 한 질환 진단/복약 | 해당 질환만 결과에서 생략, 다른 미진단 질환은 예측 |
 | 두 질환 모두 진단/복약 | 400 PRED_ALL_DIAGNOSED, prediction 생성 없음 |
 | 필수 누락 | PRED_INPUT_INSUFFICIENT, 누락 목록, 추론 없음 |
-| pending 조회 | 200 pending, 결과 null |
+| pending 조회 | 200 pending, results 없음 |
+| 제외된 질환을 disease 로 지정 | 404 PRED_NOT_FOUND, 빈 배열 아님 |
 | 같은 job 중복 소비 | 결과·기여도 한 세트 |
 | worker 오류 | failed, 이전 성공 이력 보존 |
 | D 위협도 갱신 오류 | prediction done 유지, 갱신 재시도 |
