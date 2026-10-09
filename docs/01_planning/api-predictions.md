@@ -53,16 +53,18 @@ HTTP 요청 재시도는 별도 예측을 만들 수 있다. 클라이언트는 
 
 ## PRED-02 상태와 결과 조회
 
+값이 없는 필드는 null 로 싣지 않고 아예 뺀다. pending·failed 응답에 results 를, pending·done 응답에 failure 를 넣지 않는다.
+
 path: prediction_id(양의 정수). poll 간격은 최초 1초, 장기 pending은 점진적 증가를 권고한다. 상태 ENUM은 ERD와 같은 pending/done/failed 세 가지다. worker 실행 중에도 pending이다.
 
 pending:
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","results":null,"failure":null}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION"}}
 ```
 
 done(모든 수치는 설명용 가상 예시; 미확정 등급은 응답하지 않음):
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","health_record_id":101,"status":"done","model_version":"MODEL_VERSION","predicted_at":"2026-09-28T05:00:02Z","results":[{"disease":"diabetes","probability":0.31},{"disease":"hypertension","probability":0.22}],"failure":null,"notice":"의료 진단이 아닌 참고용입니다."}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","health_record_id":101,"status":"done","model_version":"MODEL_VERSION","predicted_at":"2026-09-28T05:00:02Z","results":[{"disease":"diabetes","probability":0.31},{"disease":"hypertension","probability":0.22}],"notice":"의료 진단이 아닌 참고용입니다."}}
 ```
 
 probability는 계약 형식을 보이는 가상 수치다. 이 응답에는 팀이 정하지 않은 등급, 직전값·변화량, 이력 및 대사증후군 결과를 추가하지 않는다. 값이 필요해지면 정책과 응답 필드를 API 시트에서 먼저 확정한다.
@@ -73,7 +75,7 @@ probability는 계약 형식을 보이는 가상 수치다. 이 응답에는 팀
 
 failed:
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","results":null,"failure":{"code":"PRED_INFERENCE_FAILED","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"failed","failure":{"code":"PRED_INFERENCE_FAILED","message":"예측에 실패했습니다. 다시 시도해주세요.","retryable":true}}}
 ```
 조회 자체는 성공했으므로 HTTP 200/success=true이고 작업 실패는 failure로 전달한다. worker exception stack·경로·원시 건강값은 노출하지 않는다. `failure` 상세 저장 위치는 기존 ERD에 없으므로 Redis 보존 정책 또는 B 컬럼 확장을 A/C와 협의한다. 30초는 추론 목표이며 곧바로 실패로 바꾸는 하드 timeout 값은 아니다. 별도 hard timeout·복구 작업 설정을 운영 계약에 둔다.
 
@@ -104,7 +106,7 @@ query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. diseas
 | 한 질환 진단/복약 | 해당 질환만 결과에서 생략, 다른 미진단 질환은 예측 |
 | 두 질환 모두 진단/복약 | 400 PRED_ALL_DIAGNOSED, prediction 생성 없음 |
 | 필수 누락 | PRED_INPUT_INSUFFICIENT, 누락 목록, 추론 없음 |
-| pending 조회 | 200 pending, 결과 null |
+| pending 조회 | 200 pending, results 없음 |
 | 같은 job 중복 소비 | 결과·기여도 한 세트 |
 | worker 오류 | failed, 이전 성공 이력 보존 |
 | D 위협도 갱신 오류 | prediction done 유지, 갱신 재시도 |
