@@ -1,10 +1,10 @@
 # KNHANES 입력 선택 및 2024 비교 평가
 
-상태: 2026-10-01, 2026-10-11 재적합 반영. 목적은 당뇨·고혈압의 입력 후보를 비교하고, 팀에서 요청한 2024 평가로 외식 빈도 기반 `sodium_behavior`의 적용 여부를 정하는 것이다. 결과는 실험용이며 성능 최적화·임상 판단·배포 인증이 아니다.
+상태: 2026-10-01, 2026-10-11 재적합·2019 평가 반영. 목적은 당뇨·고혈압의 입력 후보를 비교하고, 팀에서 요청한 2024 평가로 외식 빈도 기반 `sodium_behavior`의 적용 여부를 정하는 것이다. 결과는 실험용이며 성능 최적화·임상 판단·배포 인증이 아니다.
 
 ## 설계
 
-입력 선택 단계에서는 2022 train, 2023 validation, 2024 비교 평가 연도 분할을 사용했다. 선택 뒤 최종 재적합은 2022+2023 학습·2024 평가로 바꿨다(아래 2026-10-11 절). 질환별로 미진단·미복약 성인만 eligibility에 포함하고 유효 y가 없는 행은 제외했다. RandomForest(200 trees, min leaf 10, max depth 10), train-only median/mode imputation과 one-hot encoding, seed 42·43·44를 썼다. 후보 평가 뒤 선택된 두 모델은 seed 42로 재학습해 전체 eligible 2022 train 행을 SHAP calibration reference로 다시 설명했다. 2024는 소디·입력 선택에 실제 사용했으므로 해당 선택 뒤 독립적인 최종 일반화 평가로 해석하지 않는다.
+지금 구조는 다음과 같다. 학습은 2022+2023 eligible 행이다. 입력 조합(base·sodium·sitting·sodium_sitting·vegetable) 선택은 2023 validation 으로 했고, 과거에는 2024 비교 평가도 선택에 사용했다(아래 2024 비교 절). 운영 임계값은 학습 연도 안 5-fold 층화 교차검증의 out-of-fold 예측에서 재현율 0.70 지점으로 정한다. 평가는 2024 와 2019 다. 질환별로 미진단·미복약 성인만 eligibility에 포함하고 유효 y가 없는 행은 제외했다. RandomForest(200 trees, min leaf 10, max depth 10), train-only median/mode imputation과 one-hot encoding, seed 42·43·44를 썼다. 2024 는 입력 선택에 쓰였으므로 선택 과정까지 포함한 독립 평가는 아니고, 2019 는 어떤 단계에도 쓰이지 않은 독립 평가다. 서빙 아티팩트는 seed 42 모델이다.
 
 | variant | feature |
 |---|---|
@@ -70,6 +70,36 @@ P95 가 바뀌면 같은 개인 SHAP 이라도 위협도 산출 기준이 바뀐
 
 결과 원본은 ignored `data/experiment-refit/` 아래에만 둔다. 두 명령이 같은 출력 폴더를 쓰므로 질환별 report 는 `report-diabetes.json`·`report-hypertension.json` 으로 따로 보관했다.
 
+## seed 변동폭 (seed 42·43·44, 2026-10-11)
+
+학습 연도·입력 조합·SHAP reference 는 위 재적합과 같고 seed 만 바꿨다. 값은 최소 / 중앙 / 최대다.
+
+| 실행 | 교차검증 AP | 평가 AP | 평가 AUROC |
+|---|---|---|---|
+| 당뇨 · core+sitting · 2024 평가 | 0.0893 / 0.0923 / 0.1025 | 0.1083 / 0.1110 / 0.1137 | 0.7793 / 0.7807 / 0.7809 |
+| 당뇨 · core+sitting · 2019 평가 | 0.0893 / 0.0923 / 0.1025 | 0.1513 / 0.1567 / 0.1572 | 0.7802 / 0.7808 / 0.7816 |
+| 고혈압 · core+sodium · 2024 평가 | 0.2003 / 0.2049 / 0.2102 | 0.2230 / 0.2255 / 0.2277 | 0.7303 / 0.7305 / 0.7325 |
+
+당뇨 두 행은 같은 모델을 다른 연도로 평가한 것이라 교차검증 AP 가 같다. 가장 큰 폭은 당뇨 교차검증 AP 의 0.0132 다. 학습 양성 343명을 5-fold 로 나눠 계산하는 값이라 seed 에 민감하다. 평가 AUROC 의 seed 간 폭은 모두 0.003 이하다. 운영 임계값이 seed 마다 학습 연도 안에서 다시 정해지므로 당뇨 2024 재현율은 0.7449~0.7908 로 움직인다. 9개 run 모두 `operating_point_source: out_of_fold` 이고 `threat_eligible=false` 인 factor 는 없다.
+
+## 평가셋별 기준선과 2019 독립 평가
+
+AP 는 평가셋의 양성률이 무작위 예측의 기준선이 되므로 평가셋마다 기준이 다르다. 양성률과 기준선 대비 배수를 함께 적는다(배수는 최소 / 중앙 / 최대).
+
+| 평가셋 | n (양성) | 양성률 = 기준선 AP | 평가 AP ÷ 기준선 | 평가 AUROC 중앙값 |
+|---|---:|---:|---|---:|
+| 당뇨 · 2024 | 4,853 (196) | 0.0404 | 2.68 / 2.75 / 2.82 | 0.7807 |
+| 당뇨 · 2019 | 5,345 (282) | 0.0528 | 2.87 / 2.97 / 2.98 | 0.7808 |
+| 고혈압 · 2024 | 4,226 (467) | 0.1105 | 2.02 / 2.04 / 2.06 | 0.7305 |
+
+2019 는 입력 조합 선택(2023 validation·과거 2024 비교), 학습(2022+2023), 운영 임계값(학습 연도 안 교차검증), P95 계산 어디에도 쓰지 않은 자료다. 그래서 선택 과정까지 포함한 독립 평가다. 2019 에서 당뇨 AUROC 는 2024 와 사실상 같았다(중앙값 0.7808 대 0.7807). 2024 를 입력 선택에 쓴 데서 오는 선택 편향이 크지 않다고 볼 근거가 된다. 다만 이것은 당뇨에 한한 확인이다. 고혈압은 2019 의 `HE_HP` 에 코드 4 가 없어 양성이 0 이 되므로 2019 로 평가하지 못했다.
+
+학습 자료를 약 두 배로 늘렸지만 2024 지표는 거의 그대로였다. 이번 변경으로 얻은 것은 성능이 아니라 평가 구조다.
+
+2019 를 넣어 canonical 을 다시 만들었을 때 2022~2024 행 17,262 개는 기존 canonical 과 모든 셀이 같았다(열·행 순서 포함). 전처리는 결정적이다.
+
+결과 원본은 ignored `data/experiment-seeds/` 아래에만 둔다.
+
 ## 선택 모델 전체-reference 재계산 (2022 단독 학습, 2026-10-01)
 
 선택한 입력으로 seed 42 모델을 다시 학습하고 2022 eligible training 전체에서 grouped SHAP을 계산했다. background는 같은 2022 training 집단에서 seed 고정 100행이며, P95 분포는 전체 training 평가행 기준이다. 2024는 P95에 사용하지 않았다.
@@ -112,19 +142,21 @@ P95 가 바뀌면 같은 개인 SHAP 이라도 위협도 산출 기준이 바뀐
 
 ## 재실행
 
-```bash
-../model-venv/bin/python scripts/model/preprocess_knhanes.py
-../model-venv/bin/python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-final --seeds 42 43 44 --variants base sodium sitting sodium_sitting
-../model-venv/bin/python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-vegetable --seeds 42 43 44 --variants vegetable
-../model-venv/bin/python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-2024-final-full/diabetes-sitting --seeds 42 --final-variant sitting --diseases diabetes --reference-size 0
-../model-venv/bin/python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-2024-final-full/hypertension-sodium --seeds 42 --final-variant sodium --diseases hypertension --reference-size 0
-```
-
-2026-10-11 재적합과 서빙 artifact:
+2026-10-11 에 실제로 쓴 명령이다. 원시자료는 `data/raw/` 에 둔다.
 
 ```bash
 uv sync --group app --group dev --group model
+
+# canonical: 2019 를 평가 전용으로 함께 만든다
+uv run --group model python scripts/model/preprocess_knhanes.py --years 2019 2022 2023 2024
+
+# 서빙 모델: seed 42 · 2024 평가
 uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-refit --seeds 42 --train-years 2022 2023 --validation-years 2023 --final-variant sitting --diseases diabetes --reference-size 0
 uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-refit --seeds 42 --train-years 2022 2023 --validation-years 2023 --final-variant sodium --diseases hypertension --reference-size 0
 uv run --group model python -m scripts.model.build_serving_artifact --diabetes data/experiment-refit/sitting-diabetes-42/artifact.json --hypertension data/experiment-refit/sodium-hypertension-42/artifact.json
+
+# seed 변동폭과 2019 독립 평가. 출력 폴더를 나눠 report.json 이 덮어써지지 않게 한다
+uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-seeds/diabetes-2024 --seeds 42 43 44 --train-years 2022 2023 --validation-years 2023 --final-variant sitting --diseases diabetes --reference-size 0
+uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-seeds/diabetes-2019 --seeds 42 43 44 --train-years 2022 2023 --validation-years 2023 --test-years 2019 --final-variant sitting --diseases diabetes --reference-size 0
+uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-seeds/hypertension-2024 --seeds 42 43 44 --train-years 2022 2023 --validation-years 2023 --final-variant sodium --diseases hypertension --reference-size 0
 ```
