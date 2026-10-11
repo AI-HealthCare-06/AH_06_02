@@ -80,14 +80,18 @@ CATEGORICAL = [
 LABELS = {"diabetes": ("HE_DM_HbA1c", [1, 2, 3], 3), "hypertension": ("HE_HP", [1, 2, 3, 4], 4)}
 
 
-def clean_input(frame, known_years):
+def clean_input(frame, requested_years):
     required = set(BASE + ["survey_year", "HE_DM_HbA1c", "HE_HP"])
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"Missing canonical columns: {sorted(missing)}")
-    unexpected = set(frame.survey_year.unique()) - set(known_years)
-    if unexpected:
-        raise ValueError(f"Unexpected survey_year: {sorted(unexpected)}")
+    # The canonical file may now hold more survey years than one run uses (e.g. 2019 alongside 2022-2024).
+    # The old check rejected any year the run had not asked for; the year check now guards the other way:
+    # every requested train/validation/test year must be present, and rows from unrequested years are dropped.
+    absent = sorted(set(requested_years) - set(frame.survey_year.unique()))
+    if absent:
+        raise ValueError(f"Requested survey_year missing from canonical: {absent}")
+    frame = frame[frame.survey_year.isin(requested_years)]
     if frame.age.isna().any() or (frame.age < 19).any():
         raise ValueError("Canonical input must contain verified adults only")
     bounds = {
