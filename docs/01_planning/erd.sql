@@ -1,5 +1,5 @@
 -- 당고킬러 (AH_06_02) 스키마
--- 2026.10.04 · 당고킬러_테이블명세서 기준 · 14테이블 222컬럼 FK23
+-- 2026.10.11 · 당고킬러_테이블명세서 기준 · 14테이블 223컬럼 FK23
 --
 -- 시트에 제거안으로 표시된 컬럼 세 개는 넣지 않았다.
 --   user_monsters.is_target                     공략 중 여부는 active 주기와 대상을 조인해 계산
@@ -95,6 +95,7 @@ CREATE TABLE predictions (
   metabolic_count  TINYINT     NULL COMMENT '대사증후군 해당 지표 수 0~5',
   model_version    VARCHAR(64) NOT NULL COMMENT "실제 값 예시 knhanes-ix-hypertension-base_sodium-s42 는 39자",
   input_snapshot   JSON        NULL COMMENT '전처리 전 canonical 값·단위·결측 여부',
+  failure          JSON        NULL COMMENT '작업 실패 사유 { code, message, retryable }',
   predicted_at     DATETIME    NULL,
   created_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
