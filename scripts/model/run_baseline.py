@@ -1,7 +1,10 @@
 """Offline baseline on verified canonical input, never on undocumented raw codes.
 
+Run it with the experiment dependencies attached:
+    uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py ...
 Run with --data data/canonical.csv --out data/experiment --seeds 42 43 44.
-The 2024 test set is untouched unless --final-variant is explicitly selected.
+Survey years are arguments: --train-years / --validation-years / --test-years.
+The test years stay untouched unless --final-variant is explicitly selected.
 """
 
 import argparse
@@ -19,6 +22,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import average_precision_score, brier_score_loss, roc_auc_score, roc_curve
+from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 
@@ -76,13 +80,14 @@ CATEGORICAL = [
 LABELS = {"diabetes": ("HE_DM_HbA1c", [1, 2, 3], 3), "hypertension": ("HE_HP", [1, 2, 3, 4], 4)}
 
 
-def clean_input(frame):
+def clean_input(frame, known_years):
     required = set(BASE + ["survey_year", "HE_DM_HbA1c", "HE_HP"])
     missing = required - set(frame.columns)
     if missing:
         raise ValueError(f"Missing canonical columns: {sorted(missing)}")
-    if not set(frame.survey_year.unique()) <= {2022, 2023, 2024}:
-        raise ValueError("Unexpected survey_year")
+    unexpected = set(frame.survey_year.unique()) - set(known_years)
+    if unexpected:
+        raise ValueError(f"Unexpected survey_year: {sorted(unexpected)}")
     if frame.age.isna().any() or (frame.age < 19).any():
         raise ValueError("Canonical input must contain verified adults only")
     bounds = {
@@ -156,6 +161,24 @@ def metrics(labels, probability, threshold=None):
     }
 
 
+def out_of_fold_metrics(train, features, label, seed, folds=5):
+    """Score the training years on predictions no fold of the model was fitted on.
+
+    Needed once the validation years are folded back into training: an operating
+    threshold read off rows the model has already seen is optimistic.
+    """
+    positives = int(label.sum())
+    if positives < folds:
+        raise ValueError(f"Out-of-fold thresholding needs at least {folds} positives, got {positives}")
+    splitter = StratifiedKFold(n_splits=folds, shuffle=True, random_state=seed)
+    predicted = cross_val_predict(
+        pipeline(features, seed), train[features], label, cv=splitter, method="predict_proba", n_jobs=-1
+    )[:, 1]
+    scored = metrics(label.to_numpy(), predicted)
+    scored["folds"] = folds
+    return scored
+
+
 def explain(model, reference, evaluation, features, seed):
     transform = model.named_steps["transform"]
     numeric = [key for key in features if key not in CATEGORICAL]
@@ -189,21 +212,27 @@ def enumerate_row(row):
     return [(str(index), float(value)) for index, value in enumerate(row)]
 
 
-def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_size=256):
+def run_one(frame, features, disease, seed, final_test, artifact_dir, years, reference_size=256):
     label_key, valid_codes, positive_code = LABELS[disease]
     valid = frame[frame[label_key].isin(valid_codes)].copy()
     eligible = valid[valid[f"eligible_{disease}"]].copy()
-    train = eligible[eligible.survey_year == 2022]
-    validation = eligible[eligible.survey_year == 2023]
+    train = eligible[eligible.survey_year.isin(years["train"])]
+    validation = eligible[eligible.survey_year.isin(years["validation"])]
+    validation_in_training = bool(set(years["train"]) & set(years["validation"]))
     if any(part.empty or part[label_key].eq(positive_code).nunique() != 2 for part in [train, validation]):
         raise ValueError(f"Missing years/classes: {disease}")
     if train[features].isna().all().any():
         raise ValueError("An all-missing feature cannot be silently retained")
+    train_label = train[label_key].eq(positive_code).astype(int)
     model = pipeline(features, seed)
-    model.fit(train[features], train[label_key].eq(positive_code).astype(int))
+    model.fit(train[features], train_label)
     result = metrics(
         validation[label_key].eq(positive_code).to_numpy(), model.predict_proba(validation[features])[:, 1]
     )
+    result["in_training"] = validation_in_training
+    out_of_fold = out_of_fold_metrics(train, features, train_label, seed) if validation_in_training else None
+    # The held-out operating point: cross-validated when the validation years sit inside training.
+    operating = out_of_fold if out_of_fold is not None else result
     # Use a bounded sample for a quick pass, or the complete 2022 training set for final scale references.
     train_reference = (
         train[features]
@@ -226,7 +255,7 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_
             "positive_shap_p95": p95,
             "positive_n": int((positive_shap > 0).sum()),
             "reference_n": len(train_grouped),
-            "reference_year": 2022,
+            "reference_years": list(years["train"]),
             "threat_eligible": threat_eligible,
             "threat_eligibility_reason": eligibility_reason,
         }
@@ -255,10 +284,13 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_
         }
     report = {
         "validation": result,
+        "out_of_fold": out_of_fold,
+        "operating_point_source": "out_of_fold" if out_of_fold is not None else "validation",
+        "years": {key: list(value) for key, value in years.items()},
         "train_n": len(train),
         "train_positive_n": int(train[label_key].eq(positive_code).sum()),
-        "label_valid_before_diagnosis_medication_filter_n": int(len(valid[valid.survey_year == 2022])),
-        "excluded_diagnosed_or_medicated_n": int(len(valid[valid.survey_year == 2022]) - len(train)),
+        "label_valid_before_diagnosis_medication_filter_n": int(len(valid[valid.survey_year.isin(years["train"])])),
+        "excluded_diagnosed_or_medicated_n": int(len(valid[valid.survey_year.isin(years["train"])]) - len(train)),
         "excluded_label_n": int((~frame[label_key].isin(valid_codes)).sum()),
         "feature_missing_fraction": {key: float(train[key].isna().mean()) for key in features},
         "train_shap_reference_n": len(train_reference),
@@ -286,9 +318,13 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_
                 for band, part in audit.groupby("band", observed=True)
             ]
     if final_test:
-        test = eligible[eligible.survey_year == 2024]
+        test = eligible[eligible.survey_year.isin(years["test"])]
+        if test.empty or test[label_key].eq(positive_code).nunique() != 2:
+            raise ValueError(f"Missing test years/classes: {disease}")
         report["test"] = metrics(
-            test[label_key].eq(positive_code).to_numpy(), model.predict_proba(test[features])[:, 1], result["threshold"]
+            test[label_key].eq(positive_code).to_numpy(),
+            model.predict_proba(test[features])[:, 1],
+            operating["threshold"],
         )
     artifact_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, artifact_dir / "model.joblib")
@@ -298,9 +334,11 @@ def run_one(frame, features, disease, seed, final_test, artifact_dir, reference_
         "disease": disease,
         "features": features,
         "seed": seed,
-        "split": {"train": 2022, "validation": 2023, "test": 2024},
+        "split": {key: list(value) for key, value in years.items()},
+        "validation_in_training": validation_in_training,
         "test_evaluated": bool(final_test),
         "validation_metrics": result,
+        "out_of_fold_metrics": out_of_fold,
         "test_metrics": report.get("test"),
         "global_importance": report["global_importance_train_sample"],
         "positive_shap_p95_training_reference": reference_p95,
@@ -321,6 +359,21 @@ def variant_name(features):
     return "_".join(["base", *candidates])
 
 
+def resolve_years(parser, args):
+    """Validation years may be folded back into training for the final refit; test years never can."""
+    years = {
+        "train": sorted(set(args.train_years)),
+        "validation": sorted(set(args.validation_years)),
+        "test": sorted(set(args.test_years)),
+    }
+    leaked = set(years["train"]) & set(years["test"])
+    if leaked:
+        parser.error(f"Test years must stay out of training: {sorted(leaked)}")
+    if set(years["validation"]) & set(years["test"]):
+        parser.error("Test years must stay out of validation")
+    return years
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True)
@@ -329,16 +382,20 @@ def main():
     parser.add_argument("--variants", nargs="+", choices=VARIANT_CHOICES)
     parser.add_argument("--final-variant", choices=VARIANT_CHOICES)
     parser.add_argument("--diseases", nargs="+", choices=LABELS, default=list(LABELS))
+    parser.add_argument("--train-years", type=int, nargs="+", default=[2022])
+    parser.add_argument("--validation-years", type=int, nargs="+", default=[2023])
+    parser.add_argument("--test-years", type=int, nargs="+", default=[2024])
     parser.add_argument(
         "--reference-size",
         type=int,
         default=256,
-        help="2022 train rows for SHAP scale calculation; 0 uses all eligible 2022 train rows",
+        help="Train rows for SHAP scale calculation; 0 uses every eligible training row",
     )
     args = parser.parse_args()
     if args.reference_size < 0:
         parser.error("--reference-size must be 0 (all rows) or a positive integer")
-    frame = clean_input(pd.read_csv(args.data))
+    years = resolve_years(parser, args)
+    frame = clean_input(pd.read_csv(args.data), sorted(set().union(*years.values())))
     variant_candidates = {
         "base": (),
         "sodium": ("sodium",),
@@ -368,7 +425,8 @@ def main():
         "data_sha256": hashlib.sha256(args.data.read_bytes()).hexdigest(),
         "factor_dictionary_version": FACTOR_DICTIONARY_VERSION,
         "packages": {name: importlib.metadata.version(name) for name in ["numpy", "pandas", "scikit-learn", "shap"]},
-        "split": {"train": 2022, "validation": 2023, "test": 2024},
+        "split": years,
+        "validation_in_training": bool(set(years["train"]) & set(years["validation"])),
         "test_evaluated": bool(args.final_variant),
         "diseases": args.diseases,
         "reference_size_requested": args.reference_size,
@@ -384,6 +442,7 @@ def main():
                     seed,
                     bool(args.final_variant),
                     args.out / f"{variant}-{disease}-{seed}",
+                    years,
                     args.reference_size,
                 )
                 report["runs"].append(

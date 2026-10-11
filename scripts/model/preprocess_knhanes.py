@@ -1,4 +1,8 @@
-"""Reproducible KNHANES IX adult input; all person-level output stays under data/."""
+"""Reproducible KNHANES IX adult input; all person-level output stays under data/.
+
+Run it with the experiment dependencies attached:
+    uv run --group model python scripts/model/preprocess_knhanes.py ...
+"""
 
 import argparse
 import hashlib
