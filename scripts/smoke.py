@@ -326,7 +326,8 @@ class Smoke:
             states = sorted({str(item.get("state")) for item in self.ctx.monsters})
             step.notes.append(
                 f"진단(확인됨): 도감 {len(self.ctx.monsters)}종 모두 impact_score=NULL, state={states}. "
-                "select_target 은 impact_score 가 있는 rage·caution·stable 만 고르므로 아티팩트가 있어도 공략 대상을 못 고른다"
+                "select_target 은 impact_score 가 있는 rage·caution·stable 만 고르므로 "
+                "아티팩트가 있어도 공략 대상을 못 고른다"
             )
         local = REPO_ROOT / config.MODEL_ARTIFACT_PATH
         step.notes.append(
