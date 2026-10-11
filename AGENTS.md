@@ -1,189 +1,395 @@
 # AGENTS.md
 
-당고킬러 저장소에서 코드를 쓰기 전에 읽는 규칙입니다. 사람도 에이전트도 같습니다.
+Rules to read before writing code in the 당고킬러 (DangoKiller) repository.
+They apply to humans and agents alike.
 
-프로젝트 소개는 [README](README.md)에 있습니다.
+The project overview is in [README](README.md). Typing, style and architecture
+rules are in [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md). On any conflict the
+precedence is: `pyproject.toml` settings > SYSTEM_DESIGN.md > this document.
+
+This file is written in English because agents follow English instructions more
+reliably. Everything the agent *produces* is Korean — see Output Language below.
+Domain nouns stay in Korean inside backticks (`위협도`, `공략 점수`, …) so that
+the vocabulary in the spreadsheets, the database and the UI stays single-sourced.
+Do not translate them into new English names.
 
 ---
 
-## 시작하기 전에 읽을 것
+## Read this first
 
-**화면을 만든다면 반드시 [`docs/02_team/design.md`](docs/02_team/design.md)를 먼저 읽습니다.**
-색·간격·타이포·상태 표현 규칙이 거기 있습니다. 읽지 않고 만들면 팀원 넷의 화면이 제각각이 됩니다.
+**If you are building a screen, read [`docs/02_team/design.md`](docs/02_team/design.md)
+before anything else.** Colors, spacing, typography and state representation live
+there. Skip it and the four of us ship four different-looking screens.
 
-시각적 기준은 Figma `Hi-Fi v1`입니다. Figma와 `docs/02_team/design.md`가 다르면 Figma가 맞습니다. 이 파일을 손으로 고치지 말고 팀에 확인하세요.
+The visual source of truth is Figma `Hi-Fi v1`. When Figma and
+`docs/02_team/design.md` disagree, Figma wins. Do not hand-edit that file; ask
+the team instead.
 
 ---
 
-## 용어 — 세 값을 섞지 않습니다
+## Output Language (MANDATORY)
 
-이 프로젝트에서 가장 자주 나는 실수입니다.
+ALL output MUST be in Korean — code comments, docstrings, commit messages,
+documentation, log and error messages you author, and chat responses.
+Only identifiers (variable / function / class / test names) and language
+keywords remain in English.
 
-| 이름 | 무엇인가 | 언제 바뀌나 | 어디에 |
+---
+
+## Workflow — plan.md and Canon TDD
+
+The work queue is `plan.md` at the repository root. Put the task list and the
+test list there and cross items off one at a time.
+
+`plan.md` is **not under version control** (it is in `.gitignore`). NEVER
+mention it in commit messages, PR titles or bodies, code comments, docstrings,
+test names, or any generated file. Read it and follow it, but leave no trace of
+it in the output.
+
+One test at a time, red → green → refactor:
+
+1. Pick the next unmarked item in `plan.md`. If a new scenario appears while you
+   work, do not implement it — add it to `plan.md` as an unmarked item.
+2. Turn that item into exactly one failing test with a behavior-describing name
+   (for example `test_same_day_restart_excludes_recognized_occurrences`).
+   Confirm it fails for the expected reason.
+3. Write the simplest code that makes the new test and every existing test pass.
+   Never copy a computed actual value into an expected value — derive the
+   expectation independently.
+4. Refactor only while green, one named refactoring at a time, running tests
+   after each step.
+5. Repeat until the feature is complete.
+
+When fixing a defect: write a failing test at the API level first, then the
+smallest test that reproduces the problem, then make both pass.
+
+The order of work is: plan → AI review → implement → review against the plan →
+E2E (Claude in Chrome).
+
+---
+
+## Tidy First — never mix structural and behavioral change
+
+Every change is exactly one of:
+
+- **Structural**: rearranging code without changing behavior (rename, extract, move).
+- **Behavioral**: adding or modifying functionality.
+
+Never put both in one commit. When both are needed, make the structural change
+first and run the tests before and after to prove behavior did not move.
+
+---
+
+## Import rules
+
+- All imports go at the top of the file. Never import inside a function.
+- Order: standard library → third-party → local modules.
+- The only exception is a `TYPE_CHECKING` block used to break a circular import,
+  for type hints only.
+
+```python
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from some_module import SomeClass  # type hints only
+```
+
+- Test files follow the same rules.
+
+---
+
+## Vocabulary — three values that must never be mixed
+
+This is the most frequent mistake in this project.
+
+| Term | What it is | When it changes | Where it lives |
 | --- | --- | --- | --- |
-| 위험도 | 모델이 낸 질환 발생 확률 (0~1) | 재예측할 때 | `predictions.dm_probability` · `htn_probability` |
-| 위협도 | 그 요인이 위험도를 얼마나 밀어올렸는가 (0~100) | 재예측할 때 | `user_monsters.impact_score` |
-| 공략 점수 | 이번 주 챌린지를 얼마나 했는가 | 챌린지 수행 즉시 | `user_monsters.weekly_progress` |
+| `위험도` (disease risk) | probability of developing the disease, 0~1, produced by the model | only on re-prediction | `predictions.dm_probability` · `htn_probability` |
+| `위협도` (factor threat) | how much that factor pushed `위험도` up, 0~100 | only on re-prediction | `user_monsters.impact_score` |
+| `공략 점수` (weekly attack score) | how much of this week's challenge the user has done | immediately, on each challenge log | `user_monsters.weekly_progress` |
 
-**챌린지를 수행해도 위험도와 위협도는 안 바뀝니다.** 공략 점수만 오릅니다. 건강정보를 다시 넣고 예측을 다시 돌려야 앞의 둘이 움직입니다.
+**Completing a challenge changes neither `위험도` nor `위협도`.** It raises only
+`공략 점수`. The first two move only when the user submits health data again and
+a new prediction runs.
 
-공략 점수는 퍼센트로 표기하지 않습니다. 주간 목표 100은 화면 표시용 고정값입니다.
+Never render `공략 점수` as a percentage. The weekly goal of 100 is a fixed
+display target, not a cap on the stored value.
 
-옛 용어 `HP`와 `주간 데미지`는 2026-09-28에 폐기했습니다. 코드나 문서에서 보이면 고쳐주세요.
+The old terms `HP` and `주간 데미지` were dropped on 2026-09-28. Fix them wherever
+they still appear in code or docs.
 
 ---
 
-## 소유 경계 — 한 테이블은 한 사람만 씁니다
+## Ownership boundaries — one table, one owner
 
-| 파트 | 담당 | 테이블 |
+| Part | Owner | Tables |
 | --- | --- | --- |
 | A | 배수빈 | `users` · `predictions` · `prediction_contributions` |
-| B | (공석) | 2026-10-03 홍서윤 이탈. `predictions` · `prediction_contributions` 는 A가 맡습니다 |
+| B | (vacant) | 홍서윤 left on 2026-10-07. `predictions` · `prediction_contributions` are owned by A |
 | C | 최병주 | `health_records` |
 | D | 김이경 | `monsters` · `user_monsters` · `challenges` · `user_challenges` · `user_challenge_occurrences` · `user_attack_cycles` · `challenge_logs` · `challenge_recommendations` · `rewards` · `user_rewards` |
 
-남의 테이블에 직접 쓰지 않습니다. 필요하면 담당자가 제공하는 내부 함수로 요청합니다.
-예를 들어 경험치 지급은 D가 `users`를 건드리지 않고 A의 함수를 부릅니다. 레벨 재계산과 레벨업 판정도 A 한 곳에서만 합니다.
+Never write to someone else's table directly. Call the internal function its
+owner provides. Granting XP, for example, is D calling A's function rather than
+touching `users`. Level recalculation and level-up detection happen in A only.
 
 ---
 
-## 스키마를 바꾸려면
+## Changing the schema
 
-DB 스키마의 원본은 **구글 시트 테이블 명세서**입니다. 저장소 안의 사본을 손으로 고치지 마세요.
+The source of truth for the DB schema is the **Google Sheet 테이블 명세서
+(table specification)**. Do not hand-edit the copies in this repository.
 
-순서는 이렇습니다. 시트를 고친다 → 팀에 알린다 → ERD와 DDL을 다시 뽑는다 → migration을 쓴다 → 코드를 고친다.
+The order is: edit the sheet → tell the team → regenerate the ERD and DDL →
+write the migration → change the code.
 
-사본은 [`docs/01_planning`](docs/01_planning)에 있습니다. [`erd.md`](docs/01_planning/erd.md)가 다이어그램, [`erd.sql`](docs/01_planning/erd.sql)이 DDL 기준입니다. 시트와 사본이 다르면 시트가 맞습니다. 사본은 `uv run scripts/sync_specs.py`로 다시 뽑습니다.
+The copies live in [`docs/01_planning`](docs/01_planning).
+[`erd.md`](docs/01_planning/erd.md) is the diagram and
+[`erd.sql`](docs/01_planning/erd.sql) is the DDL reference. When a copy and the
+sheet disagree, the sheet wins. Regenerate the copies with
+`uv run scripts/sync_specs.py`.
 
-migration은 한 사람이 돌립니다. 번호가 겹치면 머지할 때 충돌하니, 새로 만들기 전에 main에 올라온 마지막 번호를 확인하세요.
+One person runs migrations. Duplicate numbers conflict at merge time, so check
+the last number on `main` before creating a new one.
 
-현재 기준은 14테이블 222컬럼 FK 23입니다. 실제 DB에 걸린 FK는 그중 일부입니다. `health_records` · `user_attack_cycles` · `user_challenge_occurrences` 가 들어온 뒤 한 번에 겁니다.
+The current baseline is 14 tables, 223 columns, 23 FKs. Only some of those FKs
+exist in the database today; the rest go in at once after `health_records`,
+`user_attack_cycles` and `user_challenge_occurrences` have landed.
 
 ---
 
-## 시간대
+## Time zone
 
-DATETIME은 KST(Asia/Seoul) naive로 저장합니다. `TORTOISE_ORM` 이 `timezone: Asia/Seoul` 이고 `use_tz` 를 켜지 않았으며, 앱 코드도 `datetime.now(config.TIMEZONE)` 으로 통일되어 있습니다. 단일 시간대 서비스라 저장 단계에서 UTC로 변환하지 않습니다.
+DATETIME values are stored as KST (Asia/Seoul) naive. `TORTOISE_ORM` sets
+`timezone: Asia/Seoul`, `use_tz` is off, and application code consistently uses
+`datetime.now(config.TIMEZONE)`. This is a single-time-zone service, so nothing
+is converted to UTC on the way in.
 
-`start_date` · `end_date` · `scheduled_date` · `progress_week_start` · `log_date` 는 KST 달력 날짜라 DATE로 저장합니다. UTC로 변환해 하루를 밀지 않습니다.
+`start_date` · `end_date` · `scheduled_date` · `progress_week_start` ·
+`log_date` are KST calendar dates and are stored as DATE. Do not convert them to
+UTC and shift the day.
 
-API 응답 표기는 별도입니다. 시트의 공통 규칙을 따르세요.
+API response formatting is a separate matter. Follow the common rules in the
+spreadsheet.
 
 ---
 
-## 공략 사이클 — 한 번에 한 캐릭터
+## `공략 사이클` (attack cycle) — one character at a time
 
-2026-10-04 확정입니다.
+Settled on 2026-10-04.
 
-한 주기 동안 캐릭터 하나만 공략합니다. 챌린지 슬롯 3개를 여러 캐릭터에 나누지 않습니다. 나누면 공략 점수가 캐릭터마다 3분의 1 속도로 쌓여서 28일이 끝나도 봉인이 생기지 않습니다.
+One cycle attacks exactly one character. Never split the three challenge slots
+across several characters. Split them and `공략 점수` accumulates at a third of
+the speed per character, so no `봉인` (seal) is ever reached before the 28 days
+are up.
 
-| 항목 | 기준 |
+| Item | Rule |
 | --- | --- |
-| 대상 선정 | 위협도 1순위 자동 선정. 사용자가 도감에서 변경 가능 (REQ-RECO-006) |
-| 대상 고정 | 주기 중에는 재측정 결과로 자동 변경하지 않습니다 |
-| 기간 | 같은 주기의 챌린지는 투입 시점과 관계없이 D28 경계에서 함께 끝납니다. 이월 없음 (REQ-CHLG-011) |
-| 투입 | 초기 최대 2개. 2주차부터 주기당 1개 추가. 동시 최대 3개 (REQ-CHLG-002) |
-| 저장 | `user_attack_cycles` 한 행. 미션과 추천은 `cycle_id` 로 참조합니다 |
+| Target selection | the highest `위협도` is picked automatically. The user can change it from the `도감` (monster book) — REQ-RECO-006 |
+| Target stability | a re-measurement during the cycle does not switch the target automatically |
+| Duration | challenges in the same cycle all end together at the D28 boundary regardless of when they were added. Nothing carries over — REQ-CHLG-011 |
+| Intake | up to 2 at the start, 1 more per cycle from week 2, 3 concurrent at most — REQ-CHLG-002 |
+| Storage | one row in `user_attack_cycles`. Missions and recommendations reference it by `cycle_id` |
 
-주기 번호 `cycle_week` 와 공략 중 여부 `is_target` 은 저장하지 않고 조회할 때 계산합니다. 주간 공략 점수는 월요일 0시 KST에 초기화되는 달력 주 기준이라 주기 주차와 다릅니다. 섞지 마세요.
+The cycle number `cycle_week` and the "currently targeted" flag `is_target` are
+not stored; they are computed at read time. The weekly `공략 점수` resets on the
+calendar week boundary (Monday 00:00 KST), which is not the same as the cycle
+week. Do not mix the two.
 
-수행률은 인정 완료한 예정 기회 수를 예정 기회 수로 나눈 값입니다. 예정 기회는 `user_challenge_occurrences` 에 날짜와 슬롯 단위로 미리 만들어둡니다. `skipped` 와 기한이 지난 미기록은 분자에 넣지 않고 분모에는 남깁니다.
+The completion rate is the number of recognized-complete scheduled occurrences
+divided by the number of scheduled occurrences. Scheduled occurrences are
+created ahead of time in `user_challenge_occurrences`, one per date and slot.
+`skipped` occurrences and expired unlogged ones do not count toward the
+numerator but stay in the denominator.
 
-1단계에서는 습관 졸업을 판정하지 않습니다. `habit_established` 는 NULL이 미평가이고 FALSE를 미형성으로 읽지 않습니다. 종료 상태명 `graduated` 는 그대로 두되 화면에는 "기간 종료"로 표시합니다.
-
----
-
-## 데이터
-
-학습 데이터는 질병관리청 국민건강영양조사(KNHANES)입니다. **원시자료는 보안서약 대상이라 저장소에 올리지 않습니다.**
-
-원시자료는 `data/` 폴더에 두세요. `.gitignore`가 `data/` · `*.sav` · `*.sas7bdat`을 막고 있습니다. 커밋 전에 `git status`로 한 번 확인하세요.
-
-한 번 커밋되면 파일을 지워도 히스토리에 남습니다. 되돌리려면 히스토리를 다시 쓰고 팀원 전원이 다시 받아야 합니다.
-
-`.env` 파일과 `SECRET_KEY`도 올리지 않습니다. `envs/example.*.env`만 저장소에 둡니다.
+Phase 1 does not judge habit formation. `habit_established` NULL means not
+evaluated; do not read FALSE as "not formed". Keep the terminal status name
+`graduated` as it is, but display it as "기간 종료" (period ended) on screen.
 
 ---
 
-## 모델
+## Data
 
-혈압과 혈당은 모델 입력에서 뺐습니다. 이 값들이 라벨을 정의하는 데 쓰였기 때문입니다. 넣으면 정확도는 올라가지만 동어반복이 됩니다. 되살리지 마세요.
+The training data is the Korea National Health and Nutrition Examination Survey
+(KNHANES) from the KDCA. **The raw files are covered by a confidentiality
+undertaking and must never be committed.**
 
-이것 때문에 스파이크(혈당)만 SHAP 기여도를 구할 수 없어서, 정밀 모드에서 받은 실측 혈당으로 위협도를 따로 산출합니다.
+Keep raw files in `data/`. `.gitignore` blocks `data/` · `*.sav` ·
+`*.sas7bdat`. Run `git status` once before committing.
 
-### 위협도 계산
+Once a file is committed, deleting it later leaves it in history. Undoing that
+means rewriting history and every teammate re-cloning.
 
-SHAP 값을 두 가지로 나눠 씁니다. 섞지 마세요.
+`.env` files and `SECRET_KEY` are never committed either. Only
+`envs/example.*.env` belong in the repository.
 
-- 개인별 기여도: signed SHAP. 절댓값을 쓰지 않습니다.
-- 전역 중요도: `mean(|SHAP|)`. 절댓값 평균이라 항상 0 이상입니다.
+---
 
-두 기준값은 DB가 아니라 **모델 아티팩트 메타데이터**에 둡니다. `model_version`에 종속된 모델 메타데이터라 모델 파일과 함께 버전이 고정되는 편이 안전합니다. `ai_worker`가 해당 `model_version`의 값을 불러 계산합니다. 메타데이터에 들어가는 것은 질환별 `global_importance_max`, 질환 × factor별 `positive_shap_p95`, factor별 `threat_eligible` 세 가지입니다.
+## Model
 
-**전역 점수 (진단 질환)**
+Blood pressure and blood glucose are excluded from the model inputs because
+those values were used to define the labels. Including them raises accuracy but
+makes the prediction a tautology. Do not put them back.
 
-`normalized_score = (해당 요인의 mean|SHAP| / global_importance_max) × 100`
+Because of that, `spike` (스파이크, the blood-glucose character) is the one
+character with no SHAP contribution available, so its `위협도` is derived
+separately from the measured glucose collected in precision mode.
 
-- 당뇨 요인끼리, 고혈압 요인끼리 따로 계산합니다. 질환을 섞지 않습니다.
-- `mean|SHAP|`은 항상 0 이상이라 음수 클립이 필요 없습니다.
-- 진단 질환 위협도 = `normalized_score × behavior_weight`
+### Computing `위협도`
 
-**개인 위협도 (미진단 질환)**
+SHAP values are used in two distinct ways. Do not mix them.
+
+- Per-user contribution: signed SHAP. Never take the absolute value.
+- Global importance: `mean(|SHAP|)`. An average of absolute values, so always
+  non-negative.
+
+Both reference values live in the **model artifact metadata**, not in the
+database. They are metadata bound to a `model_version`, so pinning them to the
+model file is safer. `ai_worker` loads the values for that `model_version` and
+computes from them. The metadata holds three things: `global_importance_max` per
+disease, `positive_shap_p95` per disease × factor, and `threat_eligible` per
+factor.
+
+**Global score (diagnosed disease)**
+
+`normalized_score = (that factor's mean|SHAP| / global_importance_max) × 100`
+
+- Diabetes factors are computed among diabetes factors, hypertension among
+  hypertension. Never across diseases.
+- `mean|SHAP|` is always non-negative, so no negative clipping is needed.
+- `위협도` for a diagnosed disease = `normalized_score × behavior_weight`
+
+**Personal threat (undiagnosed disease)**
 
 `positive_shap = max(signed SHAP, 0)`
 
 `threat_score = min(100, positive_shap / positive_shap_p95 × 100)`
 
-- `positive_shap_p95`는 해당 `model_version`의 reference population에서 뽑은 질환 × factor별 positive SHAP 분포의 P95입니다. 질환별 max가 아닙니다. 전역 max는 요인 간 상대 중요도라서 개인 스케일 기준으로 쓰면 의미가 달라집니다.
-- 현재 SHAP contribution 저장 정밀도는 `DECIMAL(8,5)`입니다. model metadata에서는 `positive_shap_p95 < 0.00001`이면 저장 정밀도보다 작으므로 `threat_eligible = false`로 처리합니다. 또한 양수 SHAP 표본이 400개 미만이면 P95 상위 5%를 뒷받침하는 기대 관측치가 20개 미만이므로 false로 처리합니다. 두 기준을 모두 통과한 factor만 true입니다. 이 기준은 추정 가능성과 저장 정밀도를 위한 운영 기준이며 임상적 의미는 없습니다. contribution 형식이나 P95 산출 표본이 바뀌면 다시 검토합니다.
-- 스파이크처럼 `monsters.default_impact_source`가 `measured`인 캐릭터는 이 계산 밖입니다. 실측 혈당으로 따로 산출합니다.
+- `positive_shap_p95` is the P95 of the positive-SHAP distribution per
+  disease × factor, taken from the reference population of that `model_version`.
+  It is not a per-disease max. The global max expresses relative importance
+  between factors, so using it as a personal scale would mean something else.
+- SHAP contributions are stored as `DECIMAL(8,5)`. In the model metadata, a
+  `positive_shap_p95 < 0.00001` is below the stored precision and is marked
+  `threat_eligible = false`. A factor with fewer than 400 positive SHAP samples
+  is also marked false, because the top 5% behind a P95 would then rest on fewer
+  than 20 expected observations. Only factors that clear both checks are true.
+  These thresholds exist for estimability and storage precision; they carry no
+  clinical meaning. Revisit them if the contribution format or the P95 sampling
+  changes.
+- Characters whose `monsters.default_impact_source` is `measured` — `spike` is
+  the one today — are outside this calculation and are derived from measured
+  glucose instead.
 
 **direction**
 
-`SHAP > 0`이면 `increase`, `SHAP <= 0`이면 `decrease`로 저장합니다. 0을 decrease에 넣는 건 ENUM에 자리가 없어서지 "위험을 낮춘다"는 뜻이 아닙니다. 위협도 0으로 처리하고, 서비스에서 보호 요인처럼 보여주지 않습니다.
+Store `increase` when `SHAP > 0` and `decrease` when `SHAP <= 0`. Putting zero
+into `decrease` is only because the ENUM has no third slot; it does not mean
+"lowers the risk". Treat it as `위협도` 0 and never present it to the user as a
+protective factor.
 
-**알아둘 것**
+**Worth knowing**
 
-진단 질환 위협도(전역 max 기준)와 미진단 위협도(P95 기준)는 스케일 근거가 다릅니다. 둘 다 0~100이고 같은 `state` 임계값을 쓰지만, 같은 70이 같은 뜻은 아닙니다. 진단자는 예측을 돌리지 않아서 생기는 구조적 차이입니다.
-
-질환별·요인별 원값은 모델 1회전 후 서윤님이 전달합니다.
-
----
-
-## 어디에 붙이나
-
-- API 추가: `app/apis/v1/` 아래 라우터를 만들고 `app/apis/v1/__init__.py`에 등록
-- 테이블 추가: `app/models/`에 Tortoise 모델을 쓰고 `app/core/db/databases.py`의 `TORTOISE_APP_MODELS`에 등록
-- 추론 로직 추가: `ai_worker/tasks/`에 작성하고 `ai_worker/main.py`에서 호출
-
-추론과 SHAP 계산은 `ai_worker`에서만 합니다. `app`에서 직접 돌리면 응답 P95 3초를 못 지킵니다. `app`은 큐에 넣고 `job_id`와 함께 202를 반환합니다.
+`위협도` for a diagnosed disease (scaled by the global max) and for an
+undiagnosed one (scaled by P95) rest on different bases. Both are 0~100 and both
+use the same `state` thresholds, but 70 in one does not mean 70 in the other.
+The gap is structural: diagnosed users never run a prediction.
 
 ---
 
-## 에러 응답
+## Project structure
 
-에러 코드는 API 명세서 `에러 코드` 탭의 27개를 씁니다. 새 코드가 필요하면 시트에 먼저 등록하고 팀에 알린 뒤 씁니다. 코드를 임의로 만들지 마세요.
-
----
-
-## 커밋과 PR
-
-- 문서와 설정 변경은 `main`에 바로 밀어도 됩니다. 코드는 `feature/` 브랜치를 파서 PR로 올립니다
-- 커밋 메시지는 `feat:` · `fix:` · `docs:` · `chore:` · `refactor:` · `test:`로 시작합니다
-- 커밋 하나에 기능 하나
-- 올리기 전에 검사를 돌립니다
-
-```bash
-./scripts/ci/run_test.sh
-./scripts/ci/code_fommatting.sh
-./scripts/ci/check_mypy.sh
+```text
+.
+├── ai_worker/          # inference worker
+│   ├── core/           # settings, logger
+│   ├── schemas/        # job schemas
+│   ├── tasks/          # job definitions
+│   ├── model_contract.py
+│   └── main.py
+├── app/                # FastAPI server
+│   ├── apis/           # routers (v1)
+│   ├── core/           # settings, DB, migrations, JWT, validators
+│   ├── dtos/           # request and response schemas
+│   ├── models/         # table definitions
+│   ├── repositories/   # queries
+│   ├── services/       # business rules
+│   └── main.py
+├── data/               # model artifacts and raw data (never committed)
+├── docs/               # design documents
+├── envs/               # environment variables
+├── infra/              # Docker and Nginx configuration
+├── scripts/            # deploy, CI, seed and sync scripts
+├── docker-compose.yml
+└── pyproject.toml
 ```
 
 ---
 
-## 하지 말 것
+## Where to put things
 
-- 사용자에게 "당뇨입니다" 같은 진단 표현을 쓰지 않습니다. 확률만 보여줍니다
-- 챌린지를 못 한 날에 감점하거나 연속 기록을 초기화하지 않습니다
-- 공략 점수를 위협도에서 직접 빼지 않습니다
-- 비밀번호를 평문으로 저장하거나 로그에 남기지 않습니다
+- New API: add a router under `app/apis/v1/` and register it in
+  `app/apis/v1/__init__.py`.
+- New table: write the Tortoise model in `app/models/` and register it in
+  `TORTOISE_APP_MODELS` in `app/core/db/databases.py`.
+- New inference logic: write it in `ai_worker/tasks/` and call it from
+  `ai_worker/main.py`.
+
+Inference and SHAP computation happen in `ai_worker` only. Running them inside
+`app` breaks the 3-second P95 response budget. `app` enqueues the job and
+returns 202 with a `job_id`.
+
+---
+
+## Error responses
+
+Use the 27 error codes from the `에러 코드` (error codes) tab of the API
+specification sheet. If you need a new one, register it in the sheet and tell
+the team before using it. Never invent a code.
+
+---
+
+## Commits and PRs
+
+- Documentation and configuration changes may go straight to `main`. Code goes
+  on a `feature/` branch and comes in through a PR.
+- Commit messages start with `feat:` · `fix:` · `docs:` · `chore:` ·
+  `refactor:` · `test:`.
+- One logical change per commit. Commit only when every test passes and no
+  linter warning remains.
+- State in the first line of the body whether the change is structural or
+  behavioral (Tidy First).
+- Run the checks before pushing.
+
+```bash
+docker compose up -d mysql            # the DB first
+./scripts/ci/run_test.sh              # tests
+./scripts/ci/code_fommatting.sh       # format (Ruff)
+./scripts/ci/check_mypy.sh            # types (Mypy)
+```
+
+Never call `pytest` directly. `run_test.sh` grants the privilege to create the
+test database first and then calls pytest; calling it directly fails on
+permissions.
+
+Installing `pre-commit` runs format and lint automatically at commit time.
+
+```bash
+uv run pre-commit install
+```
+
+Two things differ from the mentor's shared rules. The commit prefixes stay
+`feat:` · `fix:` and so on rather than `structural:` · `behavioral:`, because the
+PR template and every PR merged so far use that scheme; structural versus
+behavioral is recorded in the first line of the body instead. Tests run through
+`run_test.sh` rather than `uv run pytest` for the reason in the paragraph above.
+
+---
+
+## Never
+
+- Never phrase anything to the user as a diagnosis ("you have diabetes"). Show
+  probabilities only.
+- Never deduct points or reset a streak because the user missed a day.
+- Never subtract `공략 점수` from `위협도` directly.
+- Never store a password in plain text or write one to the log.

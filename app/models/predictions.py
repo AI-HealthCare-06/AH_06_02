@@ -62,7 +62,7 @@ class Prediction(models.Model):
 
     failure: dict[str, object] | None = fields.JSONField(
         null=True,
-        description="작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 그대로 나간다 (NFR-REL-001)",
+        description="작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 나간다 (NFR-REL-001)",
     )
 
     predicted_at = fields.DatetimeField(null=True, description="추론 완료 시각")

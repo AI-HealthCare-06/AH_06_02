@@ -1,9 +1,9 @@
 # 당고킬러 ERD
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-04 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-11 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일과 [`erd.sql`](erd.sql)을 다시 뽑습니다.
 
-14테이블 · 222컬럼 · FK 23개. DB 반영은 [`app/core/db/migrations`](../../app/core/db/migrations)를 따릅니다.
+14테이블 · 223컬럼 · FK 23개. DB 반영은 [`app/core/db/migrations`](../../app/core/db/migrations)를 따릅니다.
 
 ## 다이어그램
 
@@ -99,6 +99,7 @@ erDiagram
         tinyint metabolic_count
         varchar model_version
         json input_snapshot
+        json failure
         datetime predicted_at
         datetime created_at
         datetime updated_at
