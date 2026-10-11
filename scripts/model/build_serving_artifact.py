@@ -25,7 +25,14 @@ TRAINED = "trained"
 EXPERIMENTAL = "experiment_only_not_deployable"
 #: 낮은 쪽이 앞이다. 합친 결과는 입력 중 가장 낮은 상태를 따른다
 STATUS_ORDER = (EXPERIMENTAL, TRAINED)
-REQUIRED_KEYS = ("status", "model_version", "disease", "global_importance", "positive_shap_p95_training_reference")
+REQUIRED_KEYS = (
+    "status",
+    "model_version",
+    "disease",
+    "split",
+    "global_importance",
+    "positive_shap_p95_training_reference",
+)
 
 #: predictions.model_version 은 VARCHAR(64) 다
 MODEL_VERSION_MAX = 64
@@ -37,13 +44,34 @@ class BuildError(ValueError):
     pass
 
 
-def serving_model_version(source_versions: dict[str, str]) -> str:
-    """두 원본 버전에서 짧은 합성 버전을 만든다.
+def train_years_of(source: dict[str, Any], label: str) -> list[int]:
+    """원본 artifact 의 split.train 을 정렬된 연도 목록으로 읽는다.
 
-    'serving-' + sha256("diabetes=<당뇨 버전>\\nhypertension=<고혈압 버전>") 앞 16자리. 항상 24자다.
-    같은 입력이면 같은 버전이 나와 재현 가능하고(NFR-MODL-002), 원본 두 버전은 source_model_versions 에 남긴다.
+    이전 run_baseline.py 는 정수 하나(2022), 지금은 목록([2022, 2023])을 쓴다. 둘 다 같은 형태로 맞춘다.
+    없거나 읽을 수 없으면 서빙 ID 를 만들 수 없으므로 멈춘다.
     """
-    key = "\n".join(f"{disease}={source_versions[disease]}" for disease in DISEASES)
+    split = source.get("split")
+    train = split.get("train") if isinstance(split, dict) else None
+    if isinstance(train, int) and not isinstance(train, bool):
+        return [train]
+    if isinstance(train, list) and train and all(isinstance(y, int) and not isinstance(y, bool) for y in train):
+        return sorted(set(train))
+    raise BuildError(f"{label} 에 split.train 학습 연도가 없거나 형식이 맞지 않습니다: {split!r}")
+
+
+def serving_model_version(source_versions: dict[str, str], train_years: dict[str, list[int]]) -> str:
+    """두 원본 버전과 각 학습 연도로 짧은 합성 버전을 만든다.
+
+    'serving-' + sha256("diabetes=<당뇨 버전>;train=<연도,...>\\nhypertension=<고혈압 버전>;train=<연도,...>")
+    앞 16자리. 항상 24자다. run_baseline.py 의 model_version 이름에는 학습 연도가 없어서, 이름이 같아도
+    학습 연도가 다르면 다른 모델이다. 연도까지 해시에 넣어 그런 두 모델이 같은 서빙 ID 를 갖지 않게 한다.
+    같은 버전·같은 학습 연도면 같은 ID 가 나와 재현 가능하다(NFR-MODL-002). 원본 버전과 학습 연도는
+    source_model_versions · source_train_years 에 남겨 ID 를 다시 계산해 볼 수 있다.
+    """
+    key = "\n".join(
+        f"{disease}={source_versions[disease]};train={','.join(str(year) for year in train_years[disease])}"
+        for disease in DISEASES
+    )
     digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:SERVING_VERSION_HASH_LEN]
     return f"{SERVING_VERSION_PREFIX}{digest}"
 
@@ -78,13 +106,15 @@ def build(sources: dict[str, dict[str, Any]]) -> dict[str, Any]:
     if set(sources) != set(DISEASES):
         raise BuildError(f"당뇨·고혈압 산출물이 하나씩 필요합니다: {sorted(sources)}")
     source_versions = {disease: str(sources[disease]["model_version"]) for disease in DISEASES}
-    version = serving_model_version(source_versions)
+    train_years = {disease: train_years_of(sources[disease], disease) for disease in DISEASES}
+    version = serving_model_version(source_versions, train_years)
     if len(version) > MODEL_VERSION_MAX:
         raise BuildError(f"합성 model_version 이 {MODEL_VERSION_MAX}자를 넘습니다: {version}")
     return {
         "status": combined_status([sources[disease]["status"] for disease in DISEASES]),
         "model_version": version,
         "source_model_versions": source_versions,
+        "source_train_years": train_years,
         "diseases": {
             disease: {
                 # 값은 그대로 옮긴다
