@@ -5,7 +5,7 @@
         --hypertension data/experiment-2024-final-full/hypertension-sodium/<run>/artifact.json \\
         [--out data/model/artifact.json]
 
-run_baseline.py 는 질환마다 global_importance 와 positive_shap_p95_training_reference 를 최상위에 둔다.
+run_baseline.py 는 질환마다 features · global_importance · positive_shap_p95_training_reference 를 최상위에 둔다.
 서비스(app/services/model_artifact.py)는 diseases.<질환> 아래에서 읽는다. 이 스크립트는 구조만 옮긴다.
 숫자는 반올림·정규화·보정하지 않는다. status 는 입력보다 높게 올리지 않는다.
 """
@@ -30,6 +30,7 @@ REQUIRED_KEYS = (
     "model_version",
     "disease",
     "split",
+    "features",
     "global_importance",
     "positive_shap_p95_training_reference",
 )
@@ -97,6 +98,9 @@ def load_source(path: Path, expected_disease: str) -> dict[str, Any]:
         raise BuildError(f"{path} 의 질환을 알 수 없습니다: {raw['disease']!r}")
     if raw["disease"] != expected_disease:
         raise BuildError(f"{path} 는 {raw['disease']} 산출물입니다. --{expected_disease} 자리에 넣었습니다")
+    features = raw["features"]
+    if not isinstance(features, list) or not features or not all(isinstance(name, str) for name in features):
+        raise BuildError(f"{path} 의 features 가 비어 있거나 형식이 맞지 않습니다: {features!r}")
     if not raw["global_importance"] or not raw["positive_shap_p95_training_reference"]:
         raise BuildError(f"{path} 의 global_importance 또는 positive_shap_p95_training_reference 가 비어 있습니다")
     return raw
@@ -117,7 +121,8 @@ def build(sources: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "source_train_years": train_years,
         "diseases": {
             disease: {
-                # 값은 그대로 옮긴다
+                # 값은 그대로 옮긴다. features 는 모델이 실제로 받는 입력 목록이라 앱이 필수 입력 판정에 쓴다
+                "features": sources[disease]["features"],
                 "global_importance": sources[disease]["global_importance"],
                 "positive_shap_p95_training_reference": sources[disease]["positive_shap_p95_training_reference"],
             }
