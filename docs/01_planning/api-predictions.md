@@ -26,7 +26,7 @@ Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 �
 
 성공 예시(설명용):
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","model_experimental":true,"poll_url":"/api/v1/predictions/501","created_at":"2026-09-28T05:00:00Z"}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"pending","model_version":"MODEL_VERSION","model_experimental":true,"poll_url":"/api/v1/predictions/501"}}
 ```
 
 1초 내 접수를 목표로 한다. HTTP 202를 반환한다. 이는 요청을 접수해 비동기 처리 중이라는 뜻이며 추론 완료를 뜻하지 않는다. B가 predictions pending을 만들고 확정한 model_version과 입력 스냅샷을 저장한다. 큐에는 prediction_id/job_id와 최소 작업 메타데이터만 전달하고 개인정보 전체를 로그에 찍지 않는다. ai_worker가 추론·기여도 계산을 수행한다. 큐 적재가 실패하면 failed를 기록하고 500으로 응답하여 영구 pending을 만들지 않는다. DB-큐 사이의 유실 복구 전략은 아래 구현 항목에 명시한다.
@@ -67,12 +67,14 @@ pending:
 
 done(모든 수치는 설명용 가상 예시; 미확정 등급은 응답하지 않음):
 ```json
-{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","health_record_id":101,"status":"done","model_version":"MODEL_VERSION","model_experimental":true,"predicted_at":"2026-09-28T05:00:02Z","results":[{"disease":"diabetes","probability":0.31},{"disease":"hypertension","probability":0.22}],"notice":"의료 진단이 아닌 참고용입니다."}}
+{"success":true,"data":{"prediction_id":501,"job_id":"job-example-501","status":"done","model_version":"MODEL_VERSION","model_experimental":true,"results":[{"disease":"diabetes","probability":0.31},{"disease":"hypertension","probability":0.22}]}}
 ```
 
 probability는 계약 형식을 보이는 가상 수치다. 이 응답에는 팀이 정하지 않은 등급, 직전값·변화량, 이력 및 대사증후군 결과를 추가하지 않는다. 값이 필요해지면 정책과 응답 필드를 API 시트에서 먼저 확정한다.
 
 실패 요청을 기존 최신 성공 결과로 덮어쓰지 않는다. API가 반환하는 DB의 질환별 컬럼은 HTTP에서는 disease 배열로 변환한다(NFR-SCAL-001).
+
+1단계에서는 응답에 넣지 않는다. 아래는 2단계에 쓸 판정 규칙이다.
 
 대사증후군 판정은 실측 다섯 지표의 별도 규칙이다. '분노 캐릭터 3개'로 계산하지 않는다. 공식 판정 기준·복약·누락 정책이 확정되지 않으면 unavailable를 반환한다. 규칙이 확정되고 모든 필요한 입력이 있을 때만 evaluated/count를 반환한다. 신규 진단이나 의료 조언으로 표현하지 않는다.
 
