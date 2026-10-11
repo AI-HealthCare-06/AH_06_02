@@ -17,6 +17,21 @@
   },
   "diseases": {
     "diabetes": {
+      "features": [
+        "age",
+        "sex",
+        "bmi",
+        "waist_cm",
+        "smoking_current",
+        "alcohol_frequency",
+        "alcohol_amount",
+        "walking_days",
+        "walking_minutes",
+        "strength_days",
+        "family_history_dm",
+        "family_history_htn",
+        "sitting_minutes"
+      ],
       "global_importance": [
         {
           "factor_key": "age",
@@ -239,6 +254,21 @@
       }
     },
     "hypertension": {
+      "features": [
+        "age",
+        "sex",
+        "bmi",
+        "waist_cm",
+        "smoking_current",
+        "alcohol_frequency",
+        "alcohol_amount",
+        "walking_days",
+        "walking_minutes",
+        "strength_days",
+        "family_history_dm",
+        "family_history_htn",
+        "dining_out_freq"
+      ],
       "global_importance": [
         {
           "factor_key": "age",
