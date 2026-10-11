@@ -276,3 +276,33 @@ def test_bad_inputs_exit_1_without_writing(tmp_path: Path, case: str) -> None:
 
     assert code == 1
     assert not out.exists()
+
+
+def test_parse_reads_feature_lists_per_disease(tmp_path: Path) -> None:
+    dm, htn = baseline_artifact("diabetes", DM_VERSION), baseline_artifact("hypertension", HTN_VERSION)
+    htn["features"] = ["age", "dining_out_freq"]
+    _, out = _build(tmp_path, dm, htn)
+
+    artifact = parse_artifact(json.loads(out.read_text(encoding="utf-8")))
+
+    assert artifact is not None
+    assert artifact.features == {"diabetes": dm["features"], "hypertension": ["age", "dining_out_freq"]}
+
+
+def test_parse_keeps_older_artifacts_without_features_readable() -> None:
+    # 추천·위협도는 features 가 필요 없다. 없으면 빈 목록으로 두고 예측 접수가 따로 거절한다
+    raw = {
+        "status": "trained",
+        "model_version": "v",
+        "diseases": {
+            "diabetes": {
+                "global_importance": [{"factor_key": "age", "normalized_score": 100.0}],
+                "positive_shap_p95_training_reference": {"age": {"positive_shap_p95": 0.03, "threat_eligible": True}},
+            }
+        },
+    }
+
+    artifact = parse_artifact(raw)
+
+    assert artifact is not None
+    assert artifact.features == {"diabetes": []}
