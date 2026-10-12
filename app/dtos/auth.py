@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
 
-from app.core.validators import validate_birth_year, validate_height_cm, validate_password
+from app.core.validators import optional_after_validator, validate_birth_year, validate_height_cm
 from app.dtos.base import BaseSerializerModel
 from app.models.users import MotivationType, Sex
 
@@ -11,12 +11,13 @@ class SignUpRequest(BaseModel):
     """AUTH-02 회원가입 요청. API 명세서 A 탭 기준이다."""
 
     email: Annotated[EmailStr, Field(max_length=255)]
-    password: Annotated[str, AfterValidator(validate_password)]
+    # 규칙 검사는 AuthService 가 한다. 여기서 막으면 AUTH_WEAK_PASSWORD 대신 VALIDATION_ERROR 로 나간다
+    password: str
     nickname: Annotated[str, Field(min_length=1, max_length=50)]
 
-    birth_year: Annotated[int | None, Field(None), AfterValidator(validate_birth_year)] = None
+    birth_year: Annotated[int | None, Field(None), optional_after_validator(validate_birth_year)] = None
     sex: Sex | None = None
-    height_cm: Annotated[float | None, Field(None), AfterValidator(validate_height_cm)] = None
+    height_cm: Annotated[float | None, Field(None), optional_after_validator(validate_height_cm)] = None
     motivation_type: MotivationType = MotivationType.COLLECT
 
     dm_diagnosed: bool

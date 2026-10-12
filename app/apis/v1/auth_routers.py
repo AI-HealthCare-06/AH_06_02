@@ -17,14 +17,15 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 REFRESH_COOKIE_KEY = "refresh_token"
 
 
-def _set_refresh_cookie(response: Response, refresh_token: str, expires: int) -> None:
+def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
+    # 쿠키 수명은 리프레시 토큰 수명과 같다. expires 는 '지금부터 몇 초' 자리라 만료 시각을 넣으면 안 된다
     response.set_cookie(
         key=REFRESH_COOKIE_KEY,
         value=refresh_token,
         httponly=True,
         secure=config.ENV == Env.PROD,
         domain=config.COOKIE_DOMAIN or None,
-        expires=expires,
+        max_age=config.REFRESH_TOKEN_EXPIRE_MINUTES * 60,
     )
 
 
@@ -48,7 +49,7 @@ async def signup(
     user = await auth_service.signup(request)
     tokens = await auth_service.login(user)
 
-    _set_refresh_cookie(response, str(tokens["refresh_token"]), tokens["refresh_token"].payload["exp"])
+    _set_refresh_cookie(response, str(tokens["refresh_token"]))
     return ok(
         {
             "user_id": user.id,
@@ -68,7 +69,7 @@ async def login(
     user = await auth_service.authenticate(request)
     tokens = await auth_service.login(user)
 
-    _set_refresh_cookie(response, str(tokens["refresh_token"]), tokens["refresh_token"].payload["exp"])
+    _set_refresh_cookie(response, str(tokens["refresh_token"]))
     return ok(
         {
             "access_token": str(tokens["access_token"]),

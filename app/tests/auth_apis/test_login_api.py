@@ -2,6 +2,7 @@ from httpx import ASGITransport, AsyncClient
 from starlette import status
 from tortoise.contrib.test import TestCase
 
+from app.core.config import Config
 from app.main import app
 from app.models.users import User
 from app.repositories.user_repository import LOGIN_FAIL_LIMIT
@@ -26,6 +27,21 @@ class TestLoginAPI(TestCase):
         assert data["user"]["level"] == 1
         assert data["user"]["total_xp"] == 0
         assert any("refresh_token" in header for header in response.headers.get_list("set-cookie"))
+
+    async def test_login_refresh_cookie_lasts_as_long_as_refresh_token(self):
+        email = "login_cookie@example.com"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            await client.post("/api/v1/auth/signup", json=signup_body(email=email))
+            response = await client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
+
+        cookie = next(header for header in response.headers.get_list("set-cookie") if "refresh_token=" in header)
+        # 14일. 만료 시각을 '지금부터 몇 초' 자리에 넣으면 수십 년짜리 쿠키가 된다
+        assert f"Max-Age={14 * 24 * 60 * 60}" in cookie
+        assert "expires=" not in cookie.lower()
+
+    def test_cookie_domain_defaults_to_request_host(self):
+        # 기본값이 비어 있어야 Domain 을 붙이지 않아 localhost·127.0.0.1 어느 쪽으로 열어도 쿠키가 남는다
+        assert Config.model_fields["COOKIE_DOMAIN"].default == ""
 
     async def test_login_invalid_credentials(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

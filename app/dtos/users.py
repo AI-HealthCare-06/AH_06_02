@@ -2,9 +2,9 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
 
-from app.core.validators import optional_after_validator, validate_birth_year, validate_height_cm, validate_password
+from app.core.validators import optional_after_validator, validate_birth_year, validate_height_cm
 from app.dtos.base import BaseSerializerModel
 from app.models.users import MotivationType, Sex, UserStatus
 
@@ -61,7 +61,8 @@ class PasswordChangeRequest(BaseModel):
     """USER-04 비밀번호 변경."""
 
     current_password: str
-    new_password: Annotated[str, AfterValidator(validate_password)]
+    # 규칙 검사는 UserService 가 한다. 여기서 막으면 AUTH_WEAK_PASSWORD 대신 VALIDATION_ERROR 로 나간다
+    new_password: str
 
 
 class WithdrawRequest(BaseModel):

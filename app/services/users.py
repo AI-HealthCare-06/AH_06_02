@@ -8,7 +8,7 @@ from app.core.utils.security import hash_password, verify_password
 from app.dtos.users import DiagnosisUpdateRequest, UserUpdateRequest
 from app.models.users import User
 from app.repositories.user_repository import PURGE_AFTER_DAYS, UserRepository
-from app.services.auth import AuthService
+from app.services.auth import AuthService, ensure_strong_password
 
 
 def prediction_enabled(user: User) -> bool:
@@ -54,6 +54,7 @@ class UserManageService:
 
     async def change_password(self, user: User, current_password: str, new_password: str) -> None:
         """USER-04. 현재 비밀번호를 확인한 뒤 바꾼다."""
+        ensure_strong_password(new_password)
         if not verify_password(current_password, user.password_hash):
             raise AppError(ErrorCode.AUTH_INVALID_CREDENTIALS, message="현재 비밀번호가 올바르지 않습니다.")
 
