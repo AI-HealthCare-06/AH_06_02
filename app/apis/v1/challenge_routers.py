@@ -61,7 +61,7 @@ async def generate_recommendations(
         for item in result.items
     ]
     # 어느 모델 기준 점수인지 추적한다. challenge_recommendations 에는 저장할 컬럼이 없다
-    # model_experimental 은 실험 아티팩트로 낸 점수임을 숨기지 않으려는 A 제안 필드다 (API 명세서 미반영)
+    # model_experimental 은 실험 아티팩트로 낸 점수임을 숨기지 않으려는 필드다 (10/9 명세 반영, 10/12 D 확인)
     return ok(
         {
             "items": items,

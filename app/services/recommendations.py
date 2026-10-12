@@ -24,7 +24,7 @@ from app.models.challenges import (
     UserChallenge,
     UserChallengeStatus,
 )
-from app.models.health_records import HealthRecord
+from app.models.health_records import HealthRecord, InputMode
 from app.models.predictions import Disease, Prediction, PredictionContribution, PredictionStatus
 from app.models.users import User
 from app.repositories.health_record_repository import HealthRecordRepository
@@ -80,11 +80,23 @@ CONDITION_PENDING_FACTORS = frozenset(
 )
 
 DISEASE_DIAGNOSED_FIELD = {Disease.DIABETES: "dm_diagnosed", Disease.HYPERTENSION: "htn_diagnosed"}
+DISEASE_MEDICATION_FIELD = {Disease.DIABETES: "dm_medication", Disease.HYPERTENSION: "htn_medication"}
 DISEASE_PROBABILITY_FIELD = {Disease.DIABETES: "dm_probability", Disease.HYPERTENSION: "htn_probability"}
 
 COOLDOWN_DAYS = {CooldownChoice.DAYS_7: 7, CooldownChoice.DAYS_30: 30}
 #: 같은 챌린지를 이만큼 연속 거절하면 재추천 시점을 고른다 (REQ-CHLG-006)
 REJECTS_BEFORE_COOLDOWN = 3
+
+
+def disease_has_history(user: User, disease: Disease) -> bool | None:
+    """예측 API와 같은 진단·복약 제외 기준. 미확인 값은 미진단으로 간주하지 않는다."""
+    diagnosed = getattr(user, DISEASE_DIAGNOSED_FIELD[disease])
+    medication = getattr(user, DISEASE_MEDICATION_FIELD[disease])
+    if diagnosed or medication:
+        return True
+    if diagnosed is None or medication is None:
+        return None
+    return False
 
 
 def behavior_weight(factor_key: str, record: HealthRecord | None) -> int | None:
@@ -229,15 +241,35 @@ class RecommendationService:
         self, user: User, monster: Monster, artifact: ModelArtifact
     ) -> tuple[dict[str, FactorScore], bool]:
         """factor 별 최고 점수. 질환을 섞지 않고 각각 계산한 뒤 factor 단위로 큰 값을 쓴다 (REQ-PRED-007)."""
-        record = await self.health_records.get_latest(user.id)
-        prediction = await (
-            Prediction.filter(user_id=user.id, status=PredictionStatus.DONE).order_by("-predicted_at", "-id").first()
+        # daily는 부분 기록이므로 추천의 생활패턴과 예측 기준을 바꾸지 않는다.
+        record = await (
+            HealthRecord.filter(user_id=user.id)
+            .exclude(input_mode=InputMode.DAILY)
+            .order_by("-recorded_at", "-id")
+            .first()
         )
+        prediction = None
+        if record is not None:
+            # 늦게 끝난 과거 작업이나 다른 버전이 현재 입력의 완료 결과를 가리지 않게 먼저 범위를 제한한다.
+            prediction = await (
+                Prediction.filter(
+                    user_id=user.id,
+                    health_record_id=record.id,
+                    model_version=artifact.model_version,
+                    status=PredictionStatus.DONE,
+                )
+                .order_by("-predicted_at", "-id")
+                .first()
+            )
         scores: dict[str, FactorScore] = {}
         missing_prediction = False
 
         for disease in monster_diseases(monster):
-            if getattr(user, DISEASE_DIAGNOSED_FIELD[disease]):
+            history = disease_has_history(user, disease)
+            if history is None:
+                missing_prediction = True
+                continue
+            if history:
                 path = self._global_scores(disease, monster, artifact, record)
             else:
                 usable = (
