@@ -34,5 +34,9 @@ class HealthRecordRepository:
             "recorded_at", "id"
         )
 
+    async def get_for_user(self, record_id: int, user_id: int) -> HealthRecord | None:
+        """본인 기록만 돌려준다. 남의 기록은 없는 것과 똑같이 None 이다."""
+        return await self._model.get_or_none(id=record_id, user_id=user_id)
+
     async def get_latest(self, user_id: int) -> HealthRecord | None:
         return await self._model.filter(user_id=user_id).order_by("-recorded_at", "-id").first()

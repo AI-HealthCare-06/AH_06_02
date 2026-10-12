@@ -19,7 +19,7 @@ import json
 import logging
 import math
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +55,8 @@ class ModelArtifact:
     references: dict[str, dict[str, FactorReference]]
     #: 실험 아티팩트면 True. 이 값으로 낸 점수는 응답에 실험 모델임을 함께 싣는다
     experimental: bool
+    #: disease -> 모델이 실제로 받는 입력 목록. 예측 접수가 필수 입력 판정에 쓴다. 옛 아티팩트에는 없다
+    features: dict[str, list[str]] = field(default_factory=dict)
 
 
 def parse_artifact(raw: Mapping[str, Any]) -> ModelArtifact | None:
@@ -78,6 +80,7 @@ def parse_artifact(raw: Mapping[str, Any]) -> ModelArtifact | None:
 
     global_scores: dict[str, dict[str, float]] = {}
     references: dict[str, dict[str, FactorReference]] = {}
+    features: dict[str, list[str]] = {}
     try:
         for disease, body in diseases.items():
             importance = body.get("global_importance") or []
@@ -96,6 +99,7 @@ def parse_artifact(raw: Mapping[str, Any]) -> ModelArtifact | None:
                 )
                 for factor, item in reference.items()
             }
+            features[disease] = [str(name) for name in body.get("features") or []]
     except (AttributeError, KeyError, TypeError, ValueError) as exc:
         _log_rejection(f"항목 형식이 맞지 않다: {exc!r}")
         return None
@@ -105,6 +109,7 @@ def parse_artifact(raw: Mapping[str, Any]) -> ModelArtifact | None:
         global_scores=global_scores,
         references=references,
         experimental=ACCEPTED_STATUSES[status],
+        features=features,
     )
 
 
