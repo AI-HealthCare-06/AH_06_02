@@ -75,6 +75,26 @@ class TestSignupAPI(TestCase):
         assert f"Max-Age={14 * 24 * 60 * 60}" in cookie
         assert "expires=" not in cookie.lower()
 
+    async def test_signup_accepts_null_birth_year(self):
+        email = "null_birth_year@example.com"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/api/v1/auth/signup", json=signup_body(email=email, birth_year=None))
+
+        # users.birth_year 는 NULL 을 허용한다. 검증기가 None 과 비교하다 500 이 나면 안 된다
+        assert response.status_code == status.HTTP_201_CREATED
+        user = await User.get(email=email)
+        assert user.birth_year is None
+
+    async def test_signup_accepts_null_height_cm(self):
+        email = "null_height_cm@example.com"
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post("/api/v1/auth/signup", json=signup_body(email=email, height_cm=None))
+
+        # users.height_cm 는 NULL 을 허용한다. 검증기가 None 과 비교하다 500 이 나면 안 된다
+        assert response.status_code == status.HTTP_201_CREATED
+        user = await User.get(email=email)
+        assert user.height_cm is None
+
     async def test_signup_duplicated_email(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             await client.post("/api/v1/auth/signup", json=signup_body(email="dup@example.com"))
