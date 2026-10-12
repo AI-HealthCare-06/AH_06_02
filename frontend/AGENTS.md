@@ -14,145 +14,6 @@ single-sourced. Do not translate them into new English names.
 
 ---
 
-## The mistake everyone makes — three different numbers
-
-This service has three numbers with different meanings. Mixing them makes the
-screen lie to the user.
-
-**`위험도`** — the probability of developing the disease. The API returns
-`dm_probability` and `htn_probability` as decimals between 0 and 1. Convert to a
-percentage for display, e.g. `24%`.
-
-**`위협도`** — how much that factor pushed the user's `위험도` up. The field is
-`impact_score`, an integer from 0 to 100. **It is not a percentage.** Render
-`72`, never `72%`. When the value is absent the state is `미측정` and the screen
-shows `—`.
-
-**`공략 점수`** — how much of this week's challenge work is done. The field is
-`weekly_progress`; the weekly target is fixed at 100. Render `40 / 100`, never
-as a percentage. It resets to 0 at Monday 00:00 KST.
-
-Completing a challenge does not move `위협도`. It only raises `공략 점수`.
-`위협도` changes only when the user re-enters health data and the prediction
-runs again.
-
----
-
-## API
-
-Paths start with `/api/v1`. Auth is a JWT bearer token: access tokens last 30
-minutes, refresh tokens 14 days. Only signup, login, token refresh and the email
-duplicate check are callable without a token.
-
-Every response has one of these two shapes:
-
-```json
-{ "success": true, "data": { } }
-{ "success": false, "error": { "code": "AUTH_EMAIL_DUPLICATED", "message": "이미 가입된 이메일입니다" } }
-```
-
-Lists arrive as a `data.items` array. Paging is `?page=1&size=20`.
-
-`error.message` is a Korean sentence that is safe to show to the user as-is. Do
-not invent your own copy in the frontend — render it directly. Branch on
-`error.code` when you need to behave differently.
-
-JSON keys are snake_case. Timestamps arrive as ISO 8601 UTC; convert to KST in
-the frontend.
-
----
-
-## Endpoints that exist today
-
-As of 2026-10-12 five routers are registered and 27 endpoints are callable.
-
-```
-auth         GET  /auth/check-email            POST /auth/signup
-             POST /auth/login                  POST /auth/refresh
-             POST /auth/logout
-
-users        GET  /users/me                    PATCH /users/me
-             PATCH /users/me/diagnosis         PATCH /users/me/password
-             DELETE /users/me                  GET /users/me/level
-
-health       POST /health-records              GET  /health-records
-             GET  /dashboard/summary           GET  /dashboard/trends
-
-challenges   POST /challenge-recommendations/generate
-             GET  /challenge-recommendations
-             PATCH /challenge-recommendations/{id}
-             PATCH /challenge-recommendations/{id}/unsuppress
-             POST /user-challenges             GET  /user-challenges
-             POST /user-challenges/{id}/logs   GET  /user-challenges/{id}/logs
-             GET  /monsters/me
-
-predictions  POST /predictions                 GET /predictions/{id}
-             GET  /predictions/{id}/contributions
-```
-
-Rewards and the full `도감` screens are specified but not callable yet. When you
-build those screens, mock them using the exact response shapes in
-`docs/01_planning/api-spec.md` at the repository root (predictions are in
-`api-predictions.md`), and keep every call in one place so the mocks are easy to
-swap out later.
-
-This list goes stale. Check `app/apis/v1/__init__.py` when it matters.
-
----
-
-## Retrying right after a prediction finishes
-
-When polling returns `done`, the very first recommendation call can still fail
-because D has not refreshed yet. That one case is the only one worth retrying,
-and the retry is deliberately narrow:
-
-- only on `404 PRED_NOT_FOUND` or `409 CHLG_RECOMMENDATION_UNAVAILABLE`
-- only on the first call after polling turned `done`
-- 1 second apart, at most 2 attempts
-
-Do not retry anywhere else. `409 CHLG_RECOMMENDATION_UNAVAILABLE` is a single
-code that also covers "no artifact", "no eligible candidate" and "no free
-slot" — none of those get better by trying again. After the two attempts, show
-the `error.message` the API returned instead of retrying further.
-
-This is a frontend-only rule; the backend does not change. Splitting the 409
-into separate codes so the client can tell "refresh pending" from "no
-candidate" is a 2단계 candidate.
-
----
-
-## Monsters
-
-The codes are `spike`, `alde`, `cotinine`, `viscera`, `sodi`. In Korean:
-스파이크, 알데, 코티니, 비세라, 소디.
-
-`spike` derives its `위협도` from a measured blood glucose value. If the user
-does not enter fasting glucose in precise mode it stays `미측정`. The other four
-come from model contributions.
-
-`sodi` is on hold. All five exist in the `도감` definition, but the current
-database seed has four, `sodi` produces a `위협도` for hypertension only, and it
-is excluded from automatic challenge recommendation candidates.
-
----
-
-## The seven 도감 states
-
-| value | label | condition |
-| --- | --- | --- |
-| rage | 매우 주의 | `위협도` 70 or above |
-| caution | 주의 | 40 or above, below 70 |
-| stable | 안정 | above 0, below 40 |
-| not_contributing | 현재 기여 없음 | `위협도` is 0 and there is no resolution record |
-| resolved | 요인 해소됨 | `위협도` is 0 and a resolution record exists |
-| sealed | 봉인 완료 | the 28-day `공략` condition was met |
-| unmeasured | 미측정 | no value |
-
-Whether a `위협도` of 0 means `현재 기여 없음` or `요인 해소됨` depends on
-whether a resolution record exists. Never decide it from the number alone.
-
----
-
 ## Building a screen
 
 `docs/prototype/당고킬러-모험시안_v4.html` is the reference. Take colors,
@@ -171,15 +32,18 @@ No horizontal scrolling at a 320px viewport width.
 
 ## Never do this
 
-Do not write copy that asserts a medical diagnosis or treatment. Do not remove
-the "for reference only" notice from any result screen.
-
 Do not show a predicted probability for a disease the user has already been
 diagnosed with. A user diagnosed with diabetes must never see "당뇨 확률 24%" —
 show `진단 관리 중` instead.
 
-Do not keep tokens in `localStorage` in plaintext for long. Never log passwords
-or tokens to the console.
+토큰은 공통 메모리 세션만 사용한다. localStorage·sessionStorage에 새로 저장하거나
+비밀번호·토큰을 콘솔에 출력하지 않는다.
 
-KNHANES raw data never enters this repository. It is covered by a
-security undertaking (`보안서약`).
+## 공통 구현 연결
+
+실행·담당 페이지·공통 인증·라우팅·API·UI 사용법은 [README.md](README.md)를 따른다.
+페이지는 내용 영역만 렌더링하며 공통 헤더와 하단 메뉴를 중복 생성하지 않는다.
+개별 페이지에서 별도 토큰 저장소나 API 클라이언트를 만들지 않는다.
+날짜·API 활성 상태·봉인 의미는 상위 지침과 실제 서버 응답을 따른다.
+API 타임스탬프를 UTC로 가정하지 않는다. KST 달력 날짜는 날짜 그대로 표시한다.
+등록되지 않은 화면과 사진 업로드를 완료된 것처럼 표시하지 않는다.
