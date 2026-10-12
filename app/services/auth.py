@@ -6,10 +6,18 @@ from app.core import config
 from app.core.errors import AppError, ErrorCode
 from app.core.jwt.tokens import AccessToken, RefreshToken
 from app.core.utils.security import hash_password, verify_password
+from app.core.validators import password_unmet_rules
 from app.dtos.auth import LoginRequest, SignUpRequest
 from app.models.users import User, UserStatus
 from app.repositories.user_repository import UserRepository
 from app.services.jwt import JwtService
+
+
+def ensure_strong_password(password: str) -> None:
+    """비밀번호 규칙(REQ-USER-002) 미달이면 못 지킨 항목을 담아 AUTH_WEAK_PASSWORD 를 낸다."""
+    unmet = password_unmet_rules(password)
+    if unmet:
+        raise AppError(ErrorCode.AUTH_WEAK_PASSWORD, extra={"unmet": unmet})
 
 
 class AuthService:
@@ -18,6 +26,7 @@ class AuthService:
         self.jwt_service = JwtService()
 
     async def signup(self, data: SignUpRequest) -> User:
+        ensure_strong_password(data.password)
         if not data.disclaimer_agreed:
             raise AppError(
                 ErrorCode.VALIDATION_ERROR,

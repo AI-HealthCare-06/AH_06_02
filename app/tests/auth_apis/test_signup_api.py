@@ -58,8 +58,13 @@ class TestSignupAPI(TestCase):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.post("/api/v1/auth/signup", json=signup_body(password="short"))
 
-        assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+        # 명세 AUTH-02: 비밀번호 규칙 미달은 AUTH_WEAK_PASSWORD(422)이고 못 지킨 항목을 함께 준다
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        error = response.json()["error"]
+        assert error["code"] == "AUTH_WEAK_PASSWORD"
+        # "short" 는 5자이고 숫자가 없다
+        assert error["unmet"] == ["min_length", "needs_digit"]
+        assert not await User.filter(email=BASE_SIGNUP["email"]).exists()
 
     async def test_signup_refresh_cookie_lasts_as_long_as_refresh_token(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
