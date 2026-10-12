@@ -266,7 +266,7 @@ export function mount({ root, ui, api, auth, router, signal }) {
         "span",
         {},
         ui.element("b", { text: "(필수)" }),
-        " 개인정보·의료 고지를 확인했습니다.",
+        " 의료 고지를 확인했습니다.",
       ),
     ),
     feedback,
