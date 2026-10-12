@@ -81,7 +81,9 @@ def xp_for_completion(daily_xp: int, daily_target: int, completed_today: int) ->
     return base + remainder if completed_today == daily_target else base
 
 
-def plan_occurrences(challenge: Challenge, start: date, end: date) -> list[tuple[date, str, int]]:
+def plan_occurrences(
+    challenge: Challenge, start: date, end: date, scheduled_dates: list[date] | None = None
+) -> list[tuple[date, str, int]]:
     """예정 기회 (날짜, slot_code, sequence_no). 수행률 분모가 된다.
 
     식사 슬롯이 정해진 챌린지는 슬롯마다, 아니면 하루 목표 횟수만큼 독립 회차로 만든다.
@@ -89,6 +91,22 @@ def plan_occurrences(challenge: Challenge, start: date, end: date) -> list[tuple
     slots = list(challenge.context_slots or [])
     if slots and len(slots) != challenge.daily_target_count:
         raise AppError(ErrorCode.VALIDATION_ERROR, message="하루 목표 횟수와 식사 슬롯 수가 맞지 않습니다.")
+    if challenge.context_type == ContextType.EVENT:
+        if not scheduled_dates:
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="예정 이용일을 확인한 뒤에 시작할 수 있습니다.")
+        if len(set(scheduled_dates)) != len(scheduled_dates) or any(not start <= day <= end for day in scheduled_dates):
+            raise AppError(
+                ErrorCode.VALIDATION_ERROR, message="중복 없이 오늘부터 주기 종료일까지의 이용일을 선택해주세요."
+            )
+        return [
+            (day, slot, seq)
+            for day in sorted(scheduled_dates)
+            for slot, seq in (
+                [(slot, 1) for slot in slots]
+                if slots
+                else [("", seq) for seq in range(1, challenge.daily_target_count + 1)]
+            )
+        ]
     planned: list[tuple[date, str, int]] = []
     day = start
     while day <= end:
@@ -122,6 +140,7 @@ class ChallengeCoreService:
         user_id: int,
         recommendation_ids: list[int],
         safety_confirmed: bool | None = None,
+        scheduled_dates: list[date] | None = None,
         now: datetime | None = None,
     ) -> list[UserChallenge]:
         """CHLG-05. 첫 시작은 draft 주기를 active 로 바꾸고 D0·D28 을 함께 확정한다 (REQ-CHLG-002·011).
@@ -145,6 +164,12 @@ class ChallengeCoreService:
             ordered_challenges = await self._load_start_challenges(user_id, cycle, ordered_recommendations)
             if any(ch.safety_check_required for ch in ordered_challenges) and safety_confirmed is not True:
                 raise AppError(ErrorCode.CHLG_SAFETY_CONFIRMATION_REQUIRED)
+            if scheduled_dates is not None and not any(
+                ch.context_type == ContextType.EVENT for ch in ordered_challenges
+            ):
+                raise AppError(
+                    ErrorCode.VALIDATION_ERROR, message="예정 이용일은 이용일 확인이 필요한 챌린지에만 입력합니다."
+                )
 
             active = UserChallenge.filter(user_id=user_id, status=UserChallengeStatus.ACTIVE)
             slots = self.cycles.remaining_slots(
@@ -187,6 +212,11 @@ class ChallengeCoreService:
                         "difficulty": str(challenge.difficulty),
                         "daily_xp": challenge.reward_xp,
                         "unit": challenge.unit,
+                        **(
+                            {"scheduled_dates": [str(day) for day in sorted(scheduled_dates or [])]}
+                            if challenge.context_type == ContextType.EVENT
+                            else {}
+                        ),
                     },
                 )
                 await UserChallengeOccurrence.bulk_create(
@@ -194,7 +224,9 @@ class ChallengeCoreService:
                         UserChallengeOccurrence(
                             user_challenge_id=mission.id, scheduled_date=day, slot_code=slot, sequence_no=seq
                         )
-                        for day, slot, seq in await self._plan_new_instance(user_id, challenge, today, end_date)
+                        for day, slot, seq in await self._plan_new_instance(
+                            user_id, challenge, today, end_date, scheduled_dates
+                        )
                     ]
                 )
                 created.append(mission)
@@ -214,7 +246,7 @@ class ChallengeCoreService:
         return [mission.id for mission in missions]
 
     async def _plan_new_instance(
-        self, user_id: int, challenge: Challenge, start: date, end: date
+        self, user_id: int, challenge: Challenge, start: date, end: date, scheduled_dates: list[date] | None = None
     ) -> list[tuple[date, str, int]]:
         """새 인스턴스의 예정 기회. 이전 인스턴스에서 이미 인정 완료한 기회는 뺀다.
 
@@ -222,7 +254,7 @@ class ChallengeCoreService:
         회차 번호는 1 부터 다시 세지 않는다. 그날 목표를 다 채웠으면 그날은 0 개다.
         시작일 이전 날짜는 계획에 없으므로 지난 미완료 기회를 소급해 다시 배정하지 않는다.
         """
-        planned = plan_occurrences(challenge, start, end)
+        planned = plan_occurrences(challenge, start, end, scheduled_dates)
         siblings = await self._sibling_mission_ids(user_id, challenge.id)
         done = await UserChallengeOccurrence.filter(
             user_challenge_id__in=siblings, status=OccurrenceStatus.COMPLETED, scheduled_date__gte=start
@@ -282,9 +314,6 @@ class ChallengeCoreService:
         monster = await self.cycles.target_monster(cycle)
         if any(challenge.factor_key not in monster.factor_keys for challenge in ordered):
             raise AppError(ErrorCode.VALIDATION_ERROR, message="이번 공략 대상과 연결되지 않은 챌린지입니다.")
-        if any(challenge.context_type == ContextType.EVENT for challenge in ordered):
-            # 예정 기회는 사용자가 확인한 이용일로만 만든다. 이용일을 받는 경로가 아직 없다
-            raise AppError(ErrorCode.VALIDATION_ERROR, message="예정 이용일을 확인한 뒤에 시작할 수 있습니다.")
         if await UserChallenge.filter(
             user_id=user_id, challenge_id__in=challenge_ids, status=UserChallengeStatus.ACTIVE
         ).exists():

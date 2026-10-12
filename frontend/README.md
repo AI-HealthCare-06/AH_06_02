@@ -107,6 +107,20 @@ export function mount({ root, ui, api, auth, router, route, signal }) {
 슬롯 부족도 함께 덮는 코드다. 두 번 더 시도해도 실패하면 error.message 를 그대로
 보여준다. 409 를 코드별로 나누는 것은 2단계 후보다.
 
+공통 컨텍스트의 `predictionReady`가 완료 직후 추천 호출을 관리한다. C의 폴링 화면은
+실제 `pending` → `done` 전환을 확인한 뒤 아래처럼 연결한다.
+
+```javascript
+predictionReady.markDone(result); // result.status === 'done', 양의 정수 prediction_id 확인
+router.navigate('reco');
+```
+
+D 화면은 이 표시가 있던 첫 추천 호출만 재시도한다. 완료 표시는 메모리에만 보관하며
+5초가 지나거나 첫 요청이 사용하거나 로그인 상태가 바뀌면 만료된다.
+화면 이탈·계정 변경 이후에는 예약된 재시도를 보내지 않는다.
+일반 추천 오류나 시작·대상 변경·인증 쓰기에는 자동 재시도를 적용하지 않는다.
+C 폴링 화면 자체는 C 담당자가 구현해야 하며, 서버의 `done` 확인 없이 완료 표시를 만들지 않는다.
+
 API 타임스탬프는 오프셋을 포함해 해석한다. UTC로 고정해서 9시간을 중복 추가하지 않는다.
 KST 달력 날짜 `YYYY-MM-DD`는 날짜 자체를 유지한다. `위험도`·`위협도`·`공략 점수`·봉인은 루트 지침을 따른다.
 PRED 상태는 실제 API의 `pending`·`done`·`failed`를 사용한다. HTTP 200만으로 추론 완료를 판단하지 않는다.

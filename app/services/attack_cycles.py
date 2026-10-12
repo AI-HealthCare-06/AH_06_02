@@ -6,8 +6,10 @@ from decimal import ROUND_HALF_UP, Decimal
 from tortoise.transactions import in_transaction
 
 from app.core import config
+from app.core.errors import AppError, ErrorCode
 from app.models.challenges import (
     AttackCycleStatus,
+    ChallengeRecommendation,
     Monster,
     MonsterState,
     OccurrenceStatus,
@@ -153,6 +155,29 @@ class AttackCycleService:
     async def target_monster(self, cycle: UserAttackCycle) -> Monster:
         user_monster = await UserMonster.get(id=cycle.target_user_monster_id)
         return await Monster.get(id=user_monster.monster_id)
+
+    async def change_draft_target(self, user_id: int, user_monster_id: int) -> tuple[UserAttackCycle, Monster]:
+        """시작 전 주기만 본인 대상에 연결한다. 진행 중 미션·XP·공략 점수·봉인은 변경하지 않는다."""
+        async with in_transaction():
+            await lock_user(user_id)
+            current = await self.get_current(user_id)
+            if current is None:
+                raise AppError(ErrorCode.CHLG_NOT_FOUND, message="변경할 공략 주기가 없습니다.")
+            cycle = await UserAttackCycle.select_for_update().get(id=current.id)
+            if cycle.status != AttackCycleStatus.DRAFT or await UserChallenge.filter(cycle_id=cycle.id).exists():
+                raise AppError(ErrorCode.CHLG_NOT_ACTIVE, message="공략 대상은 챌린지 시작 전에만 변경할 수 있습니다.")
+            target = await UserMonster.select_for_update().filter(id=user_monster_id, user_id=user_id).first()
+            if target is None:
+                raise AppError(ErrorCode.CHLG_NOT_FOUND, message="선택한 공략 대상을 찾을 수 없습니다.")
+            monster = await Monster.get(id=target.monster_id)
+            if not monster.is_enabled or target.state not in TARGETABLE_STATES or target.impact_score is None:
+                raise AppError(ErrorCode.VALIDATION_ERROR, message="현재 공략할 수 있는 대상을 선택해주세요.")
+            if cycle.target_user_monster_id != target.id:
+                cycle.target_user_monster_id = target.id
+                await cycle.save(update_fields=["target_user_monster_id", "updated_at"])
+                # 이전 대상의 미응답 카드만 무효화한다. 거절·수동 제외 이력은 보존한다.
+                await ChallengeRecommendation.filter(user_id=user_id, cycle_id=cycle.id, action__isnull=True).delete()
+            return cycle, monster
 
     def remaining_slots(self, cycle: UserAttackCycle, active_in_cycle: int, active_total: int, today: date) -> int:
         """이번에 더 시작할 수 있는 개수 (REQ-CHLG-002)."""

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 from app.core.errors import AppError, ErrorCode
 from app.dependencies.security import get_request_user
 from app.dtos.challenges import (
+    AttackTargetRequest,
     ChallengeLogRequest,
     ChallengeStartRequest,
     ChallengeStopRequest,
@@ -21,12 +22,30 @@ from app.models.challenges import (
     UserChallengeStatus,
 )
 from app.models.users import User
+from app.services.attack_cycles import AttackCycleService
 from app.services.challenges import ChallengeCoreService
 from app.services.monsters import MonsterService
 from app.services.recommendations import RecommendationService, challenge_goal_body, target_monster_body
 from app.services.rewards import RewardService
 
 challenge_router = APIRouter(tags=["challenges"])
+
+
+@challenge_router.patch("/attack-cycles/current/target", status_code=status.HTTP_200_OK)
+async def change_attack_target(
+    request: AttackTargetRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[AttackCycleService, Depends(AttackCycleService)],
+) -> dict[str, Any]:
+    """CHLG-10. 1단계는 챌린지 시작 전 draft 주기의 대상만 변경한다."""
+    cycle, monster = await service.change_draft_target(user.id, request.user_monster_id)
+    return ok(
+        {
+            "cycle_id": cycle.id,
+            "target_user_monster_id": cycle.target_user_monster_id,
+            "monster": target_monster_body(monster),
+        }
+    )
 
 
 def get_recommendation_service() -> RecommendationService:
@@ -71,6 +90,7 @@ async def generate_recommendations(
             "model_version": result.model_version,
             "model_experimental": result.model_experimental,
             "remaining_slots": result.remaining_slots,
+            "cycle_end_date": result.cycle.end_date,
         }
     )
 
@@ -134,6 +154,7 @@ async def start_user_challenges(
         user_id=user.id,
         recommendation_ids=request.recommendation_ids,
         safety_confirmed=request.safety_confirmed,
+        scheduled_dates=request.scheduled_dates,
     )
     active_count = await UserChallenge.filter(
         user_id=user.id,
