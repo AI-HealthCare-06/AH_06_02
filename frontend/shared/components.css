@@ -114,6 +114,41 @@
 .common-page-host .secondary {
   margin-top: 8px;
 }
+/* A 로그인·회원가입은 시안처럼 그림을 내용 영역 여백 밖까지 채운다. */
+.auth-page {
+  margin: -22px;
+}
+.common-page-host .auth-page .login-art {
+  background: #dae5f7 url("../d/assets/v4-4.png") center / cover;
+}
+.common-page-host .hero-copy h1 {
+  font-size: 33px;
+}
+.common-page-host .signup-copy h1 {
+  font-size: 29px;
+}
+.email-check {
+  display: flex;
+  gap: 8px;
+}
+.email-check .stack-field {
+  flex: 1;
+  min-width: 0;
+}
+.email-check .secondary {
+  flex: none;
+  margin: 0 0 10px;
+}
+@media (max-width: 740px) {
+  .auth-page {
+    margin: -20px;
+  }
+}
+@media (max-width: 360px) {
+  .common-page-host .hero-copy h1 {
+    font-size: 30px;
+  }
+}
 @media (max-width: 740px) {
   .common-page-host {
     padding: 20px;
