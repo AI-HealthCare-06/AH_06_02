@@ -28,3 +28,4 @@ plan.md
 
 # 프론트 검증용 개발 의존성
 frontend/node_modules/
+.DS_Store
