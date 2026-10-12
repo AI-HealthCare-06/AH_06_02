@@ -1,0 +1,2 @@
+# 프론트 검증용 개발 의존성은 실행 이미지에 넣지 않는다.
+frontend/node_modules/

@@ -320,7 +320,7 @@ class TestStartInCycle(TestCase):
         assert mission.cycle_id == cycle.id
         assert mission.end_date == cycle.end_date
         assert mission.duration_days_snapshot == 28
-        assert mission.goal_config_snapshot == {"difficulty": "challenge", "daily_xp": 36}
+        assert mission.goal_config_snapshot == {"difficulty": "challenge", "daily_xp": 36, "unit": "분"}
         # 점심·저녁 두 슬롯 × 28일
         occurrences = await UserChallengeOccurrence.filter(user_challenge_id=mission.id)
         assert len(occurrences) == 56

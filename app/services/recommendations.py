@@ -163,6 +163,7 @@ class GeneratedRecommendations:
     model_version: str
     #: 실험 아티팩트로 낸 점수인지. 추천 가능 여부에는 영향을 주지 않고 표시만 한다
     model_experimental: bool
+    remaining_slots: int = 0
 
 
 class RecommendationService:
@@ -235,6 +236,7 @@ class RecommendationService:
             monster=monster,
             model_version=artifact.model_version,
             model_experimental=artifact.experimental,
+            remaining_slots=slots,
         )
 
     async def _factor_scores(
@@ -346,6 +348,7 @@ class RecommendationService:
                     "rank": row.rank,
                     "difficulty": challenge.difficulty,
                     "verification_type": challenge.verification_type,
+                    **challenge_goal_body(challenge),
                     "context_label": challenge.context_label,
                     "cycle_id": row.cycle_id,
                     "target_monster": targets.get(row.cycle_id) if row.cycle_id is not None else None,
@@ -353,6 +356,7 @@ class RecommendationService:
                     "action": row.action,
                     "cooldown_choice": row.cooldown_choice,
                     "exclude_until": row.exclude_until,
+                    "suppressed_until_manual": row.suppressed_until_manual,
                 }
             )
         return items, total
@@ -425,3 +429,15 @@ class RecommendationService:
 
 def target_monster_body(monster: Monster) -> dict[str, Any]:
     return {"monster_id": monster.id, "code": monster.code, "name": monster.name}
+
+
+def challenge_goal_body(challenge: Challenge) -> dict[str, Any]:
+    """추천 화면의 선택 전 목표 안내. 시작 이후에는 미션 스냅샷을 사용한다."""
+    return {
+        "daily_target_count": challenge.daily_target_count,
+        "target_value": float(challenge.target_value) if challenge.target_value is not None else None,
+        "unit": challenge.unit,
+        "daily_xp": challenge.reward_xp,
+        "safety_check_required": challenge.safety_check_required,
+        "manual_fallback_allowed": challenge.manual_fallback_allowed,
+    }

@@ -1,25 +1,16 @@
 {
-  "name": "dangokiller",
+  "name": "dangokiller-html",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "description": "당고킬러 HTML 화면과 검증 도구",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "dev": "node ../scripts/frontend/dev-server.mjs",
+    "test:unit": "node --test ../scripts/frontend/api.test.mjs ../scripts/frontend/auth.test.mjs ../scripts/frontend/router.test.mjs ../scripts/frontend/model.test.mjs ../scripts/frontend/dev-server.test.mjs",
+    "test:browser": "node --test ../scripts/frontend/browser.test.mjs ../scripts/frontend/common-browser.test.mjs"
   },
   "devDependencies": {
-    "@types/node": "^24.13.3",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
-    "oxlint": "^1.81.0",
-    "typescript": "~6.0.2",
-    "vite": "^8.3.0"
+    "playwright": "1.62.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

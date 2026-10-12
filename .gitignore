@@ -25,3 +25,6 @@ data/model/*
 
 # AI 작업 큐. 임시 파일이라 올리지 않는다 (AGENTS.md 작업 방식)
 plan.md
+
+# 프론트 검증용 개발 의존성
+frontend/node_modules/
