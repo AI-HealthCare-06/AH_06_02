@@ -109,14 +109,23 @@ function errorMessage(error) {
       null,
     ],
   };
-  if (messages[error.code]) return messages[error.code];
+  if (messages[error.code]) {
+    const [title, copy, route] = messages[error.code];
+    return [title, error.message || copy, route];
+  }
   if (error.status === 0)
     return [
       "연결이 끊겼어요",
       "처리 결과를 확인하지 못했어요. 목록을 새로고침한 뒤 확인해주세요.",
       null,
     ];
-  return ["내용을 불러오지 못했어요", "잠시 후 다시 시도해주세요.", null];
+  return [
+    "내용을 불러오지 못했어요",
+    error.status >= 400 && error.status < 500
+      ? error.message || "입력 내용을 확인해주세요."
+      : "잠시 후 다시 시도해주세요.",
+    null,
+  ];
 }
 
 /** 공통 페이지 안에 D 화면만 붙인다. 인증·다른 화면 이동·사진 업로드는 호출자가 연결한다. */
@@ -127,6 +136,8 @@ export function mountDangoScreens(
     navigate = () => {},
     onPageChange = () => {},
     uploadPhoto,
+    generateRecommendations = () =>
+      request("/challenge-recommendations/generate", { method: "POST" }),
     now = () => new Date(),
     clock,
     embedded = false,
@@ -142,6 +153,8 @@ export function mountDangoScreens(
     excluded: [],
     authEpoch: 0,
     selected: new Set(),
+    scheduledDates: new Set(),
+    scheduleEnd: null,
     capacity: 0,
     monsters: [],
     missions: [],
@@ -167,6 +180,21 @@ export function mountDangoScreens(
   const content = root.querySelector("[data-content]");
   const dialog = root.querySelector("dialog");
   let dialogListener;
+  let loadController;
+
+  function scheduleLimit() {
+    if (state.scheduleEnd) return state.scheduleEnd;
+    const date = new Date(`${kstDate(now())}T12:00:00+09:00`);
+    date.setTime(date.getTime() + 27 * 86400000);
+    return kstDate(date);
+  }
+  function needsSchedule() {
+    return state.cards.some(
+      (card) =>
+        state.selected.has(card.recommendation_id) &&
+        card.context_type === "event",
+    );
+  }
 
   async function collection(path) {
     const items = [];
@@ -228,6 +256,19 @@ export function mountDangoScreens(
         )
         .join("")}</div>
       ${!state.cards.length ? '<div class="status-panel"><p>추천 카드를 모두 확인했어요.</p><button class="secondary" data-generate>다른 챌린지 추천받기</button></div>' : ""}
+      ${
+        needsSchedule()
+          ? `<section class="ui-card"><h2>예정 이용일 확인</h2><p class="hint">실제로 이용할 날짜만 추가해주세요. 선택한 날만 수행 기회로 잡습니다.</p><label class="stack-field">예정 이용일<input type="date" data-schedule-date min="${kstDate(now())}" max="${scheduleLimit()}"></label><button class="secondary" data-add-date>이용일 추가</button><div>${[
+              ...state.scheduledDates,
+            ]
+              .sort()
+              .map(
+                (day) =>
+                  `<button class="secondary" data-remove-date="${day}">${day} 삭제</button>`,
+              )
+              .join("")}</div></section>`
+          : ""
+      }
       <p class="hint">1주차에는 최대 2개, 2주차부터 주기당 1개를 더 시작할 수 있어요. 동시 진행은 최대 3개예요.</p>
       <button class="primary" data-start ${state.selected.size ? "" : "disabled"}>선택한 챌린지 시작하기</button>${excludedCards()}`;
   }
@@ -373,10 +414,14 @@ export function mountDangoScreens(
   async function load(page = state.page) {
     if (!PAGES[page]) return navigate(page);
     const version = ++state.version;
+    loadController?.abort();
+    loadController = new AbortController();
+    const signal = loadController.signal;
     state.page = page;
     state.mode = "loading";
     state.error = null;
     state.selected.clear();
+    state.scheduledDates.clear();
     render();
     try {
       const monsters = await request("/monsters/me");
@@ -385,9 +430,7 @@ export function mountDangoScreens(
         const history = await collection("/challenge-recommendations");
         if (version !== state.version) return;
         state.excluded = history.filter((card) => card.suppressed_until_manual);
-        data = await request("/challenge-recommendations/generate", {
-          method: "POST",
-        });
+        data = await generateRecommendations({ signal });
       } else if (page === "today")
         data = await collection("/user-challenges?status=active");
       else if (page === "progress")
@@ -403,6 +446,7 @@ export function mountDangoScreens(
       state.monsters = monsters.items;
       if (page === "reco") {
         state.cards = data.items;
+        state.scheduleEnd = data.cycle_end_date || null;
         state.capacity = Number.isInteger(data.remaining_slots)
           ? Math.max(0, Math.min(3, data.remaining_slots))
           : 0;
@@ -516,6 +560,10 @@ export function mountDangoScreens(
   async function start() {
     if (!state.selected.size || state.selected.size > state.capacity) return;
     const ids = [...state.selected];
+    if (needsSchedule() && !state.scheduledDates.size) {
+      message("예정 이용일을 한 날짜 이상 확인해주세요.", true);
+      return;
+    }
     const needsSafety = state.cards.some(
       (card) =>
         ids.includes(card.recommendation_id) && card.safety_check_required,
@@ -539,6 +587,9 @@ export function mountDangoScreens(
           body: {
             recommendation_ids: ids,
             ...(safety ? { safety_confirmed: true } : {}),
+            ...(needsSchedule()
+              ? { scheduled_dates: [...state.scheduledDates].sort() }
+              : {}),
           },
         }),
       async () => {
@@ -675,8 +726,25 @@ export function mountDangoScreens(
         );
         return;
       }
+      if (!needsSchedule()) state.scheduledDates.clear();
       render();
       root.querySelector(`[data-pick="${id}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    if (button.hasAttribute("data-add-date")) {
+      const input = root.querySelector("[data-schedule-date]");
+      const day = input?.value;
+      if (!day || day < kstDate(now()) || day > scheduleLimit()) {
+        message("오늘부터 주기 종료일까지의 이용일을 선택해주세요.", true);
+        return;
+      }
+      state.scheduledDates.add(day);
+      render();
+      return;
+    }
+    if (button.dataset.removeDate) {
+      state.scheduledDates.delete(button.dataset.removeDate);
+      render();
       return;
     }
     if (button.dataset.restore) {
@@ -808,11 +876,32 @@ export function mountDangoScreens(
       const sealed = item.sealed_at
         ? ` 봉인 기록: ${item.sealed_at.slice(0, 10)} · ${item.seal_count}회.`
         : "";
-      await ask(
+      const choice = await ask(
         item.name,
         `${stateLabel}. 위협도 ${item.impact_score == null ? "미측정" : item.impact_score}. 이번 주 공략 점수 ${item.weekly_progress}. ${item.is_target ? "현재 공략 대상이에요." : ""}${sealed} 위협도는 재측정 결과로 갱신돼요.`,
-        [{ key: "confirm", text: "도감으로 돌아가기" }],
+        [
+          ...(item.target_change_allowed &&
+          !item.is_target &&
+          Number.isInteger(item.user_monster_id)
+            ? [{ key: "change", text: "이 몬스터 공략하기" }]
+            : []),
+          { key: "confirm", text: "도감으로 돌아가기" },
+        ],
       );
+      if (choice === "change")
+        await mutate(
+          () =>
+            request("/attack-cycles/current/target", {
+              method: "PATCH",
+              body: { user_monster_id: item.user_monster_id },
+            }),
+          async () => {
+            await load("monsters");
+            message(
+              "시작 전 공략 대상을 변경했어요. 새 대상의 챌린지를 골라주세요.",
+            );
+          },
+        );
     }
   }
   const clickListener = (event) => {
@@ -867,6 +956,7 @@ export function mountDangoScreens(
     show,
     reload: () => load(),
     destroy() {
+      loadController?.abort();
       clearInterval(ticking);
       ++state.version;
       ++state.authEpoch;

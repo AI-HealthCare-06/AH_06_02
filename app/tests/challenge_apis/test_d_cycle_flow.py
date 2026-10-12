@@ -39,13 +39,14 @@ TODAY = NOW.date()
 
 CSV_ROWS = 19
 
-#: 1단계 운영 후보 6개. 카드 성격으로 빠진 10개, 보류 factor(소디)로 빠진 3개와 따로 센다
+#: 1단계 운영 후보 7개. 예정 이용일 입력이 생겨 한 정거장 걷기도 포함한다.
 PHASE1_CODES = {
     # 비세라
     "CH_WALK_AFTER_MEAL",
     "CH_STAND_HOURLY",
     "CH_STAIRS",
     "CH_STRENGTH_10",
+    "CH_WALK_ONE_STOP",
     # 알데
     "CH_NO_DRINK_TODAY",
     # 코티니
@@ -124,12 +125,12 @@ class TestPhase1Candidates(TestCase):
         assert len(challenges) == CSV_ROWS
         assert candidates == PHASE1_CODES
         excluded = set(challenges) - candidates - HELD_SODIUM_CODES
-        assert len(excluded) == 10
+        assert len(excluded) == 9
         assert {"CH_VEGGIE_FIRST", "CH_SLOW_EAT_20"} <= excluded  # 비활성
         assert {"CH_ONE_LESS_GLASS", "CH_WATER_BETWEEN", "CH_DELAY_5MIN"} <= excluded  # 욕구 발생형
         assert {"CH_CHECK_LABEL", "CH_COUNT_DOWN", "CH_WATER_8", "CH_SLEEP_7H"} <= excluded
-        # 예정 이용일 계약 전까지 제외. 마스터 행과 난이도는 그대로 둔다
-        assert "CH_WALK_ONE_STOP" in excluded
+        # 사용자 확인 이용일 계약으로 후보에 복귀한다. 마스터 행과 난이도는 그대로 둔다.
+        assert "CH_WALK_ONE_STOP" in candidates
         walk_one_stop = challenges["CH_WALK_ONE_STOP"]
         assert walk_one_stop.is_enabled is True
         assert str(walk_one_stop.difficulty) == "normal"
@@ -272,12 +273,13 @@ class TestGenerateRecommendations(TestCase):
         result = await _service(artifact).generate(user, NOW)
 
         assert [item.rank for item in result.items] == [1, 2, 3]
-        # 걷기 후보 2개(CH_WALK_ONE_STOP 제외)가 먼저, 다음 점수의 좌식 후보가 3위
+        # 이용일 확인 계약이 생겨 걷기 후보 3개가 높은 점수 순으로 먼저 나온다.
         assert [item.factor_key for item in result.items] == [
             "physical_activity_low",
             "physical_activity_low",
-            "sedentary_time_high",
+            "physical_activity_low",
         ]
+        assert "CH_WALK_ONE_STOP" in {item.code for item in result.challenges.values()}
 
     async def test_sodium_hold_applies_to_the_personal_path(self) -> None:
         await _seed()

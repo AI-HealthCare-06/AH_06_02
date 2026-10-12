@@ -47,8 +47,6 @@ PHASE1_EXCLUDED_CODES = frozenset(
         # 보너스. factor_key 가 없어 캐릭터에 매핑되지 않는다
         "CH_WATER_8",
         "CH_SLEEP_7H",
-        # 예정 이용일을 받는 계약이 없어 시작할 수 없다. 마스터 행·난이도는 그대로 두고 계약이 생기면 다시 넣는다
-        "CH_WALK_ONE_STOP",
     }
 )
 
@@ -434,6 +432,7 @@ def target_monster_body(monster: Monster) -> dict[str, Any]:
 def challenge_goal_body(challenge: Challenge) -> dict[str, Any]:
     """추천 화면의 선택 전 목표 안내. 시작 이후에는 미션 스냅샷을 사용한다."""
     return {
+        "context_type": challenge.context_type,
         "daily_target_count": challenge.daily_target_count,
         "target_value": float(challenge.target_value) if challenge.target_value is not None else None,
         "unit": challenge.unit,

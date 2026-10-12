@@ -4,8 +4,8 @@
   "description": "당고킬러 HTML 화면과 검증 도구",
   "scripts": {
     "dev": "node ../scripts/frontend/dev-server.mjs",
-    "test:unit": "node --test ../scripts/frontend/api.test.mjs ../scripts/frontend/auth.test.mjs ../scripts/frontend/router.test.mjs ../scripts/frontend/model.test.mjs ../scripts/frontend/dev-server.test.mjs",
-    "test:browser": "node --test ../scripts/frontend/browser.test.mjs ../scripts/frontend/common-browser.test.mjs"
+    "test:unit": "node --test ../scripts/frontend/api.test.mjs ../scripts/frontend/auth.test.mjs ../scripts/frontend/router.test.mjs ../scripts/frontend/model.test.mjs ../scripts/frontend/dev-server.test.mjs ../scripts/frontend/prediction-readiness.test.mjs",
+    "test:browser": "node --test ../scripts/frontend/browser.test.mjs ../scripts/frontend/common-browser.test.mjs ../scripts/frontend/start-contracts-browser.test.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"
