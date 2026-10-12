@@ -24,6 +24,8 @@
 
 대상은 KNHANES 2022~2024의 만 19세 이상이다. 당뇨·고혈압을 **서로 독립적인 두 이진 분류기**로 학습한다.
 
+학습은 2022+2023, 평가는 2024 와 2019 다. 2019 는 평가 전용으로만 쓰고 학습·입력 선택·운영 임계값·P95 에는 넣지 않는다. 지금까지 한 번도 쓰지 않은 자료를 그 상태로 남겨 두어야 선택 과정까지 포함한 독립 평가로 쓸 수 있기 때문이다. 2019 는 제8기 자료이고 같은 전처리(`knhanes-ix-v2`)를 그대로 적용했다. 제8기 코드북과 문항별로 대조한 기록은 아직 없다. 고혈압은 2019 의 `HE_HP` 에 코드 4 가 없어 2019 로 평가하지 않는다. 2016~2018 은 당뇨 라벨 변수가 `HE_DM` 으로 달라 현재 파이프라인(`HE_DM_HbA1c`)이 읽지 못한다.
+
 | 질환 | 원시 라벨 | y=1 | y=0 | 학습 제외 |
 |---|---|---|---|---|
 | diabetes | HE_DM_HbA1c | 코드 3 | 유효 코드 1·2 | 결측·비유효·미확인 코드 |
@@ -82,10 +84,10 @@ B 제안 기본안은 확률 공간 SHAP이다. 고정된 train background와 ex
 
 ## 6. 위협도 정규화와 미확정 산식
 
-미진단자 factor별 위협도는 아래 기준으로 계산한다. reference 집단은 선택된 질환별 모델의 2022 training 전체 eligible 표본이며, 집단·모델 버전을 함께 artifact에 고정한다. 2023 validation은 후보 비교에 쓰고 calibration 기준값에는 쓰지 않는다. 2024 비교 평가는 소디 채택 여부와 질환별 입력 변형을 정하는 데 사용했으므로, 그 feature 선택 후 2024는 독립 최종 일반화 평가로 간주할 수 없다. P95 산출에는 2024 자료를 쓰지 않는다.
+미진단자 factor별 위협도는 아래 기준으로 계산한다. reference 집단은 선택된 질환별 모델의 2022+2023 training 전체 eligible 표본이며(2026-10-11 재적합), 집단·모델 버전을 함께 artifact에 고정한다. 입력 선택 단계에서 2023 은 validation 으로 후보 비교에 썼고, 선택 뒤 최종 재적합에서는 학습 연도에 합쳤다. 그래서 운영 임계값은 2023 validation 이 아니라 학습 연도 안 5-fold out-of-fold 예측에서 정한다. 2024 는 학습·임계값·P95 에 쓰지 않고 마지막 평가에만 쓴다. 다만 소디 채택 여부와 질환별 입력 변형을 2024 비교로 정했으므로 그 2024 성적도 선택 과정까지 포함한 완전한 독립 일반화 평가로 간주할 수 없다.
 
 1. factor의 개인 기여도에서 `positive_shap = max(signed_group_shap, 0)`을 계산한다. 음수 SHAP은 보호 방향 설명으로 남기되 위협도를 만들지 않는다. 정확히 0인 factor는 위협도 0 / `not_contributing`이며 보호 요인으로 설명하지 않는다.
-2. 질환 × factor × `model_version`별 2022 training reference 집단의 positive SHAP 분포에서 `P95_reference`를 계산해 artifact metadata에 저장한다.
+2. 질환 × factor × `model_version`별 training reference 집단(2022+2023)의 positive SHAP 분포에서 `P95_reference`를 계산해 artifact metadata에 저장한다.
 3. `threat_score = round(100 * clip(positive_shap / P95_reference, 0, 1))`로 0~100 변환한다. 개인별 최대값이나 다른 사용자의 최신값으로 나누지 않는다.
 4. `positive_shap_p95 < 0.00001`이면 `DECIMAL(8,5)` contribution 저장 정밀도보다 작으므로, 또는 양수 SHAP 표본이 400개 미만이면 P95 위쪽 기대 관측치가 20개 미만이므로 `threat_eligible=false`로 둔다. 어느 하나라도 해당하면 위협도는 0이며 임의 floor를 나누지 않는다. 그렇지 않으면 true다. 저장 단위·reference 정의가 바뀌면 기준도 다시 확인한다.
 
@@ -114,7 +116,7 @@ Mapping v1의 `risk_condition`은 위험 방향을 설명한 문구이며 확정
 
 ## 8. 검증과 남은 결정
 
-기본·소디·좌식 validation 비교는 당뇨·고혈압 각 4개 입력 변형(base, sodium, sitting, sodium_sitting)과 seed 42·43·44, 총 24회로 수행했다. 채소 후보는 6회 추가해 총 30회 validation 탐색이다. 이어 네 변형 24개 run의 2024 평가를 수행해 당뇨는 core+sitting, 고혈압은 core+sodium을 첫 실험 입력으로 선택했다. 전체 결과와 trade-off, 2024 선택 사용 한계는 `experiment.md`에 기록한다. 선택된 모델은 seed 42로 다시 학습하고 각 질환의 전체 eligible 2022 training 표본을 SHAP calibration reference로 사용해 P95와 전역 중요도를 재계산했다. 이 산출물은 로컬 `data/`에만 있고 실험용이며 배포 승인을 의미하지 않는다.
+기본·소디·좌식 validation 비교는 당뇨·고혈압 각 4개 입력 변형(base, sodium, sitting, sodium_sitting)과 seed 42·43·44, 총 24회로 수행했다. 채소 후보는 6회 추가해 총 30회 validation 탐색이다. 이어 네 변형 24개 run의 2024 평가를 수행해 당뇨는 core+sitting, 고혈압은 core+sodium을 첫 실험 입력으로 선택했다. 전체 결과와 trade-off, 2024 선택 사용 한계는 `experiment.md`에 기록한다. 선택된 모델은 seed 42로 다시 학습하고 각 질환의 전체 eligible 2022 training 표본을 SHAP calibration reference로 사용해 P95와 전역 중요도를 재계산했다. 2026-10-11 에는 같은 입력 변형을 2022+2023 으로 다시 적합해 학습 양성을 당뇨 149→343, 고혈압 373→754 로 늘리고, P95·전역 중요도 기준집단도 2022+2023 전체 eligible 학습 표본으로 바꿨다. 수치는 `experiment.md`·`factor-scales.md` 에 있다. 이 산출물은 로컬 `data/`에만 있고 실험용이며 배포 승인을 의미하지 않는다.
 
 validation에서 sitting 추가 시 평균 AP는 당뇨 +0.0024, 고혈압 +0.0021이었다. 2024 비교 평가 후 첫 모델에는 좌식을 당뇨에만 넣었다. 이는 팀의 factor 분리 결정과 외식 대리변수의 고혈압 한정 범위를 따른 실험 선택이며, 좌식시간 변화의 인과효과를 뜻하지 않는다.
 

@@ -28,8 +28,9 @@ from app.core import config
 logger = logging.getLogger(__name__)
 
 DEPLOYABLE_STATUS = "trained"
-#: scripts/model/run_baseline.py 가 쓰는 실험 표시. 2024 자료로 후보를 고르고 같은 2024 로 성능을 쟀으므로
-#: 독립 일반화 성능이 아니다 (docs/03_ai_data/experiment.md · submission-status.md)
+#: scripts/model/run_baseline.py 가 쓰는 실험 표시. 현재 모델은 2022+2023 으로 학습하고 임계값은 학습 연도 안
+#: 교차검증으로 정해 2024 는 평가에만 썼다. 다만 입력 변형(sitting·sodium)을 2024 비교로 골랐으므로 2024 성적도
+#: 완전한 독립 일반화 성능은 아니다 (docs/03_ai_data/experiment.md · submission-status.md)
 EXPERIMENTAL_STATUS = "experiment_only_not_deployable"
 #: 받는 status → 실험 모델 여부. 그 밖의 status 는 거부한다
 ACCEPTED_STATUSES = {DEPLOYABLE_STATUS: False, EXPERIMENTAL_STATUS: True}

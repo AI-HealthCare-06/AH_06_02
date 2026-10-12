@@ -13,7 +13,12 @@ wheels/
 *.coverage
 .coverage.*
 # KNHANES 원시자료와 행 단위 파생 자료는 저장소에 올리지 않는다.
-data/
+# 예외는 서빙 아티팩트 하나뿐이다. 집계값만 들어 있어 개인 단위 자료가 아니고,
+# 배포 때 따로 챙기지 않도록 저장소가 들고 간다.
+data/*
+!data/model/
+data/model/*
+!data/model/artifact.json
 *.sav
 *.sas7bdat
 *.zsav

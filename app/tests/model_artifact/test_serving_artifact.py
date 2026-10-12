@@ -177,19 +177,64 @@ def test_status_never_goes_above_the_inputs(tmp_path: Path, dm_status: str, htn_
 
 
 def test_serving_version_fits_predictions_column_and_is_deterministic() -> None:
-    real = serving_model_version({"diabetes": DM_VERSION, "hypertension": HTN_VERSION})
-    huge = serving_model_version({"diabetes": "d" * 500, "hypertension": "h" * 500})
+    years = {"diabetes": [2022, 2023], "hypertension": [2022, 2023]}
+    real = serving_model_version({"diabetes": DM_VERSION, "hypertension": HTN_VERSION}, years)
+    huge = serving_model_version({"diabetes": "d" * 500, "hypertension": "h" * 500}, years)
 
     assert len(DM_VERSION) + len(HTN_VERSION) > MODEL_VERSION_MAX  # 이어 붙이면 넘친다
     assert len(real) <= MODEL_VERSION_MAX
     assert len(huge) <= MODEL_VERSION_MAX
-    assert real == serving_model_version({"diabetes": DM_VERSION, "hypertension": HTN_VERSION})
-    assert real != serving_model_version({"diabetes": HTN_VERSION, "hypertension": DM_VERSION})
+    assert real == serving_model_version({"diabetes": DM_VERSION, "hypertension": HTN_VERSION}, years)
+    assert real != serving_model_version({"diabetes": HTN_VERSION, "hypertension": DM_VERSION}, years)
+
+
+def test_same_names_with_different_train_years_get_different_ids() -> None:
+    # run_baseline.py 의 이름에는 학습 연도가 없다. 이름이 같아도 연도가 다르면 다른 모델이다
+    names = {"diabetes": DM_VERSION, "hypertension": HTN_VERSION}
+    only_2022 = serving_model_version(names, {"diabetes": [2022], "hypertension": [2022]})
+    with_2023 = serving_model_version(names, {"diabetes": [2022, 2023], "hypertension": [2022, 2023]})
+
+    assert only_2022 != with_2023
+
+
+def test_old_integer_train_year_reads_like_a_one_year_list(tmp_path: Path) -> None:
+    dm, htn = baseline_artifact("diabetes", DM_VERSION), baseline_artifact("hypertension", HTN_VERSION)
+    code, out = _build(tmp_path, dm, htn)
+
+    assert code == 0
+    built = json.loads(out.read_text(encoding="utf-8"))
+    # 이전 run_baseline.py 는 split.train 을 정수 2022 로 썼다
+    assert built["source_train_years"] == {"diabetes": [2022], "hypertension": [2022]}
+    names = {"diabetes": DM_VERSION, "hypertension": HTN_VERSION}
+    assert built["model_version"] == serving_model_version(names, {"diabetes": [2022], "hypertension": [2022]})
+
+
+def test_refit_years_change_the_built_id(tmp_path: Path) -> None:
+    dm, htn = baseline_artifact("diabetes", DM_VERSION), baseline_artifact("hypertension", HTN_VERSION)
+    for name in ("old", "new"):
+        (tmp_path / name).mkdir()
+    _, old_out = _build(tmp_path / "old", dm, htn)
+    for source in (dm, htn):
+        source["split"] = {"train": [2022, 2023], "validation": [2023], "test": [2024]}
+    _, new_out = _build(tmp_path / "new", dm, htn)
+
+    old = json.loads(old_out.read_text(encoding="utf-8"))
+    new = json.loads(new_out.read_text(encoding="utf-8"))
+    assert old["source_model_versions"] == new["source_model_versions"]
+    assert old["model_version"] != new["model_version"]
 
 
 @pytest.mark.parametrize(
     "case",
-    ["same_disease_twice", "unknown_disease", "missing_key", "unknown_status", "empty_importance"],
+    [
+        "same_disease_twice",
+        "unknown_disease",
+        "missing_key",
+        "unknown_status",
+        "empty_importance",
+        "missing_split",
+        "missing_train_years",
+    ],
 )
 def test_bad_inputs_exit_1_without_writing(tmp_path: Path, case: str) -> None:
     dm, htn = baseline_artifact("diabetes", DM_VERSION), baseline_artifact("hypertension", HTN_VERSION)
@@ -203,6 +248,10 @@ def test_bad_inputs_exit_1_without_writing(tmp_path: Path, case: str) -> None:
         htn["status"] = "draft"
     elif case == "empty_importance":
         dm["global_importance"] = []
+    elif case == "missing_split":
+        del htn["split"]
+    elif case == "missing_train_years":
+        dm["split"] = {"validation": [2023], "test": [2024]}
 
     code, out = _build(tmp_path, dm, htn)
 

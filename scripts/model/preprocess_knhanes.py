@@ -1,4 +1,8 @@
-"""Reproducible KNHANES IX adult input; all person-level output stays under data/."""
+"""Reproducible KNHANES IX adult input; all person-level output stays under data/.
+
+Run it with the experiment dependencies attached:
+    uv run --group model python scripts/model/preprocess_knhanes.py ...
+"""
 
 import argparse
 import hashlib
@@ -109,9 +113,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw", type=Path, default=Path("data/raw"))
     parser.add_argument("--out", type=Path, default=Path("data/canonical.csv"))
+    parser.add_argument(
+        "--years",
+        type=int,
+        nargs="+",
+        default=[2022, 2023, 2024],
+        help="Survey years to read from --raw as HN<yy>_ALL.sav",
+    )
     args = parser.parse_args()
     frames, audits = [], []
-    for year in [2022, 2023, 2024]:
+    for year in args.years:
         path = args.raw / f"HN{str(year)[2:]}_ALL.sav"
         raw, _ = pyreadstat.read_sav(path, usecols=RAW_COLUMNS)
         if raw.ID.isna().any() or raw.ID.duplicated().any() or not raw.year.eq(year).all():
