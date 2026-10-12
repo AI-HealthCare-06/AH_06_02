@@ -1,5 +1,6 @@
 import { AuthSession } from "./shared/auth.mjs";
 import { HashRouter, ROUTES } from "./shared/router.mjs";
+import { PredictionReadiness } from "./shared/prediction-readiness.mjs";
 import * as ui from "./shared/components.mjs";
 import { mountDangoScreens } from "./d/screens.mjs";
 
@@ -35,6 +36,7 @@ export async function startApplication(
     fetchImpl,
     dispatch: () => window.dispatchEvent(new Event("dango:auth-changed")),
   });
+  const predictionReady = new PredictionReadiness();
   const title = ui.element("span");
   const toolbar = ui.element("div", { className: "topbar common-toolbar" });
   const userName = ui.element("span");
@@ -82,6 +84,14 @@ export async function startApplication(
           dScreens = mountDangoScreens(host, {
             embedded: true,
             request: auth.api,
+            generateRecommendations: ({ signal } = {}) =>
+              predictionReady.request(
+                () =>
+                  auth.api("/challenge-recommendations/generate", {
+                    method: "POST",
+                  }),
+                { signal },
+              ),
             uploadPhoto,
             navigate: (id) => router.navigate(id),
           });
@@ -101,6 +111,7 @@ export async function startApplication(
           signal,
           ui,
           auth,
+          predictionReady,
           router,
           navigate: (id) => router.navigate(id),
           api: (path, options = {}) =>
@@ -179,6 +190,7 @@ export async function startApplication(
   nav.hidden = true;
   host.replaceChildren(ui.loading("로그인 상태를 확인하고 있어요."));
   const subscription = auth.subscribe(() => {
+    predictionReady.clear();
     userName.textContent = `${auth.user?.nickname || ""}님`;
     userStrip.hidden = !auth.signedIn;
     nav.hidden = !auth.signedIn;
@@ -192,6 +204,10 @@ export async function startApplication(
     setAccessToken: (token) => auth.setAccessToken(token),
   };
   window.dangoNavigate = (id) => router.navigate(id);
+  window.dangoPredictionReady = {
+    markDone: (data) => predictionReady.markDone(data),
+    clear: () => predictionReady.clear(),
+  };
   await auth.restore();
   started = true;
   await router.start();
@@ -206,6 +222,8 @@ export async function startApplication(
       root.replaceChildren();
       delete window.dangoAuth;
       delete window.dangoNavigate;
+      delete window.dangoPredictionReady;
+      predictionReady.clear();
     },
   };
 }

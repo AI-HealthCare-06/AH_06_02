@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Any
 
 from app.core import config
-from app.models.challenges import Monster, MonsterState, UserMonster
-from app.services.attack_cycles import AttackCycleService, today_kst
+from app.models.challenges import AttackCycleStatus, Monster, MonsterState, UserMonster
+from app.services.attack_cycles import TARGETABLE_STATES, AttackCycleService, today_kst
 from app.services.challenges import week_start_for
 
 
@@ -12,14 +12,14 @@ class MonsterService:
         self.cycles = AttackCycleService()
 
     async def list_mine(self, user_id: int, now: datetime | None = None) -> list[dict[str, Any]]:
-        """MNSTR-01. is_target 은 저장하지 않고 active 주기의 대상과 비교해 계산한다 (REQ-RECO-006)."""
+        """MNSTR-01. 현재 draft/active 주기로 대상을 계산하고 시작 전 변경 가능 여부를 전달한다."""
         current = now or datetime.now(config.TIMEZONE)
         await self.cycles.close_expired(user_id, today_kst(current), current)
 
         monsters = await Monster.filter(is_enabled=True).order_by("no")
         states = {item.monster_id: item for item in await UserMonster.filter(user_id=user_id)}
-        active = await self.cycles.get_active(user_id)
-        target_id = active.target_user_monster_id if active else None
+        cycle = await self.cycles.get_current(user_id)
+        target_id = cycle.target_user_monster_id if cycle else None
         this_week = week_start_for(current)
 
         items = []
@@ -30,6 +30,14 @@ class MonsterService:
             items.append(
                 {
                     "monster_id": monster.id,
+                    "user_monster_id": state.id if state else None,
+                    "target_change_allowed": bool(
+                        cycle
+                        and cycle.status == AttackCycleStatus.DRAFT
+                        and state
+                        and state.state in TARGETABLE_STATES
+                        and state.impact_score is not None
+                    ),
                     "code": monster.code,
                     "name": monster.name,
                     "title": monster.title,
