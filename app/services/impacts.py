@@ -20,9 +20,9 @@ from app.models.users import User
 from app.services.attack_cycles import lock_user
 from app.services.model_artifact import ArtifactLoader, ArtifactSource, ModelArtifact, personal_threat_score
 from app.services.recommendations import (
-    DISEASE_DIAGNOSED_FIELD,
     DISEASE_PROBABILITY_FIELD,
     behavior_weight,
+    disease_has_history,
     monster_diseases,
     phase1_candidates,
 )
@@ -182,7 +182,7 @@ class ImpactService:
             return None, ImpactSource.CONTRIBUTION
         values: list[tuple[int, ImpactSource]] = []
         for disease in monster_diseases(monster):
-            diagnosed = getattr(user, DISEASE_DIAGNOSED_FIELD[disease])
+            diagnosed = disease_has_history(user, disease)
             if diagnosed is None:
                 return None, ImpactSource.CONTRIBUTION
             if not diagnosed and (

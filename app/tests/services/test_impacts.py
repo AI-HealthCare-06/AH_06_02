@@ -149,6 +149,19 @@ class TestImpactService(TestCase):
         assert row.impact_score == 60 and row.impact_source == ImpactSource.GLOBAL
         assert row.last_prediction_id is None
 
+    async def test_medication_without_diagnosis_uses_global_without_prediction(self) -> None:
+        user, record, monster = await self.setup_data()
+        await User.filter(id=user.id).update(dm_medication=True, htn_medication=True)
+        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
+
+        result = await ImpactService(lambda: artifact()).from_health_record(user.id, record.id)
+
+        assert result["updated"] == 1
+        row = await UserMonster.get(user_id=user.id, monster_id=monster.id)
+        assert row.impact_score == 60
+        assert row.impact_source == ImpactSource.GLOBAL
+        assert row.last_prediction_id is None
+
     async def test_pending_diagnosed_cutoff_is_not_invented(self):
         factors = ("physical_activity_low",)
         user, record, _ = await self.setup_data(diagnosed=True, factors=factors)
