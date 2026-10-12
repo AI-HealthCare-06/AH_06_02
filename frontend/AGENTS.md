@@ -100,6 +100,27 @@ This list goes stale. Check `app/apis/v1/__init__.py` when it matters.
 
 ---
 
+## Retrying right after a prediction finishes
+
+When polling returns `done`, the very first recommendation call can still fail
+because D has not refreshed yet. That one case is the only one worth retrying,
+and the retry is deliberately narrow:
+
+- only on `404 PRED_NOT_FOUND` or `409 CHLG_RECOMMENDATION_UNAVAILABLE`
+- only on the first call after polling turned `done`
+- 1 second apart, at most 2 attempts
+
+Do not retry anywhere else. `409 CHLG_RECOMMENDATION_UNAVAILABLE` is a single
+code that also covers "no artifact", "no eligible candidate" and "no free
+slot" — none of those get better by trying again. After the two attempts, show
+the `error.message` the API returned instead of retrying further.
+
+This is a frontend-only rule; the backend does not change. Splitting the 409
+into separate codes so the client can tell "refresh pending" from "no
+candidate" is a 2단계 candidate.
+
+---
+
 ## Monsters
 
 The codes are `spike`, `alde`, `cotinine`, `viscera`, `sodi`. In Korean:
