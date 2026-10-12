@@ -183,7 +183,11 @@ class ChallengeCoreService:
                     target_value_snapshot=challenge.target_value,
                     duration_days_snapshot=(end_date - today).days + 1,
                     # 시작 시 하루 XP 를 고정한다. 진행 중 마스터가 바뀌어도 다시 계산하지 않는다
-                    goal_config_snapshot={"difficulty": str(challenge.difficulty), "daily_xp": challenge.reward_xp},
+                    goal_config_snapshot={
+                        "difficulty": str(challenge.difficulty),
+                        "daily_xp": challenge.reward_xp,
+                        "unit": challenge.unit,
+                    },
                 )
                 await UserChallengeOccurrence.bulk_create(
                     [
@@ -552,6 +556,7 @@ class ChallengeCoreService:
             scheduled = await occurrences.count()
             completed = await occurrences.filter(status=OccurrenceStatus.COMPLETED).count()
             snapshot = mission.goal_config_snapshot or {}
+            today_occurrences = await occurrences.filter(scheduled_date=today).order_by("sequence_no", "id")
             items.append(
                 {
                     "user_challenge_id": mission.id,
@@ -568,6 +573,19 @@ class ChallengeCoreService:
                     "start_date": mission.start_date,
                     "end_date": mission.end_date,
                     "completed_count": completed,
+                    "status": str(mission.status),
+                    "unit": snapshot.get("unit", challenge.unit),
+                    "manual_fallback_allowed": challenge.manual_fallback_allowed,
+                    "today_date": today,
+                    "today_occurrences": [
+                        {
+                            "occurrence_id": item.id,
+                            "slot_code": item.slot_code,
+                            "sequence_no": item.sequence_no,
+                            "status": str(item.status),
+                        }
+                        for item in today_occurrences
+                    ],
                     "daily_target_count": mission.daily_target_count_snapshot,
                     "target_value": float(mission.target_value_snapshot)
                     if mission.target_value_snapshot is not None

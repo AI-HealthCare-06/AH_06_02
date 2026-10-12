@@ -23,7 +23,8 @@ from app.models.challenges import (
 from app.models.users import User
 from app.services.challenges import ChallengeCoreService
 from app.services.monsters import MonsterService
-from app.services.recommendations import RecommendationService, target_monster_body
+from app.services.recommendations import RecommendationService, challenge_goal_body, target_monster_body
+from app.services.rewards import RewardService
 
 challenge_router = APIRouter(tags=["challenges"])
 
@@ -54,6 +55,7 @@ async def generate_recommendations(
             "rank": item.rank,
             "difficulty": result.challenges[item.challenge_id].difficulty,
             "verification_type": result.challenges[item.challenge_id].verification_type,
+            **challenge_goal_body(result.challenges[item.challenge_id]),
             "context_label": result.challenges[item.challenge_id].context_label,
             "cycle_id": item.cycle_id,
             "target_monster": target,
@@ -68,6 +70,7 @@ async def generate_recommendations(
             "total": len(items),
             "model_version": result.model_version,
             "model_experimental": result.model_experimental,
+            "remaining_slots": result.remaining_slots,
         }
     )
 
@@ -277,3 +280,15 @@ async def my_monsters(
 ) -> dict[str, Any]:
     """MNSTR-01 내 위험요인 도감 조회."""
     return ok({"items": await service.list_mine(user.id)})
+
+
+@challenge_router.get("/rewards/me", status_code=status.HTTP_200_OK)
+async def my_rewards(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[RewardService, Depends(RewardService)],
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> dict[str, Any]:
+    """RWRD-01 내 보상 조회."""
+    items, total = await service.list_mine(user.id, page, size)
+    return ok({"items": items, "total": total, "page": page, "size": size})
