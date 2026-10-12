@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field
 
-from app.core.validators import validate_birth_year, validate_height_cm
+from app.core.validators import optional_after_validator, validate_birth_year, validate_height_cm
 from app.dtos.base import BaseSerializerModel
 from app.models.users import MotivationType, Sex
 
@@ -15,9 +15,9 @@ class SignUpRequest(BaseModel):
     password: str
     nickname: Annotated[str, Field(min_length=1, max_length=50)]
 
-    birth_year: Annotated[int | None, Field(None), AfterValidator(validate_birth_year)] = None
+    birth_year: Annotated[int | None, Field(None), optional_after_validator(validate_birth_year)] = None
     sex: Sex | None = None
-    height_cm: Annotated[float | None, Field(None), AfterValidator(validate_height_cm)] = None
+    height_cm: Annotated[float | None, Field(None), optional_after_validator(validate_height_cm)] = None
     motivation_type: MotivationType = MotivationType.COLLECT
 
     dm_diagnosed: bool
