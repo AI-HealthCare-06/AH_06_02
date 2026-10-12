@@ -3,10 +3,12 @@ import {
   bindRoutes,
   claimSubmission,
   escape,
+  notePending,
   positiveId,
   predictionFor,
   releaseSubmission,
   rememberPrediction,
+  takePending,
 } from "./health-flow.mjs";
 
 /** 폴링 간격(ms). 처음 1초에서 늘려 5초에서 멈춘다(PRED-02 권고). */
@@ -24,8 +26,10 @@ const STEP_COPY = [
  * 예측 대기. v4 시안 waiting 화면(영상 자산은 아직 공통 assets 에 없어 뺐다).
  * - waiting?record_id=N  : PRED-01 을 한 번 접수하고 waiting?prediction_id=M 으로 바꾼다.
  * - waiting?prediction_id=M : PRED-02 를 폴링한다. 새로고침·뒤로가기로 다시 접수하지 않는다.
+ * pending → done 전환을 직접 확인했을 때만 predictionReady.markDone 후 추천(reco)으로 간다
+ * (docs/02_team/d-start-contracts.md "C 폴링 화면 연결"). 추천 첫 호출 재시도는 predictionReady 가 맡는다.
  */
-export function mount({ root, ui, api, auth, router, route, signal }) {
+export function mount({ root, ui, api, auth, predictionReady, router, route, signal }) {
   const recordId = positiveId(route.params.get("record_id"));
   const predictionId = positiveId(route.params.get("prediction_id"));
   root.innerHTML = `<section class="waiting">
@@ -79,10 +83,13 @@ export function mount({ root, ui, api, auth, router, route, signal }) {
     }
     paintSteps(0);
     show([ui.loading("예측을 접수하고 있어요.")]);
+    // 새 예측을 내면 이전 예측의 완료 표시는 버린다
+    predictionReady.clear();
     try {
       // 쓰기라 화면을 떠나도 취소하지 않는다. 받은 ID 는 기억해 두고 다시 접수하지 않는다
       const accepted = await api("/predictions", { method: "POST", body: { health_record_id: id } });
       rememberPrediction(auth, id, accepted.prediction_id);
+      if (accepted.status === "pending") notePending(auth, accepted.prediction_id);
       if (!signal.aborted)
         await router.navigate(`waiting?prediction_id=${accepted.prediction_id}`, { replace: true });
     } catch (error) {
@@ -141,8 +148,8 @@ export function mount({ root, ui, api, auth, router, route, signal }) {
       }
       if (disposed || signal.aborted) return;
       if (data.status === "done") {
-        paintSteps(2);
-        await router.navigate(`risk?prediction_id=${id}`, { replace: true });
+        paintSteps(3);
+        done(id, data);
         return;
       }
       if (data.status === "failed") {
@@ -154,6 +161,7 @@ export function mount({ root, ui, api, auth, router, route, signal }) {
         actionButton("다시 확인하기", async () => poll(id));
         return;
       }
+      notePending(auth, id);
       if (!warned && Date.now() - started >= LONG_PENDING_MS) {
         warned = true;
         show(
@@ -169,6 +177,19 @@ export function mount({ root, ui, api, auth, router, route, signal }) {
       timer = setTimeout(tick, DELAYS[Math.min(attempt++, DELAYS.length - 1)]);
     }
     void tick();
+  }
+
+  function done(id, data) {
+    // 서버가 준 done 결과로만 완료 표시를 만든다. 이미 끝난 예측을 다시 연 경우에는 만들지 않는다
+    if (takePending(auth, id) && predictionReady.markDone({ status: "done", prediction_id: id })) {
+      // 뒤로가기로 대기 화면에 돌아와 다시 넘어가지 않게 바꿔 넣는다
+      void router.navigate("reco", { replace: true });
+      return;
+    }
+    show(
+      [ui.notice("예측이 완료됐어요.")],
+      `${routeButton("추천 챌린지 보기", "reco")}${routeButton("위험도 보기", "risk", "secondary")}`,
+    );
   }
 
   function experimentalNote() {

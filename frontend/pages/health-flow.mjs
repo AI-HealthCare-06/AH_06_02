@@ -59,6 +59,8 @@ let completed = new Set();
 /** 같은 건강기록으로 예측을 두 번 접수하지 않도록 이번 세션의 접수 결과를 기억한다. */
 const predictions = new Map();
 const submitting = new Set();
+/** 이 세션에서 pending 을 직접 확인한 예측 ID. done 전환일 때만 완료 표시를 만든다. */
+const pendingSeen = new Set();
 
 function ownerOf(auth) {
   return auth?.user?.id ?? null;
@@ -73,6 +75,7 @@ function sync(auth) {
     completed = new Set();
     predictions.clear();
     submitting.clear();
+    pendingSeen.clear();
   }
 }
 
@@ -122,6 +125,17 @@ export function predictionFor(auth, recordId) {
 export function rememberPrediction(auth, recordId, predictionId) {
   sync(auth);
   predictions.set(recordId, predictionId);
+}
+
+export function notePending(auth, predictionId) {
+  sync(auth);
+  pendingSeen.add(predictionId);
+}
+
+/** pending 을 본 예측이면 true 를 돌려주고 지운다. 완료 표시는 한 번만 만든다. */
+export function takePending(auth, predictionId) {
+  sync(auth);
+  return pendingSeen.delete(predictionId);
 }
 
 /** 접수 요청이 진행 중이면 false. 끝나면 반드시 release 를 부른다. */

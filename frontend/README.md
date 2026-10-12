@@ -52,7 +52,7 @@ D 네 화면은 `embedded` 모드로 공통 틀 안에 연결되어 있다. D �
 | 이경 / D | reco·today·progress·monsters | d/screens.mjs, d/model.mjs |
 
 `login`에는 공통 인증을 검증할 최소 로그인 폼을 제공한다. A의 최종 시안·회원가입 흐름 구현 완료를 뜻하지 않는다.
-`signup`과 C 다섯 화면은 담당자가 교체할 진입점만 있다. 아직 준비 중임을 표시하며 가상 건강 수치·결과나 저장 동작은 넣지 않는다.
+C 세 입력 화면(health·health2·health3)은 `pages/health-flow.mjs`의 메모리 초안에 값을 모아 HLTH-01을 한 번만 보낸다. waiting은 PRED-01을 한 번 접수하고 PRED-02를 폴링해 `pending` → `done`을 확인하면 추천으로 넘긴다. risk는 DASH-01과 USER-01로 현재 위험도를 보여준다. 가상 건강 수치·결과는 넣지 않는다.
 회원가입·건강기록·예측 접수·폴링·결과 표시·사진 업로드의 화면별 처리는 해당 담당자가 이어서 구현한다.
 
 ## 페이지 구현 규약

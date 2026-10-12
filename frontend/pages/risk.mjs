@@ -3,7 +3,6 @@ import {
   bindRoutes,
   escape,
   formatDateTime,
-  positiveId,
 } from "./health-flow.mjs";
 
 /** 질환별 표시와 users 의 진단·복약 컬럼 접두사. */
@@ -45,14 +44,14 @@ function tile({ icon, label }, risk, isManaged) {
 /**
  * 현재 위험도. v4 시안 risk 화면에서 예시 수치를 빼고 DASH-01 결과로 채운다.
  * 기여 요인(PRED-03)은 1단계에서 빼고 D 도감·추천으로 잇는다. 추이(DASH-02)는 2단계다.
+ * 예측 완료 뒤에는 waiting 이 추천으로 보낸다. 이 화면은 하단 메뉴로 직접 들어온다.
  */
 export function mount({ root, ui, api, router, route, signal }) {
-  const predictionId = positiveId(route.params.get("prediction_id"));
   root.innerHTML = `<section class="risk"><h1>${escape(route.title)}</h1><div data-body></div>${MEDICAL_NOTICE}</section>`;
   const body = root.querySelector("[data-body]");
   const unbindRoutes = bindRoutes(root, router);
 
-  function render(user, summary, prediction) {
+  function render(user, summary) {
     const latest = summary.latest_health_record;
     const byDisease = Object.fromEntries((summary.risks || []).map((risk) => [risk.disease, risk]));
     const flags = DISEASES.map((item) => managed(user, item.prefix));
@@ -69,11 +68,8 @@ export function mount({ root, ui, api, router, route, signal }) {
     else if (shown.length) lead = '<p class="small-copy">먼저 공략할 요인을 찾아봐요.</p>';
     else
       lead = `<p class="small-copy">아직 완료된 예측이 없어요.</p>${latest ? `<button type="button" class="primary" data-route="waiting?record_id=${latest.health_record_id}">최근 기록으로 예측 요청하기 ${ARROW}</button>` : ""}`;
-    const experimental =
-      prediction?.model_experimental === true ? '<p class="pending-note">실험 모델의 예측 결과예요.</p>' : "";
     body.innerHTML = `${caption}${lead}
 <div class="risk-grid">${DISEASES.map((item, index) => tile(item, byDisease[item.disease], flags[index])).join("")}</div>
-${experimental}
 <h2>지금, 이 요인에 주목해 보세요</h2><p class="small-copy">생활습관과 연결된 요인을 함께 살펴봐요.</p>
 <button type="button" class="primary" data-route="monsters">내 위험요인 보기 ${ARROW}</button>
 <button type="button" class="secondary" data-route="reco">챌린지 고르기</button>`;
@@ -82,19 +78,12 @@ ${experimental}
   async function load() {
     body.replaceChildren(ui.loading("위험도를 불러오고 있어요."));
     try {
-      const [user, summary, prediction] = await Promise.all([
+      const [user, summary] = await Promise.all([
         // 진단·복약은 화면 진입 시점의 값을 쓴다. auth.user 는 로그인 시점 값이다
         api("/users/me"),
         api("/dashboard/summary"),
-        // 실험 모델 표시용. 실패해도 위험도는 보여준다
-        predictionId
-          ? api(`/predictions/${predictionId}`).catch((error) => {
-              if (error.name === "AbortError") throw error;
-              return null;
-            })
-          : null,
       ]);
-      if (!signal.aborted) render(user, summary, prediction);
+      if (!signal.aborted) render(user, summary);
     } catch (error) {
       if (signal.aborted || error.name === "AbortError") return;
       body.replaceChildren(

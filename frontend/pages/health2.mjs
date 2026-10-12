@@ -13,7 +13,7 @@ import {
 } from "./health-flow.mjs";
 
 // 선택지 문구는 docs/03_ai_data/input-code-map.md 의 KNHANES 코드 의미를 따른다. 값은 코드 그대로 보낸다.
-// TODO(B 홍서윤): 화면 문구로 확정됐는지 확인. 원 문항은 최근 1년이고 서비스는 최근 4주를 묻는다(근사).
+// TODO(이경님 확인: 음주·외식 선택지 화면 문구 확정 필요). 원 문항은 최근 1년이고 서비스는 최근 4주를 묻는다(근사).
 const NON_DRINKER = 1;
 const ALCOHOL_FREQUENCY = [
   [1, "최근 안 마심"],
