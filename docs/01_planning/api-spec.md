@@ -401,7 +401,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음. ※ A 제안 — 10/6. 응답 최상위에 model_version, model_experimental 추가. model_version은 이 추천을 만든 모델 버전으로 predictions.model_version과 같은 값이며 CharField(64)를 넘지 않는다. model_experimental은 boolean으로, 아직 독립 검증을 통과하지 않은 실험 아티팩트로 만든 추천이면 true다. 화면은 true일 때 실험 모델임을 표시한다. 추천 가능 여부와 factor_score 계산에는 영향을 주지 않는다. 추천 카드 조회(CHLG-02)에는 넣지 않았다. 생성 당시 실험 여부를 저장할 컬럼이 없어 지금 아티팩트 기준으로 붙이면 다른 모델로 만든 카드에 틀린 표시가 붙기 때문이다. D 확인 완료 — 2026.10.12 김이경
+- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음. ※ A 제안 — 10/6. 응답 최상위에 model_version, model_experimental 추가. model_version은 이 추천을 만든 모델 버전으로 predictions.model_version과 같은 값이며 CharField(64)를 넘지 않는다. model_experimental은 boolean으로, 아직 독립 검증을 통과하지 않은 실험 아티팩트로 만든 추천이면 true다. 화면은 true일 때 실험 모델임을 표시한다. 추천 가능 여부와 factor_score 계산에는 영향을 주지 않는다. 추천 카드 조회(CHLG-02)에는 넣지 않았다. 생성 당시 실험 여부를 저장할 컬럼이 없어 지금 아티팩트 기준으로 붙이면 다른 모델로 만든 카드에 틀린 표시가 붙기 때문이다. D 확인 완료 — 2026.10.12 김이경 ※ 10/12 추가. 응답 최상위에 cycle_end_date. 연결된 주기의 end_date 이며 KST YYYY-MM-DD 다. 화면이 남은 기간을 계산하는 데 쓴다. ※ 시트 누락 보완 — 10/12. items 각 항목에 목표 안내 필드가 함께 나간다: context_type, daily_target_count, target_value, unit, daily_xp, safety_check_required, manual_fallback_allowed. 선택 전 안내값이며 시작 이후에는 미션 snapshot 을 쓴다. 응답 최상위에 remaining_slots 도 있다. 셋 다 이번에 새로 만든 필드가 아니라 기존 구현에 있던 것을 명세에 반영한 것이다.
 - **주요 에러**: CHLG_RECOMMENDATION_UNAVAILABLE, PRED_NOT_FOUND, UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-001·002
 - **사용 테이블**: predictions·prediction_contributions 읽기 / challenges 읽기 / challenge_recommendations 쓰기 / user_attack_cycles·user_monsters·monsters 읽기
@@ -457,7 +457,7 @@
 - **주요 에러**: CHLG_LIMIT_EXCEEDED, CHLG_RECOMMENDATION_NOT_FOUND, CHLG_ALREADY_ACTIVE, CHLG_SAFETY_CONFIRMATION_REQUIRED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-002 · REQ-CHLG-010 · REQ-CHLG-011 · REQ-CHLG-012
 - **사용 테이블**: challenge_recommendations 쓰기(accepted·거절횟수 초기화) / challenges 읽기 / user_challenges 쓰기 / user_attack_cycles 읽기·추가 횟수 갱신
-- **상태**: 수용안 — 동일 주기·대상 일치·공통 종료·추가 횟수 검증. 팀 확정 후 구현, A 제안 — 10/6. 예정 이용일 입력 필드 보완. D 확인 필요
+- **상태**: 수용안 — 동일 주기·대상 일치·공통 종료·추가 횟수 검증. 팀 확정 후 구현, A 제안 — 10/6. 예정 이용일 입력 필드 보완. 구현 완료. 이벤트형 카드는 사용자 확인 예정 이용일 필수. KST 날짜·중복·기간 검증 후 해당 날짜의 예정 기회만 생성. D 확인 완료 — 2026.10.12 김이경
 
 ### CHLG-06 · 진행 중 챌린지 조회
 
@@ -518,7 +518,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, is_target, weekly_progress, progress_week_start, seal_progress, sealed_at, seal_count, reawakened_at, impact_source }] } ※ state: rage \| caution \| stable \| not_contributing \| resolved \| sealed \| unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시. ※ is_target은 active 주기의 대상과 일치하는지 계산한 표시값이다. user_monsters.is_target 저장은 제거안이며 공략 주기 테이블을 조인한다 (REQ-RECO-006 수용안). seal_progress는 28일 누적 진행률 0~100으로 외형 단계 표시에 쓴다 (REQ-RECO-008). 봉인은 재측정으로 위협도가 올라가도 해제되지 않으며 reawakened_at에 상승 시각만 기록한다 (REQ-RECO-007).
+- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, is_target, weekly_progress, progress_week_start, seal_progress, sealed_at, seal_count, reawakened_at, impact_source }] } ※ state: rage \| caution \| stable \| not_contributing \| resolved \| sealed \| unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시. ※ is_target은 active 주기의 대상과 일치하는지 계산한 표시값이다. user_monsters.is_target 저장은 제거안이며 공략 주기 테이블을 조인한다 (REQ-RECO-006 수용안). seal_progress는 28일 누적 진행률 0~100으로 외형 단계 표시에 쓴다 (REQ-RECO-008). 봉인은 재측정으로 위협도가 올라가도 해제되지 않으며 reawakened_at에 상승 시각만 기록한다 (REQ-RECO-007). ※ 10/12 CHLG-10 연동. items 각 항목에 user_monster_id(없으면 null), target_change_allowed(boolean) 추가. target_change_allowed 는 현재 주기가 draft 이고, 해당 요인에 user_monster 행이 있고, state 가 rage/caution/stable 이고, impact_score 가 null 이 아닐 때만 true. is_target 은 draft·active 중 현재 주기의 target_user_monster_id 와 비교해 계산한다. 화면은 target_change_allowed 가 true 인 항목에만 대상 변경 버튼을 노출한다.
 - **주요 에러**: UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-007 · REQ-RECO-005·006·007·008 · REQ-PRED-010·011
 - **사용 테이블**: monsters·user_monsters 읽기 / user_attack_cycles 읽기
@@ -548,4 +548,4 @@
 - **주요 에러**: VALIDATION_ERROR, UNAUTHORIZED, CHLG_NOT_FOUND, CHLG_NOT_ACTIVE
 - **관련 요구사항**: REQ-RECO-006
 - **사용 테이블**: user_attack_cycles 쓰기, user_monsters 읽기 (본인 소유만)
-- **상태**: A 제안 — 10/6. REQ-RECO-006에 "사용자가 도감에서 직접 변경할 수 있다"가 있으나 엔드포인트가 없어 추가 제안. D 확인 필요
+- **상태**: A 제안 — 10/6. REQ-RECO-006에 "사용자가 도감에서 직접 변경할 수 있다"가 있으나 엔드포인트가 없어 추가 제안. 구현 완료. 1단계는 챌린지 시작 전 draft 주기에서만 본인 공략 가능 대상으로 변경. 기존 미응답 추천 무효화, 수행·XP·봉인 보존. 진행 중 변경은 후속 범위. D 확인 완료 — 2026.10.12 김이경
