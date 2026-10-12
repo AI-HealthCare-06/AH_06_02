@@ -1,85 +1,164 @@
-# AGENTS.md
+# AGENTS.md — frontend
 
-이 저장소에서 코드를 쓰는 사람과 AI가 같이 보는 규칙입니다. 백엔드 규칙은 AH_06_02 저장소의 AGENTS.md에 있습니다.
+Rules for writing screen code under `frontend/`. They apply to humans and
+agents alike.
 
-## 가장 많이 틀리는 것 — 숫자 세 개
+The repository-wide rules are in [`../AGENTS.md`](../AGENTS.md). On any
+conflict that file wins and this one only adds frontend-specific detail.
+Output language is Korean, as mandated there.
 
-이 서비스에는 성격이 다른 숫자가 셋 있습니다. 섞어 쓰면 화면이 거짓말을 합니다.
+This file is written in English because agents follow English instructions more
+reliably. Domain nouns stay in Korean inside backticks (`위협도`, `공략 점수`,
+…) so that the vocabulary in the spreadsheets, the database and the UI stays
+single-sourced. Do not translate them into new English names.
 
-**위험도** 질환이 생길 확률입니다. API는 `dm_probability`, `htn_probability`를 0에서 1 사이 소수로 줍니다. 화면에서 퍼센트로 바꿔 보여줍니다. 24% 같은 식입니다.
+---
 
-**위협도** 그 요인이 내 위험도를 얼마나 밀어올렸는지입니다. `impact_score`이고 0에서 100 사이 정수입니다. **퍼센트가 아닙니다.** 화면에 `72`라고 쓰고 `%`를 붙이지 않습니다. 값이 없으면 미측정이고 `—`로 표시합니다.
+## The mistake everyone makes — three different numbers
 
-**공략 점수** 이번 주에 챌린지를 얼마나 했는지입니다. `weekly_progress`이고 주간 목표는 100 고정입니다. `40 / 100`처럼 쓰고 퍼센트로 표기하지 않습니다. 월요일 0시(KST)에 0으로 돌아갑니다.
+This service has three numbers with different meanings. Mixing them makes the
+screen lie to the user.
 
-챌린지를 수행해도 위협도는 움직이지 않습니다. 공략 점수만 오릅니다. 위협도는 건강정보를 다시 입력하고 예측을 다시 돌려야 바뀝니다.
+**`위험도`** — the probability of developing the disease. The API returns
+`dm_probability` and `htn_probability` as decimals between 0 and 1. Convert to a
+percentage for display, e.g. `24%`.
+
+**`위협도`** — how much that factor pushed the user's `위험도` up. The field is
+`impact_score`, an integer from 0 to 100. **It is not a percentage.** Render
+`72`, never `72%`. When the value is absent the state is `미측정` and the screen
+shows `—`.
+
+**`공략 점수`** — how much of this week's challenge work is done. The field is
+`weekly_progress`; the weekly target is fixed at 100. Render `40 / 100`, never
+as a percentage. It resets to 0 at Monday 00:00 KST.
+
+Completing a challenge does not move `위협도`. It only raises `공략 점수`.
+`위협도` changes only when the user re-enters health data and the prediction
+runs again.
+
+---
 
 ## API
 
-주소는 `/api/v1`로 시작합니다. 인증은 JWT Bearer 토큰이고 Access는 30분, Refresh는 14일입니다. 회원가입, 로그인, 토큰 재발급, 이메일 중복 확인만 토큰 없이 호출합니다.
+Paths start with `/api/v1`. Auth is a JWT bearer token: access tokens last 30
+minutes, refresh tokens 14 days. Only signup, login, token refresh and the email
+duplicate check are callable without a token.
 
-응답은 항상 이 두 가지 모양 중 하나입니다.
+Every response has one of these two shapes:
 
 ```json
 { "success": true, "data": { } }
 { "success": false, "error": { "code": "AUTH_EMAIL_DUPLICATED", "message": "이미 가입된 이메일입니다" } }
 ```
 
-목록은 `data.items` 배열로 옵니다. 페이징은 `?page=1&size=20`입니다.
+Lists arrive as a `data.items` array. Paging is `?page=1&size=20`.
 
-`error.message`는 사용자에게 그대로 보여줄 수 있는 한국어 문장입니다. 프론트에서 따로 문구를 만들지 말고 그대로 띄웁니다. 분기가 필요하면 `error.code`로 합니다.
+`error.message` is a Korean sentence that is safe to show to the user as-is. Do
+not invent your own copy in the frontend — render it directly. Branch on
+`error.code` when you need to behave differently.
 
-JSON 키는 snake_case입니다. 시간은 ISO 8601 UTC로 오고 KST 변환은 프론트에서 합니다.
+JSON keys are snake_case. Timestamps arrive as ISO 8601 UTC; convert to KST in
+the frontend.
 
-## 지금 실제로 붙는 API
+---
 
-백엔드에 라우터가 등록된 것은 회원과 인증 11개뿐입니다. 2026년 10월 1일 기준입니다.
+## Endpoints that exist today
+
+As of 2026-10-12 five routers are registered and 27 endpoints are callable.
 
 ```
-GET    /auth/check-email      POST /auth/signup      POST /auth/login
-POST   /auth/refresh          POST /auth/logout
-GET    /users/me              PATCH /users/me        PATCH /users/me/diagnosis
-PATCH  /users/me/password     DELETE /users/me       GET /users/me/level
+auth         GET  /auth/check-email            POST /auth/signup
+             POST /auth/login                  POST /auth/refresh
+             POST /auth/logout
+
+users        GET  /users/me                    PATCH /users/me
+             PATCH /users/me/diagnosis         PATCH /users/me/password
+             DELETE /users/me                  GET /users/me/level
+
+health       POST /health-records              GET  /health-records
+             GET  /dashboard/summary           GET  /dashboard/trends
+
+challenges   POST /challenge-recommendations/generate
+             GET  /challenge-recommendations
+             PATCH /challenge-recommendations/{id}
+             PATCH /challenge-recommendations/{id}/unsuppress
+             POST /user-challenges             GET  /user-challenges
+             POST /user-challenges/{id}/logs   GET  /user-challenges/{id}/logs
+             GET  /monsters/me
+
+predictions  POST /predictions                 GET /predictions/{id}
+             GET  /predictions/{id}/contributions
 ```
 
-건강정보, 예측, 챌린지, 도감, 보상은 명세는 있지만 아직 호출할 수 없습니다. 그 화면을 만들 때는 `docs/api-spec.md`의 응답 모양 그대로 목 데이터를 만들고, 호출부를 한 곳에 모아 두어 나중에 갈아끼우기 쉽게 합니다.
+Rewards and the full `도감` screens are specified but not callable yet. When you
+build those screens, mock them using the exact response shapes in
+`docs/01_planning/api-spec.md` at the repository root (predictions are in
+`api-predictions.md`), and keep every call in one place so the mocks are easy to
+swap out later.
 
-## 몬스터 다섯
+This list goes stale. Check `app/apis/v1/__init__.py` when it matters.
 
-코드는 `spike`, `alde`, `cotinine`, `viscera`, `sodi`입니다. 한글 이름은 스파이크, 알데, 코티니, 비세라, 소디입니다.
+---
 
-스파이크는 혈당 실측값으로 위협도를 냅니다. 정밀 모드에서 공복혈당을 입력하지 않으면 미측정으로 남습니다. 나머지 넷은 모델 기여도에서 나옵니다.
+## Monsters
 
-## 도감 상태 일곱
+The codes are `spike`, `alde`, `cotinine`, `viscera`, `sodi`. In Korean:
+스파이크, 알데, 코티니, 비세라, 소디.
 
-| 값 | 화면 문구 | 조건 |
+`spike` derives its `위협도` from a measured blood glucose value. If the user
+does not enter fasting glucose in precise mode it stays `미측정`. The other four
+come from model contributions.
+
+`sodi` is on hold. All five exist in the `도감` definition, but the current
+database seed has four, `sodi` produces a `위협도` for hypertension only, and it
+is excluded from automatic challenge recommendation candidates.
+
+---
+
+## The seven 도감 states
+
+| value | label | condition |
 | --- | --- | --- |
-| rage | 매우 주의 | 위협도 70 이상 |
-| caution | 주의 | 40 이상 70 미만 |
-| stable | 안정 | 0 초과 40 미만 |
-| not_contributing | 현재 기여 없음 | 위협도 0이고 해소 기록 없음 |
-| resolved | 요인 해소됨 | 위협도 0이고 해소 기록 있음 |
-| sealed | 봉인 완료 | 28일 공략 조건 달성 |
-| unmeasured | 미측정 | 값이 없음 |
+| rage | 매우 주의 | `위협도` 70 or above |
+| caution | 주의 | 40 or above, below 70 |
+| stable | 안정 | above 0, below 40 |
+| not_contributing | 현재 기여 없음 | `위협도` is 0 and there is no resolution record |
+| resolved | 요인 해소됨 | `위협도` is 0 and a resolution record exists |
+| sealed | 봉인 완료 | the 28-day `공략` condition was met |
+| unmeasured | 미측정 | no value |
 
-위협도가 0일 때 "현재 기여 없음"인지 "요인 해소됨"인지는 해소 기록이 있느냐로 갈립니다. 숫자만 보고 판단하지 않습니다.
+Whether a `위협도` of 0 means `현재 기여 없음` or `요인 해소됨` depends on
+whether a resolution record exists. Never decide it from the number alone.
 
-## 화면을 만들 때
+---
 
-`docs/prototype/당고킬러-모험시안_v2.html`이 기준입니다. 색, 여백, 문구, 버튼 모양을 여기서 가져옵니다. 새로 지어내지 않습니다.
+## Building a screen
 
-시안에 점선 테두리로 비워 둔 드롭다운이 셋 있습니다. 음주 빈도, 음주량, 외식 빈도입니다. 국민건강영양조사 코드를 쓰는 값인데 숫자별 의미가 아직 안 정해졌습니다. 임의로 채우지 않습니다. 특히 외식 빈도는 1이 가장 자주이고 7이 거의 안 함이라 방향이 거꾸로입니다.
+`docs/prototype/당고킬러-모험시안_v4.html` is the reference. Take colors,
+spacing, copy and button shapes from it. Do not invent new ones.
 
-모션 끄기를 지원합니다. `prefers-reduced-motion`을 존중하고 영상을 멈춥니다.
+The prototype has three dropdowns left empty with a dashed border: 음주 빈도,
+음주량, 외식 빈도. They carry KNHANES codes whose per-value meanings are not
+settled yet. Do not fill them in arbitrarily. Note especially that 외식 빈도 runs
+backwards — 1 is the most frequent and 7 is almost never.
 
-화면 폭 320px에서 가로 스크롤이 생기지 않아야 합니다.
+Support reduced motion. Respect `prefers-reduced-motion` and pause video.
 
-## 하지 않는 것
+No horizontal scrolling at a 320px viewport width.
 
-의학적 진단이나 치료를 단정하는 문구를 쓰지 않습니다. 참고용이라는 고지를 결과 화면에서 빼지 않습니다.
+---
 
-진단받은 질환의 예측 확률은 표시하지 않습니다. 당뇨 진단자에게 당뇨 확률 24%를 보여주면 안 됩니다. "진단 관리 중"으로 바꿉니다.
+## Never do this
 
-토큰을 `localStorage`에 평문으로 길게 들고 있지 않습니다. 비밀번호와 토큰을 콘솔에 찍지 않습니다.
+Do not write copy that asserts a medical diagnosis or treatment. Do not remove
+the "for reference only" notice from any result screen.
 
-국민건강영양조사 원시자료는 이 저장소에 넣지 않습니다.
+Do not show a predicted probability for a disease the user has already been
+diagnosed with. A user diagnosed with diabetes must never see "당뇨 확률 24%" —
+show `진단 관리 중` instead.
+
+Do not keep tokens in `localStorage` in plaintext for long. Never log passwords
+or tokens to the console.
+
+KNHANES raw data never enters this repository. It is covered by a
+security undertaking (`보안서약`).
