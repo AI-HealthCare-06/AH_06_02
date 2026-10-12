@@ -39,3 +39,5 @@ class Config(BaseSettings):
 
     # 배포 모델 아티팩트. data/ 는 .gitignore 대상이라 저장소에 올라가지 않는다
     MODEL_ARTIFACT_PATH: str = "data/model/artifact.json"
+    # 원문항 기간·음주 코드·후보 적용에 대한 팀 승인 이후에만 켠다.
+    D_DIAGNOSED_ALCOHOL_POLICY_ENABLED: bool = False
