@@ -1,6 +1,7 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Cookie, Depends, Response, status
+from fastapi import APIRouter, Cookie, Depends, Query, Response, status
+from pydantic import EmailStr
 
 from app.core import config
 from app.core.config import Env
@@ -31,7 +32,8 @@ def _set_refresh_cookie(response: Response, refresh_token: str) -> None:
 
 @auth_router.get("/check-email", status_code=status.HTTP_200_OK)
 async def check_email(
-    email: str,
+    # 가입과 같은 형식 검사를 한다. 여기서 통과한 이메일이 AUTH-02 에서 거부되면 안 된다
+    email: Annotated[EmailStr, Query(max_length=255)],
     auth_service: Annotated[AuthService, Depends(AuthService)],
 ) -> dict[str, Any]:
     """AUTH-01 이메일 중복 확인. 실제 차단은 AUTH-02에서 한 번 더 한다."""
