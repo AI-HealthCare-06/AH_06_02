@@ -4,11 +4,13 @@ from tortoise.contrib.test import TestCase
 
 from app.core import config
 from app.core.utils.security import hash_password, verify_password
+from app.models.challenges import ChallengeRecommendation, RecommendationSourceType
 from app.models.users import User, UserStatus
 from app.repositories.user_repository import PURGE_AFTER_DAYS, PURGED_EMAIL_SUFFIX, PURGED_NICKNAME
 from app.services.retention import RetentionService
 
 PASSWORD = "dango1234"
+SNAPSHOT = {"policy_version": "v1", "fingerprint": "abc", "answers": ["lunch"], "asked": ["meal"]}
 
 
 async def make_user(email: str, *, withdrawn_days_ago: int | None) -> User:
@@ -20,6 +22,20 @@ async def make_user(email: str, *, withdrawn_days_ago: int | None) -> User:
         password_hash=hash_password(PASSWORD),
         status=UserStatus.ACTIVE if withdrawn_days_ago is None else UserStatus.WITHDRAWN,
         withdrawn_at=None if withdrawn_days_ago is None else now - timedelta(days=withdrawn_days_ago),
+    )
+
+
+async def make_card(user_id: int) -> ChallengeRecommendation:
+    """대화로 만든 추천 한 장. 지우는 대상은 conversation_snapshot 뿐이다."""
+    return await ChallengeRecommendation.create(
+        user_id=user_id,
+        challenge_id=1,
+        source_type=RecommendationSourceType.CONVERSATION,
+        factor_key="sodium_behavior",
+        rank=1,
+        recommended_at=datetime.now(config.TIMEZONE),
+        conversation_snapshot=SNAPSHOT,
+        llm_model_version="llm-test",
     )
 
 
@@ -82,3 +98,29 @@ class TestPurgeWithdrawn(TestCase):
 
         assert before.purged_user_ids == []
         assert after.purged_user_ids == [user.id]
+
+    async def test_clears_conversation_snapshot_of_purged_accounts_only(self):
+        old = await make_user("card-old@example.com", withdrawn_days_ago=PURGE_AFTER_DAYS + 1)
+        recent = await make_user("card-recent@example.com", withdrawn_days_ago=PURGE_AFTER_DAYS - 1)
+        purged_card = await make_card(old.id)
+        kept_card = await make_card(recent.id)
+
+        await RetentionService().purge_withdrawn()
+
+        cleared = await ChallengeRecommendation.get(id=purged_card.id)
+        assert cleared.conversation_snapshot is None
+        # 지우는 건 이 컬럼뿐이다. 추천 행과 나머지 값은 통계로 남는다 (REQ-CHLG-012)
+        assert cleared.factor_key == "sodium_behavior"
+        assert cleared.llm_model_version == "llm-test"
+
+        untouched = await ChallengeRecommendation.get(id=kept_card.id)
+        assert untouched.conversation_snapshot == SNAPSHOT
+
+    async def test_dry_run_keeps_conversation_snapshot(self):
+        user = await make_user("card-dry@example.com", withdrawn_days_ago=PURGE_AFTER_DAYS + 1)
+        card = await make_card(user.id)
+
+        await RetentionService().purge_withdrawn(dry_run=True)
+
+        kept = await ChallengeRecommendation.get(id=card.id)
+        assert kept.conversation_snapshot == SNAPSHOT
