@@ -16,7 +16,7 @@ import {
 // TODO(이경님 확인: 음주·외식 선택지 화면 문구 확정 필요). 원 문항은 최근 1년이고 서비스는 최근 4주를 묻는다(근사).
 const NON_DRINKER = 1;
 const ALCOHOL_FREQUENCY = [
-  [1, "최근 안 마심"],
+  [1, "최근 4주 동안 마시지 않음"],
   [2, "월 1회 미만"],
   [3, "월 1회 정도"],
   [4, "월 2~4회"],
@@ -71,6 +71,7 @@ ${numberFieldHtml({ name: "strength_days", label: "주당 근력운동", unit: "
 ${numberFieldHtml({ name: "sitting_minutes", label: "하루 앉은 시간", unit: "분", value: saved.sitting_minutes })}
 </div>
 <h2 class="section-gap">식생활</h2>
+<p class="small-copy">최근 4주 기준으로 선택해 주세요.</p>
 <div class="diagnoses">${selectHtml({ name: "dining_out_freq", label: "외식 빈도", options: DINING_OUT, value: saved.dining_out_freq })}</div>
 <div class="guide-card"><span class="sprite sodi" aria-hidden="true"></span><p>습관은 바꿀 수 있는 값이에요.<br><b>여기가 공략의 출발점이 돼요!</b></p></div>
 <div data-feedback aria-live="polite"></div>
