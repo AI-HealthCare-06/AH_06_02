@@ -268,9 +268,9 @@
 | 12 | cooldown_choice | ENUM('7d','30d','until_manual') | NULL |  |  | 3회 거절 시 사용자 선택 (REQ-CHLG-006) | 확정 |
 | 13 | exclude_until | DATETIME | NULL |  |  | 기간형 쿨다운 종료 | 확정 |
 | 14 | suppressed_until_manual | BOOLEAN | NN |  | FALSE | 직접 해제할 때까지 숨김. 3회 연속 거절 또는 not_applicable 선택 시 TRUE | 변경 — 9/28 김이경 제외조건 합의 |
-| 15 | conversation_snapshot | JSON | NULL |  |  | 대화형 추천에서 주고받은 질문과 답변 기록. 추천 근거를 되짚을 때 사용하며 추천에 불필요한 개인정보는 넣지 않는다 (REQ-CHLG-012) | 신규 — 10/2 대화형 추천 도입 |
-| 16 | llm_model_version | VARCHAR(32) | NULL |  |  | 추천을 생성한 모델 식별자. 재현과 검증에 사용한다. source_type='conversation'일 때만 채운다 | 신규 — 10/2 대화형 추천 도입 |
-| 17 | evidence_card_ids | JSON | NULL |  |  | 제안 근거로 전달된 승인 카드 ID 배열. 검증과 사후 검토용 | 신규 — 10/2 대화형 추천 도입 |
+| 15 | conversation_snapshot | JSON | NULL |  |  | 대화형 추천에서 주고받은 질문과 답변 기록. 저장 키는 policy_version · fingerprint · answers · asked · card_versions · model_version(예측 모델 식별자. 선택에 쓴 LLM 식별자인 llm_model_version 과 다르다) · health_record_id 다. 자유 입력 원문·이름·연락처는 저장하지 않는다. 탈퇴 +30일 식별정보 삭제 시 이 컬럼 전체를 NULL 로 지운다 (REQ-CHLG-012) | 신규 — 10/2 대화형 추천 도입. 저장 범위·삭제 규칙 10/13 A 확정. 삭제 구현·검증 미반영 — A 남은 작업 |
+| 16 | llm_model_version | VARCHAR(32) | NULL |  |  | 대화 개인화에서 후보 선택에 사용한 LLM 식별자. conversation_snapshot 의 model_version(예측 모델)과 다르다. 재현과 검증에 사용한다. 기존 규칙·예측 후보를 대화로 선택한 경우 source_type 은 원래 값을 유지하므로, source_type 과 무관하게 채운다. 32자 이내 | 변경 — 10/13 source_type 조건 제거. 구현과 정합화 |
+| 17 | evidence_card_ids | JSON | NULL |  |  | 제안 근거로 전달된 승인 카드 ID 배열. 검증과 사후 검토용. ID 는 C01~C12 고정값으로 문서 순서와 무관하며 삭제한 ID 는 재사용하지 않는다. 수정 이력은 카드의 version 으로 관리한다 (형식 20261012-v1) | 신규 — 10/2 대화형 추천 도입. ID 체계 10/13 A 확정. 카드 12개는 전부 draft 이며 운영 승인은 별건 |
 | 18 | proposed_goal | JSON | NULL |  |  | 서버 검증한 개인 목표(시간·횟수·슬롯·난이도·예정 기회·정책 버전). cycle_id FK로 대상·주기 연결하고 시작일/대상은 JSON에 중복 저장하지 않음. 사용자 확인 후 동일 목표를 snapshot에 전달. 미검증 LLM 원문 사용 금지. | 추가 제안 — 10/2 D 정의 완료·A 구조 검토 필요. DB 미반영 |
 | 19 | cycle_id | BIGINT | NULL | FK |  | → user_attack_cycles.id · 추천 생성 당시 주기. 시작 시 소유권·active 주기·대상 일치·남은 슬롯 재검증. 종료되거나 다른 주기의 추천은 시작 불가. 레거시/주기 밖 추천만 NULL. | 수용안 — 오래된 추천의 새 주기 사용 방지. 팀 확정 전·DB 미반영 |
 | 20 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
