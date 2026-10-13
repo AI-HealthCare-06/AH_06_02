@@ -59,6 +59,7 @@ services:
       # 컨테이너 안의 localhost 는 자기 자신이므로 compose 네트워크의 mysql 서비스 이름으로 덮어쓴다.
       # environment 가 env_file 보다 우선한다.
       DB_HOST: mysql
+      REDIS_URL: redis://redis:6379/0
     command: | 
       sh -c "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
@@ -90,6 +91,10 @@ services:
     environment:
       # fastapi 와 같은 설정(app.core.config.Config)을 읽으므로 같은 이유로 덮어쓴다
       DB_HOST: mysql
+      REDIS_URL: redis://redis:6379/0
+    volumes:
+      - ./data:/app/data  # 서빙 artifact (data/model/artifact.json)
+      - ./experiment-refit:/app/experiment-refit  # 원본 질환 모델과 background-<질환>.npy. git 에 올리지 않는다
     restart: always
     mem_limit: 4G
     networks:

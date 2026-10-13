@@ -27,6 +27,12 @@ class PredictionRepository:
             input_snapshot=input_snapshot,
         )
 
+    async def mark_failed(self, prediction_id: int, failure: dict[str, Any]) -> None:
+        """아직 pending 인 예측만 failed 로 바꾼다. 이미 끝난 결과는 덮어쓰지 않는다."""
+        await self._model.filter(id=prediction_id, status=PredictionStatus.PENDING).update(
+            status=PredictionStatus.FAILED, failure=failure
+        )
+
     async def get_for_user(self, prediction_id: int, user_id: int) -> Prediction | None:
         """본인 예측만 돌려준다. 남의 예측은 없는 것과 똑같이 None 이다."""
         return await self._model.get_or_none(id=prediction_id, user_id=user_id)

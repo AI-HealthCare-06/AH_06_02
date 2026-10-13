@@ -67,9 +67,23 @@ async def record(user_id: int, **overrides: Any) -> HealthRecord:
     return await HealthRecord.create(user_id=user_id, **(values | overrides))
 
 
+class RecordingQueue:
+    """Redis 대신 적재한 작업을 기억한다. fail=True 면 적재 실패를 흉내 낸다."""
+
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.jobs: list[tuple[int, str]] = []
+
+    async def enqueue(self, prediction_id: int, job_id: str) -> None:
+        if self.fail:
+            raise ConnectionError("queue down")
+        self.jobs.append((prediction_id, job_id))
+
+
 @contextmanager
-def serving(artifact: ModelArtifact | None = ARTIFACT) -> Iterator[None]:
-    app.dependency_overrides[get_prediction_service] = lambda: PredictionService(lambda: artifact)
+def serving(artifact: ModelArtifact | None = ARTIFACT, queue: RecordingQueue | None = None) -> Iterator[None]:
+    used = queue or RecordingQueue()
+    app.dependency_overrides[get_prediction_service] = lambda: PredictionService(lambda: artifact, used)
     try:
         yield
     finally:

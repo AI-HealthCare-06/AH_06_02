@@ -28,6 +28,7 @@ from app.services.model_artifact import (
     ModelArtifact,
     is_modifiable,
 )
+from app.services.prediction_queue import PredictionQueue, RedisPredictionQueue
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,8 @@ PROBABILITY_FIELDS = {Disease.DIABETES: "dm_probability", Disease.HYPERTENSION: 
 #: 모델 입력 중 users 에서 오는 값. 나머지는 같은 이름의 health_records 컬럼에서 읽는다
 PROFILE_FIELDS = ("birth_year", "sex")
 CONTRIBUTION_UNIT = "probability"
+#: PRED-02 failure 로 나가는 문구. 큐·워커 내부 사정(스택·경로·원시 건강값)은 싣지 않는다
+RETRY_FAILURE = {"code": "INTERNAL_ERROR", "message": "예측에 실패했습니다. 다시 시도해주세요.", "retryable": True}
 #: 누락 안내 문구용. 목록에 없는 입력은 이름만 쓴다
 FEATURE_LABELS = {
     "age": "나이",
@@ -90,8 +93,9 @@ def model_inputs(user: User, record: HealthRecord, names: list[str]) -> dict[str
 
 
 class PredictionService:
-    def __init__(self, artifact_source: ArtifactSource | None = None) -> None:
+    def __init__(self, artifact_source: ArtifactSource | None = None, queue: PredictionQueue | None = None) -> None:
         self.artifact_source = artifact_source or ArtifactLoader().load
+        self.queue = queue or RedisPredictionQueue()
         self.predictions = PredictionRepository()
         self.health_records = HealthRecordRepository()
 
@@ -122,7 +126,13 @@ class PredictionService:
             model_version=artifact.model_version,
             input_snapshot={"diseases": [str(disease) for disease in diseases], "features": values},
         )
-        # 여기서 prediction_id·job_id 를 큐에 적재해야 한다. 큐와 ai_worker 연결은 후속 작업이라 아직 비워 둔다
+        try:
+            await self.queue.enqueue(prediction.id, prediction.job_id)
+        except Exception:
+            # 적재에 실패하면 워커가 영영 집어 가지 않는다. 영구 pending 대신 failed 로 남기고 500 이다
+            logger.exception("예측 큐 적재 실패: prediction_id=%s", prediction.id)
+            await self.predictions.mark_failed(prediction.id, RETRY_FAILURE)
+            raise AppError(ErrorCode.INTERNAL_ERROR) from None
         return PredictionAccepted(
             prediction_id=prediction.id,
             job_id=prediction.job_id,

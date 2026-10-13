@@ -8,12 +8,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 # 2. 의존성 패키지 관리 파일을 컨테이너 내부에 복사합니다.
 COPY pyproject.toml uv.lock ./
 
-# 3. pyproject.toml에 명시된 의존성 패키지 중에서 'app' 그룹만 설치합니다.
-RUN uv sync --group ai --no-dev --frozen
+# 3. 워커는 app 모델·설정(DB)과 model 그룹(pandas·scikit-learn·joblib)을 함께 쓴다.
+#    shap 은 lock 에 넣을 수 없어(pyproject.toml model 그룹 주석) 같은 버전으로 따로 설치한다.
+RUN uv sync --group ai --group app --group model --no-dev --frozen \
+    && uv pip install --python /app/.venv/bin/python 'shap==0.50.0'
 
-# 4. 로컬 소스 코드를 컨테이너 내부로 복사합니다.
-COPY ./ai_worker ./app
+# 4. 워커는 app 패키지(ORM 모델·설정·D 위협도 갱신)를 import 한다.
+COPY ./app ./app
+COPY ./ai_worker ./ai_worker
 
-# 5. 해당 이미지를 활용하여 도커컨테이너 실행시 실행되는 명령어입니다.
-# 아래 커맨드를 수정한 뒤에 사용합니다.
-CMD ["echo", "'hello world'"]
+# 5. uv run 은 lock 기준으로 다시 동기화해 shap 을 지울 수 있어 venv 의 python 을 바로 쓴다.
+#    모델(experiment-refit/)·서빙 artifact(data/model/)는 이미지에 넣지 않고 compose 볼륨으로 붙인다.
+CMD ["/app/.venv/bin/python", "-m", "ai_worker.main"]
