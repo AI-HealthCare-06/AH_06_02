@@ -104,6 +104,13 @@ def behavior_weight(factor_key: str, record: HealthRecord | None) -> int | None:
     """
     if factor_key in NON_BEHAVIORAL_FACTORS:
         return 0
+    if factor_key == "alcohol_frequency" and config.D_DIAGNOSED_ALCOHOL_POLICY_ENABLED:
+        if record is None or type(record.alcohol_frequency) is not int:
+            return None
+        frequency = record.alcohol_frequency
+        if frequency == 1:
+            return 0 if record.alcohol_amount in (None, 0) else None
+        return 1 if 2 <= frequency <= 6 else None
     if factor_key in CONDITION_PENDING_FACTORS:
         return None
     if factor_key == "smoking_current":

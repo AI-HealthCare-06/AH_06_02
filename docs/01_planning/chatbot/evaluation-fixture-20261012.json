@@ -1,0 +1,146 @@
+{
+  "scope": "승인 테스트 fixture의 결정적 태그 검색·출력 검증·주기 계약. 실제 LLM 호출 없음.",
+  "production_card_status": "12개 전부 draft; 운영 승인 완료를 뜻하지 않음",
+  "cases": [
+    {
+      "case_id": "E01",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C01"
+      ]
+    },
+    {
+      "case_id": "E02",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E03",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C03"
+      ]
+    },
+    {
+      "case_id": "E04",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E05",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C05"
+      ]
+    },
+    {
+      "case_id": "E06",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "meal_walk",
+        "movement_breaks"
+      ]
+    },
+    {
+      "case_id": "E07",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C07"
+      ]
+    },
+    {
+      "case_id": "E08",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E09",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C09"
+      ]
+    },
+    {
+      "case_id": "E10",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C10"
+      ]
+    },
+    {
+      "case_id": "E11",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E12",
+      "kind": "questions",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E13",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E14",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E15",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E16",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E17",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E18",
+      "kind": "cycle_end",
+      "passed": true,
+      "observed": {
+        "end_date": "2026-11-08",
+        "added_duration": 21
+      }
+    },
+    {
+      "case_id": "E19",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E20",
+      "kind": "draft_excluded",
+      "passed": true,
+      "observed": []
+    }
+  ],
+  "passed": 20,
+  "total": 20
+}
