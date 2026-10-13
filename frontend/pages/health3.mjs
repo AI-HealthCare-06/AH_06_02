@@ -140,9 +140,24 @@ ${stepperHtml("health3")}
     });
   }
   form.addEventListener("submit", onSubmit);
+  // 이전으로 돌아갈 때 입력 중인 값을 초안에 보관한다. 돌아오면 readStep 으로 복원된다
+  const backButton = root.querySelector('[data-route="health2"]');
+  function onBack() {
+    try {
+      saveStep(
+        auth,
+        "health3",
+        Object.fromEntries(STEPS.health3.map((name) => [name, readNumber(form.elements.namedItem(name))])),
+      );
+    } catch {
+      // 잘못된 입력이 있어도 이전 이동은 막지 않는다
+    }
+  }
+  backButton?.addEventListener("click", onBack);
   const unbindRoutes = bindRoutes(root, router);
   return () => {
     form.removeEventListener("submit", onSubmit);
+    backButton?.removeEventListener("click", onBack);
     unbindRoutes();
   };
 }
