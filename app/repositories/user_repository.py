@@ -28,6 +28,10 @@ LOGIN_LOCK_MINUTES = 10
 
 #: 탈퇴 후 이 기간이 지나면 식별정보와 업로드 사진을 지운다 (REQ-USER-009 · NFR-SEC-005)
 PURGE_AFTER_DAYS = 30
+#: 파기한 계정의 자리값. email 은 UNIQUE NOT NULL 이라 비울 수 없어 id 로 유일한 값을 만든다
+PURGED_EMAIL_SUFFIX = "@deleted.invalid"
+PURGED_EMAIL_TEMPLATE = "withdrawn-{user_id}" + PURGED_EMAIL_SUFFIX
+PURGED_NICKNAME = "탈퇴한 사용자"
 
 
 @dataclass(frozen=True)
@@ -168,4 +172,29 @@ class UserRepository:
         user.status = UserStatus.WITHDRAWN
         user.withdrawn_at = datetime.now(config.TIMEZONE)
         await user.save(update_fields=["status", "withdrawn_at", UPDATED_AT_FIELD])
+        return user
+
+    async def find_purgeable(self, now: datetime | None = None) -> list[User]:
+        """탈퇴한 지 PURGE_AFTER_DAYS 가 지났고 아직 파기하지 않은 계정.
+
+        이미 파기한 행은 email 이 PURGED_EMAIL_SUFFIX 로 끝나므로 다시 고르지 않는다.
+        파기 여부 컬럼을 따로 두지 않아 마이그레이션 없이 여러 번 돌릴 수 있다.
+        """
+        cutoff = (now or datetime.now(config.TIMEZONE)) - timedelta(days=PURGE_AFTER_DAYS)
+        return (
+            await self._model.filter(status=UserStatus.WITHDRAWN, withdrawn_at__lte=cutoff)
+            .exclude(email__endswith=PURGED_EMAIL_SUFFIX)
+            .order_by("id")
+        )
+
+    async def purge_identifiers(self, user: User, password_hash: str) -> User:
+        """REQ-USER-009. 행·건강기록·예측은 남기고 식별정보만 지운다.
+
+        password_hash 는 서비스가 만든 유효한 해시를 받는다. 컬럼을 빈 값으로 두면
+        passlib 이 해시를 읽다 터질 수 있어, 아무도 모르는 값으로 덮어 로그인만 막는다.
+        """
+        user.email = PURGED_EMAIL_TEMPLATE.format(user_id=user.id)
+        user.nickname = PURGED_NICKNAME
+        user.password_hash = password_hash
+        await user.save(update_fields=["email", "nickname", "password_hash", UPDATED_AT_FIELD])
         return user
