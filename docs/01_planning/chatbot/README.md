@@ -22,11 +22,11 @@
 
 | 컬럼 | 용도 |
 | --- | --- |
-| `conversation_snapshot` | 주고받은 질문과 답변 기록 |
-| `llm_model_version` | 추천을 생성한 모델 식별자 |
-| `evidence_card_ids` | 제안 근거로 전달된 승인 카드 ID 배열 |
+| `conversation_snapshot` | 질문·답변 기록. 저장 키는 `policy_version` · `fingerprint` · `answers` · `asked` · `card_versions` · `model_version`(예측 모델) · `health_record_id` |
+| `llm_model_version` | 후보 선택에 쓴 LLM 식별자. snapshot 의 `model_version` 과 다르다 |
+| `evidence_card_ids` | 제안 근거로 전달된 승인 카드 ID 배열. `C01`~`C12` 고정값 |
 
-셋 다 `source_type='conversation'` 일 때만 채우도록 돼 있다. 현재 추천은 전부 `prediction_personal` 또는 `diagnosis_global` 로만 만들어지므로 세 칸은 항상 NULL 이다.
+대화로 고른 추천도 `source_type` 은 원래 값(`prediction_personal`, `diagnosis_global`)을 유지한다. 대화를 거쳤다는 이유만으로 `conversation` 으로 바꾸지 않으므로, 세 칸은 `source_type` 과 무관하게 채운다 (10/13 A·D 합의).
 
 ## 코드는 없다
 
