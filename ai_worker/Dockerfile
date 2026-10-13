@@ -10,7 +10,10 @@ COPY pyproject.toml uv.lock ./
 
 # 3. 워커는 app 모델·설정(DB)과 model 그룹(pandas·scikit-learn·joblib)을 함께 쓴다.
 #    shap 은 lock 에 넣을 수 없어(pyproject.toml model 그룹 주석) 같은 버전으로 따로 설치한다.
-RUN uv sync --group ai --group app --group model --no-dev --frozen \
+#    asyncmy 등 C 확장은 빌드 도구가 필요하다
+RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && uv sync --group ai --group app --group model --no-dev --frozen \
     && uv pip install --python /app/.venv/bin/python 'shap==0.50.0'
 
 # 4. 워커는 app 패키지(ORM 모델·설정·D 위협도 갱신)를 import 한다.
