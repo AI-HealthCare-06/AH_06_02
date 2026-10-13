@@ -1,12 +1,19 @@
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
+import pytest
 from tortoise.contrib.test import TestCase
 
 from app.core import config
 from app.core.utils.security import hash_password, verify_password
 from app.models.challenges import ChallengeRecommendation, RecommendationSourceType
 from app.models.users import User, UserStatus
-from app.repositories.user_repository import PURGE_AFTER_DAYS, PURGED_EMAIL_SUFFIX, PURGED_NICKNAME
+from app.repositories.user_repository import (
+    PURGE_AFTER_DAYS,
+    PURGED_EMAIL_SUFFIX,
+    PURGED_NICKNAME,
+    UserRepository,
+)
 from app.services.retention import RetentionService
 
 PASSWORD = "dango1234"
@@ -124,3 +131,25 @@ class TestPurgeWithdrawn(TestCase):
 
         kept = await ChallengeRecommendation.get(id=card.id)
         assert kept.conversation_snapshot == SNAPSHOT
+
+    async def test_rerun_after_a_failed_identifier_purge(self):
+        user = await make_user("card-retry@example.com", withdrawn_days_ago=PURGE_AFTER_DAYS + 1)
+        card = await make_card(user.id)
+        service = RetentionService()
+
+        # 대화 기록을 지운 직후 식별정보 파기가 터지는 상황
+        with patch.object(UserRepository, "purge_identifiers", side_effect=RuntimeError("DB 끊김")):
+            with pytest.raises(RuntimeError):
+                await service.purge_withdrawn()
+
+        half_done = await User.get(id=user.id)
+        assert half_done.email == "card-retry@example.com"
+        assert (await ChallengeRecommendation.get(id=card.id)).conversation_snapshot is None
+
+        # 식별정보가 아직 그대로라 다음 실행에서 같은 계정이 다시 대상이 된다
+        result = await service.purge_withdrawn()
+
+        assert result.purged_user_ids == [user.id]
+        purged = await User.get(id=user.id)
+        assert purged.email == f"withdrawn-{user.id}{PURGED_EMAIL_SUFFIX}"
+        assert purged.nickname == PURGED_NICKNAME

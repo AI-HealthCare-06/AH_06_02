@@ -6,7 +6,8 @@
 컨테이너가 여러 대여도 중복 실행이 데이터를 망가뜨리지 않는다. 이미 지운 계정은
 다시 고르지 않으므로 여러 번 돌려도 결과가 같다.
 
-지우는 것은 users 의 email·nickname·password_hash 뿐이다. 행은 남기고 건강기록과
+지우는 것은 users 의 email·nickname·password_hash 와 challenge_recommendations 의
+conversation_snapshot 이다 (REQ-USER-009 · REQ-CHLG-012). 행은 남기고 건강기록과
 예측 결과도 지우지 않는다. 챌린지 인증 사진은 업로드(HLTH-03)가 아직 없어 범위 밖이다.
 """
 
