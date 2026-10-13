@@ -28,10 +28,7 @@ plan.md
 
 # 프론트 검증용 개발 의존성
 frontend/node_modules/
-<<<<<<< HEAD
 .DS_Store
-=======
 
 # SHAP background 는 KNHANES 개인 단위 행을 인코딩한 자료다. 보안서약 대상이라 올리지 않는다
 experiment-refit/*.npy
->>>>>>> 49281e0 (feat(worker): 예측 큐·워커 연결)
