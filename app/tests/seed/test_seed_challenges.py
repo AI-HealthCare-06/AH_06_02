@@ -94,9 +94,13 @@ class TestUpsertChallenges(TestCase):
     async def test_inactive_rows_follow_the_factor_map(self) -> None:
         await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
 
-        # challenge-factor-map.md 'v0 활성' False 두 행
+        # 비활성 카드: 스파이크 두 행과 사진 인증 보류 카드
         disabled = await Challenge.filter(is_enabled=False).values_list("code", flat=True)
-        assert sorted(disabled) == ["CH_SLOW_EAT_20", "CH_VEGGIE_FIRST"]
+        assert sorted(disabled) == [
+            "CH_CHECK_LABEL",
+            "CH_SLOW_EAT_20",
+            "CH_VEGGIE_FIRST",
+        ]
 
     async def test_xp_and_fallback_follow_the_10_6_agreement(self) -> None:
         await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
