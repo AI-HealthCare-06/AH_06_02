@@ -28,7 +28,7 @@ from app.services.model_artifact import (
     ModelArtifact,
     is_modifiable,
 )
-from app.services.prediction_queue import PredictionQueue, RedisPredictionQueue
+from app.services.prediction_queue import PredictionQueue, ValkeyPredictionQueue
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ def model_inputs(user: User, record: HealthRecord, names: list[str]) -> dict[str
 class PredictionService:
     def __init__(self, artifact_source: ArtifactSource | None = None, queue: PredictionQueue | None = None) -> None:
         self.artifact_source = artifact_source or ArtifactLoader().load
-        self.queue = queue or RedisPredictionQueue()
+        self.queue = queue or ValkeyPredictionQueue()
         self.predictions = PredictionRepository()
         self.health_records = HealthRecordRepository()
 

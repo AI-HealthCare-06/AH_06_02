@@ -68,7 +68,7 @@ async def record(user_id: int, **overrides: Any) -> HealthRecord:
 
 
 class RecordingQueue:
-    """Redis 대신 적재한 작업을 기억한다. fail=True 면 적재 실패를 흉내 낸다."""
+    """Valkey 대신 적재한 작업을 기억한다. fail=True 면 적재 실패를 흉내 낸다."""
 
     def __init__(self, *, fail: bool = False) -> None:
         self.fail = fail

@@ -47,6 +47,6 @@ class Config(BaseSettings):
     MODEL_DIR: str = "experiment-refit"
 
     # 예측 큐. PRED-01 이 {prediction_id, job_id} 를 LPUSH 하고 ai_worker 가 BRPOP 한다
-    REDIS_URL: str = "redis://localhost:6379/0"
+    VALKEY_URL: str = "valkey://localhost:6379/0"
     PREDICTION_QUEUE_KEY: str = "pred:queue"
 >>>>>>> 49281e0 (feat(worker): 예측 큐·워커 연결)

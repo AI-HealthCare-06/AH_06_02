@@ -1,14 +1,14 @@
 services:
-  # 1. Redis (메시지 브로커 및 캐싱)
-  redis:
-    image: redis:alpine
-    container_name: redis
+  # 1. Valkey (메시지 브로커 및 캐싱)
+  valkey:
+    image: valkey/valkey:alpine
+    container_name: valkey
     networks:
       - ws
     ports:
       - "6379:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "valkey-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,7 +59,7 @@ services:
       # 컨테이너 안의 localhost 는 자기 자신이므로 compose 네트워크의 mysql 서비스 이름으로 덮어쓴다.
       # environment 가 env_file 보다 우선한다.
       DB_HOST: mysql
-      REDIS_URL: redis://redis:6379/0
+      VALKEY_URL: valkey://valkey:6379/0
     command: | 
       sh -c "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
@@ -74,7 +74,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
 
   # 4. AI Worker (Model 학습 및 추론)
@@ -91,7 +91,7 @@ services:
     environment:
       # fastapi 와 같은 설정(app.core.config.Config)을 읽으므로 같은 이유로 덮어쓴다
       DB_HOST: mysql
-      REDIS_URL: redis://redis:6379/0
+      VALKEY_URL: valkey://valkey:6379/0
     volumes:
       - ./data:/app/data  # 서빙 artifact (data/model/artifact.json)
       - ./experiment-refit:/app/experiment-refit  # 원본 질환 모델과 background-<질환>.npy. git 에 올리지 않는다
@@ -102,7 +102,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
 
   # 5. Nginx (웹 서버 - 요청 리버스 프록시로 전달)

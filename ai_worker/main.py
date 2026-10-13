@@ -1,4 +1,4 @@
-"""예측 워커. Redis pred:queue 에서 작업을 BRPOP 으로 받아 추론하고 predictions 에 반영한다.
+"""예측 워커. Valkey pred:queue 에서 작업을 BRPOP 으로 받아 추론하고 predictions 에 반영한다.
 
     python -m ai_worker.main
 
@@ -38,7 +38,7 @@ def load_models() -> ServingModels | ModelUnavailableError:
 async def run(stop: asyncio.Event) -> None:
     models = await asyncio.to_thread(load_models)
     await Tortoise.init(config=TORTOISE_ORM)
-    redis = Redis.from_url(config.REDIS_URL)
+    redis = Redis.from_url(config.VALKEY_URL)
     logger.info("예측 큐 대기: %s", config.PREDICTION_QUEUE_KEY)
     try:
         while not stop.is_set():
