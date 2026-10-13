@@ -104,22 +104,27 @@ ${numberFieldHtml({ name: "sitting_minutes", label: "하루 앉은 시간", unit
       item.setAttribute("aria-pressed", String(on));
     });
   }
+  // 현재 폼 값을 초안 객체로 만든다. 흡연은 폼 필드가 아니라 클로저 변수이고,
+  // 음주량에는 NON_DRINKER 규칙이 있어서 STEPS 일괄 처리 대신 직접 만든다
+  function draft() {
+    const alcoholFrequency = readSelect(frequency);
+    return {
+      smoking_current: smoking,
+      alcohol_frequency: alcoholFrequency,
+      alcohol_amount: alcoholFrequency === NON_DRINKER ? 0 : readSelect(amount),
+      walking_days: readNumber(field("walking_days")),
+      walking_minutes: readNumber(field("walking_minutes")),
+      strength_days: readNumber(field("strength_days")),
+      sitting_minutes: readNumber(field("sitting_minutes")),
+      dining_out_freq: readSelect(field("dining_out_freq")),
+    };
+  }
   async function onSubmit(event) {
     event.preventDefault();
     await ui.runPending(submit, async () => {
       feedback.replaceChildren();
       try {
-        const alcoholFrequency = readSelect(frequency);
-        saveStep(auth, "health2", {
-          smoking_current: smoking,
-          alcohol_frequency: alcoholFrequency,
-          alcohol_amount: alcoholFrequency === NON_DRINKER ? 0 : readSelect(amount),
-          walking_days: readNumber(field("walking_days")),
-          walking_minutes: readNumber(field("walking_minutes")),
-          strength_days: readNumber(field("strength_days")),
-          sitting_minutes: readNumber(field("sitting_minutes")),
-          dining_out_freq: readSelect(field("dining_out_freq")),
-        });
+        saveStep(auth, "health2", draft());
       } catch (error) {
         feedback.replaceChildren(ui.notice(error.message, { kind: "error" }));
         return;
@@ -131,11 +136,22 @@ ${numberFieldHtml({ name: "sitting_minutes", label: "하루 앉은 시간", unit
   frequency.addEventListener("change", syncAmount);
   form.addEventListener("click", onSmoking);
   form.addEventListener("submit", onSubmit);
+  // 이전으로 돌아갈 때 입력 중인 값을 초안에 보관한다. 돌아오면 readStep 으로 복원된다
+  const backButton = root.querySelector('[data-route="health"]');
+  function onBack() {
+    try {
+      saveStep(auth, "health2", draft());
+    } catch {
+      // 잘못된 입력이 있어도 이전 이동은 막지 않는다
+    }
+  }
+  backButton?.addEventListener("click", onBack);
   const unbindRoutes = bindRoutes(root, router);
   return () => {
     frequency.removeEventListener("change", syncAmount);
     form.removeEventListener("click", onSmoking);
     form.removeEventListener("submit", onSubmit);
+    backButton?.removeEventListener("click", onBack);
     unbindRoutes();
   };
 }
