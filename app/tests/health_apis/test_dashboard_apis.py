@@ -39,12 +39,13 @@ async def _prediction(
     dm: str | None,
     htn: str | None,
     status_: PredictionStatus = PredictionStatus.DONE,
+    model_version: str = "test-model",
 ) -> Prediction:
     return await Prediction.create(
         user_id=user.id,
         health_record_id=record.id,
         job_id=f"job-{uuid4().hex}",
-        model_version="test-model",
+        model_version=model_version,
         status=status_,
         dm_probability=Decimal(dm) if dm else None,
         htn_probability=Decimal(htn) if htn else None,
@@ -91,6 +92,18 @@ class TestDashboardSummaryAPI(TestCase):
             response = await client.get("/api/v1/dashboard/summary", headers=_auth(token))
 
         assert all(risk["delta"] is None for risk in response.json()["data"]["risks"])
+
+    async def test_delta_is_null_when_model_version_changed(self):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            token, user = await _login(client, "dash-model-change@example.com")
+            await _prediction(user, await _record(user, days_ago=10), dm="0.2900", htn="0.3000", model_version="old")
+            await _prediction(user, await _record(user, days_ago=1), dm="0.3125", htn="0.2500", model_version="new")
+            response = await client.get("/api/v1/dashboard/summary", headers=_auth(token))
+
+        risks = response.json()["data"]["risks"]
+        # 모델 교체로 생긴 차이는 변화량으로 보여주지 않는다. 최신 확률은 그대로 준다
+        assert {risk["disease"]: risk["probability"] for risk in risks} == {"diabetes": 0.3125, "hypertension": 0.25}
+        assert all(risk["delta"] is None for risk in risks)
 
     async def test_diagnosed_disease_is_not_exposed(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

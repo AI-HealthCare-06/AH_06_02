@@ -41,8 +41,12 @@ class DashboardService:
             if not latest:
                 continue
             current = getattr(latest[0], column)
-            # 확률은 0~1, 변화량은 percentage points
-            delta = float((current - getattr(latest[1], column)) * 100) if len(latest) > 1 else None
+            # 확률은 0~1, 변화량은 percentage points. 모델이 바뀐 두 예측의 차이는 행동 변화가 아니므로 내리지 않는다
+            delta = (
+                float((current - getattr(latest[1], column)) * 100)
+                if len(latest) > 1 and latest[0].model_version == latest[1].model_version
+                else None
+            )
             risks.append(
                 RiskSummary(
                     disease=disease,
