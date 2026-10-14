@@ -156,3 +156,8 @@ ignore_errors = true
 # 타입 정보를 내보내지 않는 문서 스크립트용 서드파티
 module = ["openpyxl.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# ai_worker 추론 의존성. app 그룹에 없고(pandas·joblib 은 model 그룹) shap 은 워커 이미지에만 설치한다
+module = ["joblib.*", "pandas.*", "shap.*"]
+ignore_missing_imports = true

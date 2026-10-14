@@ -47,7 +47,7 @@ await refresh_impact_from_prediction(user_id, prediction_id)
 - P0 A: 예측 API 3개(접수·상태/결과·기여도)와 실제 모델/전처리/SHAP 연결. 최신 AGENTS.md에서 A가 예측 테이블을 맡는다.
 - P0 D: 이 갱신 함수를 연결하고 도감→공략 대상→추천 통합 확인.
 - P0 모델 자료: 두 선택 모델의 실제 가중치, 동일 전처리·feature 순서, 버전 정보와 질환별 메타데이터를 함께 확인한다. metadata artifact만으로 실제 확률/개인 SHAP을 계산할 수 없다. 예측에 저장할 버전은 합쳐진 serving artifact.model_version이며 원본 두 질환 버전은 별도로 추적한다.
-- 예측 방식은 현재 202 + prediction_id/job_id + 상태 폴링 계약을 유지하는 안을 권한다. compose에는 Redis가 이미 있다. 1단계는 단일 worker와 기존 상태 3개로 범위를 제한하되 같은 작업 재처리 방지·실패/timeout·DB-큐 유실 복구는 생략하지 않는다. FastAPI BackgroundTasks나 연출 대기를 worker 구현으로 설명하지 않는다.
+- 예측 방식은 현재 202 + prediction_id/job_id + 상태 폴링 계약을 유지하는 안을 권한다. compose에는 Valkey가 이미 있다. 1단계는 단일 worker와 기존 상태 3개로 범위를 제한하되 같은 작업 재처리 방지·실패/timeout·DB-큐 유실 복구는 생략하지 않는다. FastAPI BackgroundTasks나 연출 대기를 worker 구현으로 설명하지 않는다.
 - 동기 전환은 실제 추론/SHAP 소요 시간 확인과 AGENTS.md·원본 API/요구사항·실패 계약 변경을 함께 합의한 경우의 대안이다. 현재 Draft에서 동기 전환을 구현하지 않았다.
 - 프론트는 같은 저장소 frontend/로 두는 안을 권한다. HTML 시안 재공유 후 스택과 담당을 합의한다. 제안 분담은 A 예측·백엔드 연결, D 도감/챌린지 문구·정책·통합 확인, 병주님 프론트 구현·배포다. 타 담당자의 인수 동의 전 확정 분담으로 표시하지 않는다.
 - 화면 v3의 실제 파일은 열람하지 못했다. 추천 최대 2개 선택은 최초 투입에만 맞으며 2주차에는 서버의 남은 슬롯·추가 투입 한도에 맞춰 선택 수를 제한해야 한다. 인증 버튼 클릭 자체가 아니라 서버가 인정한 완료 결과로 XP·공략 점수·보상 안내를 갱신한다.

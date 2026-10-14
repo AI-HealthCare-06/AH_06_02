@@ -9,7 +9,7 @@ from app.main import app
 from app.models.predictions import Prediction, PredictionStatus
 from app.models.users import User
 from app.tests.d_fixtures import TEST_MODEL_VERSION, fake_artifact
-from app.tests.prediction_apis.helpers import login, record, serving, snapshot
+from app.tests.prediction_apis.helpers import RecordingQueue, login, record, serving, snapshot
 
 URL = "/api/v1/predictions"
 
@@ -36,6 +36,34 @@ class TestCreatePrediction(TestCase):
         # 나이는 접수 시점의 출생연도로 고정한다 (가입 본문 1998)
         assert snapshot(saved)["features"]["age"] == datetime.now(config.TIMEZONE).year - 1998
         assert snapshot(saved)["diseases"] == ["diabetes", "hypertension"]
+
+    async def test_enqueues_only_ids_for_the_worker(self) -> None:
+        queue = RecordingQueue()
+        with serving(queue=queue):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                user, headers = await login(client, "pred-queue@example.com")
+                health = await record(user.id)
+                response = await client.post(URL, json={"health_record_id": health.id}, headers=headers)
+
+        data = response.json()["data"]
+        assert queue.jobs == [(data["prediction_id"], data["job_id"])]
+
+    async def test_queue_failure_marks_failed_instead_of_permanent_pending(self) -> None:
+        with serving(queue=RecordingQueue(fail=True)):
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                user, headers = await login(client, "pred-queue-down@example.com")
+                health = await record(user.id)
+                response = await client.post(URL, json={"health_record_id": health.id}, headers=headers)
+
+        assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        assert response.json()["error"]["code"] == "INTERNAL_ERROR"
+        saved = await Prediction.get(user_id=user.id)
+        assert saved.status == PredictionStatus.FAILED
+        assert saved.failure == {
+            "code": "INTERNAL_ERROR",
+            "message": "예측에 실패했습니다. 다시 시도해주세요.",
+            "retryable": True,
+        }
 
     async def test_another_users_record_is_not_found(self) -> None:
         with serving():
