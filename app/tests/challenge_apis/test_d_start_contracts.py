@@ -40,6 +40,29 @@ class TestDStartContracts(TestCase):
         cycle = await make_cycle(user.id, ["physical_activity_low", "smoking_current"])
         return user, headers, cycle
 
+    async def test_disabled_card_rejects_start_without_creating_missions(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            user, headers, cycle = await self.prepare(client)
+            challenge = await Challenge.get(code="CH_CHECK_LABEL")
+            challenge.is_enabled = True
+            await challenge.save()
+            card = await make_card(user.id, challenge, cycle)
+            challenge.is_enabled = False
+            await challenge.save()
+            response = await client.post(
+                "/api/v1/user-challenges",
+                headers=headers,
+                json={"recommendation_ids": [card.id], "scheduled_dates": [str(today_kst())]},
+            )
+        assert response.status_code == 404, response.text
+        assert response.json()["error"]["code"] == "CHLG_RECOMMENDATION_NOT_FOUND"
+        assert await UserChallenge.filter(user_id=user.id).count() == 0
+        assert await UserChallengeOccurrence.all().count() == 0
+        await cycle.refresh_from_db()
+        assert cycle.status == AttackCycleStatus.DRAFT and cycle.start_date is None
+        await card.refresh_from_db()
+        assert card.action is None and card.acted_at is None
+
     async def test_event_starts_only_on_confirmed_usage_dates(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             user, headers, cycle = await self.prepare(client)
