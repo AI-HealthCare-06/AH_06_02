@@ -1,6 +1,6 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-09 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-14 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -279,7 +279,7 @@
 - **응답 (성공)**: HTTP 202 { success:true, data:{ prediction_id, job_id, status:"pending", model_version, model_experimental, poll_url:"/api/v1/predictions/{prediction_id}" } }. 폴링은 PRED-02 사용
 - **주요 에러**: PRED_ALL_DIAGNOSED(400), HLTH_RECORD_NOT_FOUND(404), HLTH_PROFILE_INCOMPLETE(400), PRED_INPUT_INSUFFICIENT(400), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
 - **관련 요구사항**: REQ-PRED-001·002·007·008 · NFR-PERF-002
-- **사용 테이블**: users 읽기 / health_records 읽기 / predictions 쓰기 / Redis enqueue
+- **사용 테이블**: users 읽기 / health_records 읽기 / predictions 쓰기 / Valkey enqueue
 - **상태**: 확정 — 홍서윤 10/1 / model_experimental 추가 — 2026.10.09 배수빈, 최병주 확인 대기
 
 ### PRED-02 · 예측 상태·결과 조회
@@ -390,7 +390,7 @@
 - **사용 테이블**: D CHLG-06·CHLG-08 조회 결과 재사용; D 테이블 직접 접근 없음
 - **상태**: 제출안(D 주간 달성률 산식 확인)
 
-## D · 챌린지·보상·도감 · 11개
+## D · 챌린지·보상·도감 · 12개
 
 담당 김이경 · 작성 완료 2026-09-29
 
@@ -401,7 +401,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음. ※ A 제안 — 10/6. 응답 최상위에 model_version, model_experimental 추가. model_version은 이 추천을 만든 모델 버전으로 predictions.model_version과 같은 값이며 CharField(64)를 넘지 않는다. model_experimental은 boolean으로, 아직 독립 검증을 통과하지 않은 실험 아티팩트로 만든 추천이면 true다. 화면은 true일 때 실험 모델임을 표시한다. 추천 가능 여부와 factor_score 계산에는 영향을 주지 않는다. 추천 카드 조회(CHLG-02)에는 넣지 않았다. 생성 당시 실험 여부를 저장할 컬럼이 없어 지금 아티팩트 기준으로 붙이면 다른 모델로 만든 카드에 틀린 표시가 붙기 때문이다. D 확인 완료 — 2026.10.12 김이경 ※ 10/12 추가. 응답 최상위에 cycle_end_date. 연결된 주기의 end_date 이며 KST YYYY-MM-DD 다. 화면이 남은 기간을 계산하는 데 쓴다. ※ 시트 누락 보완 — 10/12. items 각 항목에 목표 안내 필드가 함께 나간다: context_type, daily_target_count, target_value, unit, daily_xp, safety_check_required, manual_fallback_allowed. 선택 전 안내값이며 시작 이후에는 미션 snapshot 을 쓴다. 응답 최상위에 remaining_slots 도 있다. 셋 다 이번에 새로 만든 필드가 아니라 기존 구현에 있던 것을 명세에 반영한 것이다.
+- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음. ※ A 제안 — 10/6. 응답 최상위에 model_version, model_experimental 추가. model_version은 이 추천을 만든 모델 버전으로 predictions.model_version과 같은 값이며 CharField(64)를 넘지 않는다. model_experimental은 boolean으로, 아직 독립 검증을 통과하지 않은 실험 아티팩트로 만든 추천이면 true다. 화면은 true일 때 실험 모델임을 표시한다. 추천 가능 여부와 factor_score 계산에는 영향을 주지 않는다. 추천 카드 조회(CHLG-02)에는 넣지 않았다. 생성 당시 실험 여부를 저장할 컬럼이 없어 지금 아티팩트 기준으로 붙이면 다른 모델로 만든 카드에 틀린 표시가 붙기 때문이다. D 확인 완료 — 2026.10.12 김이경, ※ 10/12 추가. 응답 최상위에 cycle_end_date. 연결된 주기의 end_date 이며 KST YYYY-MM-DD 다. 화면이 남은 기간을 계산하는 데 쓴다. ※ 시트 누락 보완 — 10/12. items 각 항목에 목표 안내 필드가 함께 나간다: context_type, daily_target_count, target_value, unit, daily_xp, safety_check_required, manual_fallback_allowed. 선택 전 안내값이며 시작 이후에는 미션 snapshot 을 쓴다. 응답 최상위에 remaining_slots 도 있다. 셋 다 이번에 새로 만든 필드가 아니라 기존 구현에 있던 것을 명세에 반영한 것이다.
 - **주요 에러**: CHLG_RECOMMENDATION_UNAVAILABLE, PRED_NOT_FOUND, UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-001·002
 - **사용 테이블**: predictions·prediction_contributions 읽기 / challenges 읽기 / challenge_recommendations 쓰기 / user_attack_cycles·user_monsters·monsters 읽기
@@ -452,8 +452,8 @@
 
 - **인증**: 필요
 - **요청 파라미터**: —
-- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean. 시작 목표는 본인 추천의 검증된 proposed_goal에서 읽고 허용 조합·슬롯·기회를 재검증한다. 초기 진행 합계 최대 2개, 2주차부터 적합 후보와 사용자 희망일 때 주기당 1개 추가, 기존 포함 최대 3개. safety_check_required=true인 마스터만 사용자가 직접 safety_confirmed=true로 확인; LLM 생성값 불인정. ※ 공략 미션은 본인 주기와 연결한다. 첫 시작은 draft→active 전환을 함께 검증하고, 추가 시작은 기존 active 주기만 허용한다. 추천의 cycle_id가 그 주기와 같아야 하며 challenge.factor_key가 대상 monsters.factor_keys에 포함되어야 한다. LLM이 대상/주기를 바꾸지 않는다. 기존 + scheduled_dates: ["YYYY-MM-DD", ...] 예정 이용일을 사용자가 확인해야 하는 챌린지에 쓴다. CH_WALK_ONE_STOP 처럼 발생 시점을 추정할 수 없는 카드가 해당한다. 평일·매일로 추정하지 않는다.
-- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, cycle_id, status, start_date, end_date, daily_target_count, target_value, duration_days, goal_config_snapshot }], active_count } ※ 목표는 개인 snapshot. 같은 공략 주기 D28 00:00 KST 종료, end_date는 마지막 수행일(D0+27) 포함. D7 추가 duration_days=21. 공통 마스터를 사용자별로 덮어쓰지 않는다. ※ 응답 cycle_id는 연결 주기 ID. 주기 end_date로 공통 종료·실제 일수를 snapshot 저장. 상대 주차는 주기 시작일로 계산. 추가 시작은 주기 잠금 후 extra_added_count≤1 검증. ※ 첫 사용자 확인 때 draft 주기→active와 D0/D28을 함께 확정. 추천 조회로 기간을 시작하지 않음. 미션 생성·주기 전환은 동일 트랜잭션.
+- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean. 시작 목표는 본인 추천의 검증된 proposed_goal에서 읽고 허용 조합·슬롯·기회를 재검증한다. 초기 진행 합계 최대 2개, 2주차부터 적합 후보와 사용자 희망일 때 주기당 1개 추가, 기존 포함 최대 3개. safety_check_required=true인 마스터만 사용자가 직접 safety_confirmed=true로 확인; LLM 생성값 불인정. ※ 공략 미션은 본인 주기와 연결한다. 첫 시작은 draft→active 전환을 함께 검증하고, 추가 시작은 기존 active 주기만 허용한다. 추천의 cycle_id가 그 주기와 같아야 하며 challenge.factor_key가 대상 monsters.factor_keys에 포함되어야 한다. LLM이 대상/주기를 바꾸지 않는다. 기존 + scheduled_dates: ["YYYY-MM-DD", ...] 예정 이용일을 사용자가 확인해야 하는 챌린지에 쓴다. CH_WALK_ONE_STOP 처럼 발생 시점을 추정할 수 없는 카드가 해당한다. 평일·매일로 추정하지 않는다. ※ 첫 사용자 확인 때 draft 주기→active와 D0/D28을 함께 확정. 추천 조회로 기간을 시작하지 않음. 미션 생성·주기 전환은 동일 트랜잭션.
+- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, cycle_id, status, start_date, end_date, daily_target_count, target_value, duration_days, goal_config_snapshot }], active_count } ※ 목표는 개인 snapshot. 같은 공략 주기 D28 00:00 KST 종료, end_date는 마지막 수행일(D0+27) 포함. D7 추가 duration_days=21. 공통 마스터를 사용자별로 덮어쓰지 않는다. ※ 응답 cycle_id는 연결 주기 ID. 주기 end_date로 공통 종료·실제 일수를 snapshot 저장. 상대 주차는 주기 시작일로 계산. 추가 시작은 주기 잠금 후 extra_added_count≤1 검증.
 - **주요 에러**: CHLG_LIMIT_EXCEEDED, CHLG_RECOMMENDATION_NOT_FOUND, CHLG_ALREADY_ACTIVE, CHLG_SAFETY_CONFIRMATION_REQUIRED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-002 · REQ-CHLG-010 · REQ-CHLG-011 · REQ-CHLG-012
 - **사용 테이블**: challenge_recommendations 쓰기(accepted·거절횟수 초기화) / challenges 읽기 / user_challenges 쓰기 / user_attack_cycles 읽기·추가 횟수 갱신

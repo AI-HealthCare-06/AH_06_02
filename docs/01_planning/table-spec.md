@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-09 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-14 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -105,7 +105,7 @@
 | 13 | predicted_at | DATETIME | NULL |  |  | 추론 완료 시각 | 확정 |
 | 14 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 요청 접수 시각 | 확정 |
 | 15 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
-| 16 | failure | JSON | NULL |  |  | 작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 그대로 나간다. Redis 는 TTL 이 지나면 사유가 사라져 다시 조회할 수 없어 컬럼으로 둔다 (NFR-REL-001) | 신규 — 2026.10.09 |
+| 16 | failure | JSON | NULL |  |  | 작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 그대로 나간다. Valkey 는 TTL 이 지나면 사유가 사라져 다시 조회할 수 없어 컬럼으로 둔다 (NFR-REL-001) | 신규 — 2026.10.09 |
 
 ### prediction_contributions — 기여요인
 담당 홍서윤 (B) · 8컬럼
@@ -268,7 +268,7 @@
 | 12 | cooldown_choice | ENUM('7d','30d','until_manual') | NULL |  |  | 3회 거절 시 사용자 선택 (REQ-CHLG-006) | 확정 |
 | 13 | exclude_until | DATETIME | NULL |  |  | 기간형 쿨다운 종료 | 확정 |
 | 14 | suppressed_until_manual | BOOLEAN | NN |  | FALSE | 직접 해제할 때까지 숨김. 3회 연속 거절 또는 not_applicable 선택 시 TRUE | 변경 — 9/28 김이경 제외조건 합의 |
-| 15 | conversation_snapshot | JSON | NULL |  |  | 대화형 추천에서 주고받은 질문과 답변 기록. 저장 키는 policy_version · fingerprint · answers · asked · card_versions · model_version(예측 모델 식별자. 선택에 쓴 LLM 식별자인 llm_model_version 과 다르다) · health_record_id 다. 자유 입력 원문·이름·연락처는 저장하지 않는다. 탈퇴 +30일 식별정보 삭제 시 이 컬럼 전체를 NULL 로 지운다 (REQ-CHLG-012) | 신규 — 10/2 대화형 추천 도입. 저장 범위·삭제 규칙 10/13 A 확정. 삭제 구현·검증 미반영 — A 남은 작업 |
+| 15 | conversation_snapshot | JSON | NULL |  |  | 대화형 추천에서 주고받은 질문과 답변 기록. 저장 키는 policy_version · fingerprint · answers · asked · card_versions · model_version(예측 모델 식별자. 선택에 쓴 LLM 식별자인 llm_model_version 과 다르다) · health_record_id 다. 자유 입력 원문·이름·연락처는 저장하지 않는다. 탈퇴 +30일 식별정보 삭제 시 이 컬럼 전체를 NULL 로 지운다 (REQ-CHLG-012) | 신규 — 10/2 대화형 추천 도입. 저장 범위·삭제 규칙 10/13 A 확정. 삭제 구현·검증 완료 — 10/13 #52 |
 | 16 | llm_model_version | VARCHAR(32) | NULL |  |  | 대화 개인화에서 후보 선택에 사용한 LLM 식별자. conversation_snapshot 의 model_version(예측 모델)과 다르다. 재현과 검증에 사용한다. 기존 규칙·예측 후보를 대화로 선택한 경우 source_type 은 원래 값을 유지하므로, source_type 과 무관하게 채운다. 32자 이내 | 변경 — 10/13 source_type 조건 제거. 구현과 정합화 |
 | 17 | evidence_card_ids | JSON | NULL |  |  | 제안 근거로 전달된 승인 카드 ID 배열. 검증과 사후 검토용. ID 는 C01~C12 고정값으로 문서 순서와 무관하며 삭제한 ID 는 재사용하지 않는다. 수정 이력은 카드의 version 으로 관리한다 (형식 20261012-v1) | 신규 — 10/2 대화형 추천 도입. ID 체계 10/13 A 확정. 카드 12개는 전부 draft 이며 운영 승인은 별건 |
 | 18 | proposed_goal | JSON | NULL |  |  | 서버 검증한 개인 목표(시간·횟수·슬롯·난이도·예정 기회·정책 버전). cycle_id FK로 대상·주기 연결하고 시작일/대상은 JSON에 중복 저장하지 않음. 사용자 확인 후 동일 목표를 snapshot에 전달. 미검증 LLM 원문 사용 금지. | 추가 제안 — 10/2 D 정의 완료·A 구조 검토 필요. DB 미반영 |
@@ -399,7 +399,7 @@
 | 레벨별 필요 경험치 | 테이블로 만들지 않고 코드 상수로 둡니다. levels 테이블을 만들면 13개가 되고 ERD를 다시 그려야 하는데, 레벨 30개짜리 상수 배열이면 밸런스 조정 시 숫자만 바꾸면 됩니다 |
 | XP 지급량 · 공략 점수 | challenges.reward_xp와 progress_value의 실제 값입니다. 컬럼과 타입은 정해져 있어 구조에는 영향이 없고, 4주차에 챌린지 목록을 채울 때 같이 정합니다 (김이경) |
 | XP 갱신 주체 | users는 A만 쓰므로, D는 A가 제공하는 내부 함수로 지급을 요청합니다. 레벨 재계산과 레벨업 판정은 A에서 한 곳으로 모읍니다 |
-| 리프레시 토큰 | Redis에 저장하기로 하여 테이블을 만들지 않았습니다. 다른 의견 있으면 알려주세요 |
+| 리프레시 토큰 | Valkey에 저장하기로 하여 테이블을 만들지 않았습니다. 다른 의견 있으면 알려주세요 |
 | ■ 예시 — 이렇게 채워주시면 됩니다 |  |
 | 컬럼명 | sleep_minutes |
 | 타입 | SMALLINT |
