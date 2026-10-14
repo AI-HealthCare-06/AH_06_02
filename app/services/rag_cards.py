@@ -67,7 +67,7 @@ class EvidenceCard(BaseModel):
 
 
 def load_cards(path: Path) -> list[EvidenceCard]:
-    cards = [EvidenceCard.model_validate(item) for item in json.loads(path.read_text())]
+    cards = [EvidenceCard.model_validate(item) for item in json.loads(path.read_text(encoding="utf-8"))]
     if len({card.card_id for card in cards}) != len(cards):
         raise ValueError("근거 카드 ID가 중복되었습니다.")
     return cards
