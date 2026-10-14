@@ -21,6 +21,10 @@ RUN uv sync --group app --no-dev --frozen
 COPY ./app ./app
 COPY ./frontend ./frontend
 COPY ./scripts ./scripts
+COPY ./ai_worker ./ai_worker
+COPY ./docs/01_planning/monster-master.csv ./docs/01_planning/monster-master.csv
+COPY ./docs/01_planning/challenge-master.csv ./docs/01_planning/challenge-master.csv
+COPY ./docs/01_planning/reward-master.csv ./docs/01_planning/reward-master.csv
 
 # 5. 해당 이미지를 활용하여 도커컨테이너 실행시 실행되는 명령어입니다.
 # FastAPI를 uvicorn을 활용하여 비동기 환경으로 서버를 실행합니다.

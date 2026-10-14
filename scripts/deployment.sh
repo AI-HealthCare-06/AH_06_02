@@ -109,7 +109,8 @@ echo ""
 scp -i ~/.ssh/${ssh_key_file} envs/.prod.env ubuntu@${ec2_ip}:~/project/.env
 scp -i ~/.ssh/${ssh_key_file} infra/docker/docker-compose.prod.yml ubuntu@${ec2_ip}:~/project/docker-compose.yml
 # 모델 아티팩트 전송 (experiment-refit/은 보안서약 대상이라 별도 전달 필요)
-scp -r -i ~/.ssh/${ssh_key_file} data ubuntu@${ec2_ip}:~/project/data
+scp -r -i ~/.ssh/${ssh_key_file} data/model ubuntu@${ec2_ip}:~/project/data/model
+scp -r -i ~/.ssh/${ssh_key_file} data/experiment-refit ubuntu@${ec2_ip}:~/project/data/experiment-refit
 if [[ "$is_https" == "1" ]] ; then
   # ---------- prod_http.conf 파일의 server_name 자동 수정 ----------
   sed -i '' "s/server_name .*/server_name ${ec2_ip};/g" infra/nginx/prod_http.conf
