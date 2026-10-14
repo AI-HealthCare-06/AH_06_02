@@ -279,7 +279,7 @@
 - **응답 (성공)**: HTTP 202 { success:true, data:{ prediction_id, job_id, status:"pending", model_version, model_experimental, poll_url:"/api/v1/predictions/{prediction_id}" } }. 폴링은 PRED-02 사용
 - **주요 에러**: PRED_ALL_DIAGNOSED(400), HLTH_RECORD_NOT_FOUND(404), HLTH_PROFILE_INCOMPLETE(400), PRED_INPUT_INSUFFICIENT(400), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
 - **관련 요구사항**: REQ-PRED-001·002·007·008 · NFR-PERF-002
-- **사용 테이블**: users 읽기 / health_records 읽기 / predictions 쓰기 / Valkey enqueue
+- **사용 테이블**: users 읽기 / health_records 읽기 / predictions 쓰기 / Redis enqueue
 - **상태**: 확정 — 홍서윤 10/1 / model_experimental 추가 — 2026.10.09 배수빈, 최병주 확인 대기
 
 ### PRED-02 · 예측 상태·결과 조회

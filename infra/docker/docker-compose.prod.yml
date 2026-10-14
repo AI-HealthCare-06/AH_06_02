@@ -1,14 +1,14 @@
 services:
-  # 1. Redis (메시지 브로커 및 캐싱)
-  redis:
-    image: redis:alpine
-    container_name: redis
+  # 1. Valkey (메시지 브로커 및 캐싱)
+  valkey:
+    image: valkey/valkey:alpine
+    container_name: valkey
     networks:
       - ws
     ports:
-      - "${REDIS_PORT}:6379"
+      - "${VALKEY_PORT}:6379"
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: [ "CMD", "valkey-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -59,7 +59,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
 
   # 4. AI Worker (Model 학습 및 추론)
@@ -74,7 +74,7 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
 
   # 5. Nginx (웹 서버 - 요청 리버스 프록시로 전달)

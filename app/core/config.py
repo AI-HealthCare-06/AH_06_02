@@ -42,7 +42,7 @@ class Config(BaseSettings):
     # 원문항 기간·음주 코드·후보 적용에 대한 팀 승인 이후에만 켠다.
     D_DIAGNOSED_ALCOHOL_POLICY_ENABLED: bool = False
     # 서빙 artifact 가 가리키는 원본 질환 모델(<실행>/model.joblib·artifact.json)과 background-<질환>.npy 위치
-    MODEL_DIR: str = "experiment-refit"
+    MODEL_DIR: str = "data/experiment-refit"
 
     # 예측 큐. PRED-01 이 {prediction_id, job_id} 를 LPUSH 하고 ai_worker 가 BRPOP 한다
     VALKEY_URL: str = "redis://localhost:6379/0"

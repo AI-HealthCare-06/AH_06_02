@@ -31,4 +31,4 @@ frontend/node_modules/
 .DS_Store
 
 # SHAP background 는 KNHANES 개인 단위 행을 인코딩한 자료다. 보안서약 대상이라 올리지 않는다
-experiment-refit/*.npy
+data/experiment-refit/*.npy

@@ -108,6 +108,8 @@ echo ""
 # ---------- EC2 내에 배포 준비 파일 복사  ----------
 scp -i ~/.ssh/${ssh_key_file} envs/.prod.env ubuntu@${ec2_ip}:~/project/.env
 scp -i ~/.ssh/${ssh_key_file} infra/docker/docker-compose.prod.yml ubuntu@${ec2_ip}:~/project/docker-compose.yml
+# 모델 아티팩트 전송 (experiment-refit/은 보안서약 대상이라 별도 전달 필요)
+scp -r -i ~/.ssh/${ssh_key_file} data ubuntu@${ec2_ip}:~/project/data
 if [[ "$is_https" == "1" ]] ; then
   # ---------- prod_http.conf 파일의 server_name 자동 수정 ----------
   sed -i '' "s/server_name .*/server_name ${ec2_ip};/g" infra/nginx/prod_http.conf
@@ -134,6 +136,9 @@ ssh -i ~/.ssh/${ssh_key_file} ubuntu@${ec2_ip} \
 
   echo "Docker login"
   docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PAT"
+
+  # valkey가 처음이면 따로 기동
+  docker compose up -d valkey
 
   echo "Deploying services: $DEPLOY_SERVICES"
   docker compose up -d --pull always --no-deps $DEPLOY_SERVICES

@@ -105,7 +105,7 @@
 | 13 | predicted_at | DATETIME | NULL |  |  | 추론 완료 시각 | 확정 |
 | 14 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 요청 접수 시각 | 확정 |
 | 15 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
-| 16 | failure | JSON | NULL |  |  | 작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 그대로 나간다. Valkey 는 TTL 이 지나면 사유가 사라져 다시 조회할 수 없어 컬럼으로 둔다 (NFR-REL-001) | 신규 — 2026.10.09 |
+| 16 | failure | JSON | NULL |  |  | 작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 그대로 나간다. Redis 는 TTL 이 지나면 사유가 사라져 다시 조회할 수 없어 컬럼으로 둔다 (NFR-REL-001) | 신규 — 2026.10.09 |
 
 ### prediction_contributions — 기여요인
 담당 홍서윤 (B) · 8컬럼
@@ -399,7 +399,7 @@
 | 레벨별 필요 경험치 | 테이블로 만들지 않고 코드 상수로 둡니다. levels 테이블을 만들면 13개가 되고 ERD를 다시 그려야 하는데, 레벨 30개짜리 상수 배열이면 밸런스 조정 시 숫자만 바꾸면 됩니다 |
 | XP 지급량 · 공략 점수 | challenges.reward_xp와 progress_value의 실제 값입니다. 컬럼과 타입은 정해져 있어 구조에는 영향이 없고, 4주차에 챌린지 목록을 채울 때 같이 정합니다 (김이경) |
 | XP 갱신 주체 | users는 A만 쓰므로, D는 A가 제공하는 내부 함수로 지급을 요청합니다. 레벨 재계산과 레벨업 판정은 A에서 한 곳으로 모읍니다 |
-| 리프레시 토큰 | Valkey에 저장하기로 하여 테이블을 만들지 않았습니다. 다른 의견 있으면 알려주세요 |
+| 리프레시 토큰 | Redis에 저장하기로 하여 테이블을 만들지 않았습니다. 다른 의견 있으면 알려주세요 |
 | ■ 예시 — 이렇게 채워주시면 됩니다 |  |
 | 컬럼명 | sleep_minutes |
 | 타입 | SMALLINT |

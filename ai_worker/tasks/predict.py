@@ -24,11 +24,10 @@ from app.models.predictions import (
     PredictionStatus,
 )
 from app.models.users import User
+from app.services.predictions import PROBABILITY_FIELDS, RETRY_FAILURE
 
 logger = logging.getLogger(__name__)
 
-PROBABILITY_FIELDS = {Disease.DIABETES: "dm_probability", Disease.HYPERTENSION: "htn_probability"}
-RETRY_FAILURE = {"code": "INTERNAL_ERROR", "message": "예측에 실패했습니다. 다시 시도해주세요.", "retryable": True}
 #: 모델 파일이 없거나 접수 때와 다른 모델이면 다시 시도해도 같다
 MODEL_FAILURE = {
     "code": "INTERNAL_ERROR",

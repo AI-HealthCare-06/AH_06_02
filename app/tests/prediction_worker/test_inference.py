@@ -23,7 +23,7 @@ from ai_worker.tasks.inference import (  # noqa: E402
 )
 
 ROOT = Path(__file__).resolve().parents[3]
-MODEL_DIR = ROOT / "experiment-refit"
+MODEL_DIR = ROOT / "data" / "experiment-refit"
 SERVING = ROOT / "data" / "model" / "artifact.json"
 pytestmark = pytest.mark.skipif(not (MODEL_DIR / "sitting-diabetes-42" / "model.joblib").is_file(), reason="모델 없음")
 

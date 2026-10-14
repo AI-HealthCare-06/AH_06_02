@@ -94,7 +94,6 @@ services:
       VALKEY_URL: redis://valkey:6379/0
     volumes:
       - ./data:/app/data  # 서빙 artifact (data/model/artifact.json)
-      - ./experiment-refit:/app/experiment-refit  # 원본 질환 모델과 background-<질환>.npy. git 에 올리지 않는다
     restart: always
     mem_limit: 4G
     networks:
