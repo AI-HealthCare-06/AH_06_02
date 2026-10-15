@@ -8,7 +8,7 @@ from io import BytesIO
 from pathlib import Path
 
 from fastapi import UploadFile
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 
 from app.core import config
 from app.core.errors import AppError, ErrorCode
@@ -38,11 +38,10 @@ class EvidenceService:
 
         본인의 활성 PHOTO 챌린지인지 검증한다.
         """
-        challenge = await UserChallenge.get_or_none(id=user_challenge_id)
+        # 남의 미션은 없는 미션과 똑같이 404 로 답한다 (에러 코드표: 소유권 위반은 404)
+        challenge = await UserChallenge.get_or_none(id=user_challenge_id, user_id=user.id)
         if not challenge:
             raise AppError(ErrorCode.CHLG_NOT_FOUND, "해당 챌린지를 찾을 수 없습니다.")
-        if challenge.user_id != user.id:
-            raise AppError(ErrorCode.FORBIDDEN, "본인의 챌린지가 아닙니다.")
         if challenge.status != UserChallengeStatus.ACTIVE:
             raise AppError(ErrorCode.CHLG_NOT_ACTIVE, "진행 중인 챌린지가 아닙니다.")
         master = await Challenge.get_or_none(id=challenge.challenge_id)
@@ -90,6 +89,7 @@ class EvidenceService:
                     if image.format != expected:
                         raise ValueError("파일 형식 불일치")
                     image.verify()
+                content = _without_metadata(content, expected)
         except (
             UnidentifiedImageError,
             SyntaxError,
@@ -99,6 +99,8 @@ class EvidenceService:
             Image.DecompressionBombWarning,
         ) as exc:
             raise AppError(ErrorCode.VALIDATION_ERROR, "올바른 JPEG·PNG 사진을 선택해주세요.") from exc
+        if len(content) > MAX_FILE_SIZE:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "파일 크기는 10MB를 초과할 수 없습니다.")
 
         # 비공개 저장
         MEDIA_EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
@@ -125,3 +127,19 @@ class EvidenceService:
         if path.is_symlink() or not path.is_file():
             return False
         return 0 < path.stat().st_size <= MAX_FILE_SIZE
+
+
+def _without_metadata(content: bytes, image_format: str) -> bytes:
+    """픽셀만 남겨 다시 저장한다. EXIF(GPS 위치·기기 정보)와 PNG 텍스트 청크를 지운다.
+
+    지우기 전에 EXIF 방향값을 픽셀에 반영해 사진이 돌아가 보이지 않게 한다.
+    """
+    with Image.open(BytesIO(content)) as image:
+        upright = ImageOps.exif_transpose(image)
+    mode = "RGB" if image_format == "JPEG" else "RGBA"
+    if upright.mode not in ("L", mode):
+        upright = upright.convert(mode)
+    clean = Image.frombytes(upright.mode, upright.size, upright.tobytes())
+    output = BytesIO()
+    clean.save(output, format=image_format, **({"quality": 90} if image_format == "JPEG" else {}))
+    return output.getvalue()
