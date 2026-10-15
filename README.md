@@ -171,8 +171,12 @@ uv run aerich upgrade
 
 ```bash
 uv run uvicorn app.main:app --reload      # API 서버
-uv run python -m ai_worker.main           # AI 워커
+uv run --group app --group model --with 'shap==0.50.0' python -m ai_worker.main   # AI 워커
 ```
+
+워커는 shap 이 lock 에 없어서(`pyproject.toml` model 그룹 주석) 실행할 때 버전을 고정해 붙입니다.
+`data/experiment-refit/` 에 `background-diabetes.npy` · `background-hypertension.npy` 가 있어야 합니다.
+없으면 워커는 켜져 있어도 예측을 모두 실패로 기록합니다. 두 파일은 모델 폴더(드라이브)에서 받습니다.
 
 ---
 
