@@ -35,6 +35,7 @@ class DashboardService:
     async def summary(self, user: User) -> DashboardSummaryResponse:
         """DASH-01. 미진단 질환의 최신 위험도와 직전 예측 대비 변화 (REQ-DASH-001)."""
         risks: list[RiskSummary] = []
+        prediction_id: int | None = None
         for disease in undiagnosed_diseases(user):
             _, column = DISEASE_COLUMNS[disease]
             latest = await self.predictions.latest_done_with(user.id, column, limit=2)
@@ -55,11 +56,15 @@ class DashboardService:
                     predicted_at=latest[0].predicted_at,
                 )
             )
+            # risks를 만든 최신 완료 예측의 id (PRED-03 호출용)
+            if prediction_id is None or latest[0].id > prediction_id:
+                prediction_id = latest[0].id
 
         record = await self.health_records.get_latest(user.id)
         return DashboardSummaryResponse(
             # 두 질환 모두 진단이거나 아직 완료된 예측이 없으면 risks 가 비고 false 다
             prediction_available=bool(risks),
+            prediction_id=prediction_id,
             risks=risks,
             latest_health_record=(
                 LatestHealthRecord(health_record_id=record.id, recorded_at=record.recorded_at) if record else None

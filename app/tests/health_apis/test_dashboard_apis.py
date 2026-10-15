@@ -60,7 +60,7 @@ class TestDashboardSummaryAPI(TestCase):
             response = await client.get("/api/v1/dashboard/summary", headers=_auth(token))
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["data"] == {"prediction_available": False, "risks": [], "latest_health_record": None}
+        assert response.json()["data"] == {"prediction_available": False, "prediction_id": None, "risks": [], "latest_health_record": None}
 
     async def test_latest_risk_with_delta_in_percentage_points(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -84,6 +84,19 @@ class TestDashboardSummaryAPI(TestCase):
         assert risks["diabetes"]["grade"] is None
         assert risks["diabetes"]["predicted_at"].endswith("+09:00")
         assert data["latest_health_record"]["health_record_id"] == second.id
+
+
+    async def test_prediction_id_is_latest_done_prediction(self):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            token, user = await _login(client, "dash-predid@example.com")
+            record = await _record(user, days_ago=1)
+            first = await _prediction(user, record, dm="0.2900", htn="0.3000")
+            second = await _prediction(user, record, dm="0.3125", htn="0.2500")
+            response = await client.get("/api/v1/dashboard/summary", headers=_auth(token))
+
+        data = response.json()["data"]
+        assert data["prediction_id"] == second.id
+        assert data["prediction_id"] != first.id
 
     async def test_delta_is_null_without_previous_prediction(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

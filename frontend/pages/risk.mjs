@@ -38,7 +38,6 @@ const FACTOR_MONSTER = {
   physical_activity_low: "비세라",
   strength_activity_low: "비세라",
   sedentary_time_high: "비세라",
-  sodium_behavior: "소디",
 };
 
 const MEDICAL_NOTICE =
@@ -90,7 +89,7 @@ function factorSection(diseases) {
           const monster = FACTOR_MONSTER[item.factor_key];
           const tag = item.modifiable
             ? monster
-              ? `<span class="factor-monster">${escape(monster)}</span>`
+              ? `<button type="button" class="factor-monster" data-route="monsters">${escape(monster)}</button>`
               : ""
             : '<span class="factor-fixed">바꿀 수 없는 요인</span>';
           return `<div class="factor-card"><strong>${escape(name)}</strong><span class="factor-contrib">${pct}</span>${tag}</div>`;
@@ -151,8 +150,8 @@ ${factors}
       const predictionId = summary?.prediction_id;
       if (predictionId) {
         try {
-          const res = await api(`/predictions/${predictionId}/contributions?limit=3`);
-          contributions = res?.data?.diseases || null;
+          const res = await api(`/predictions/${predictionId}/contributions`);
+          contributions = res?.diseases || null;
         } catch {
           // 기여요인 조회 실패는 화면 전체를 막지 않는다
           contributions = null;
