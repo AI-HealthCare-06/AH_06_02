@@ -65,16 +65,16 @@ const goal = (card) =>
 function monsterCard(item, target = false) {
   const impact = number(item.impact_score);
   const pendingSpike = item.code === "spike" && impact === null;
-  const description = item.code === "viscera"
-    ? "체격·활동 관련 요인"
-    : item.title || "위험요인 캐릭터";
+  const description = item.title || "위험요인 캐릭터";
   const explanation = pendingSpike
     ? '<p class="hint">혈당 입력 여부와 관계없이 위협도 산정이 보류 중이에요.</p>'
-    : item.code === "viscera"
+    : item.code === "viscera" && impact === null
+      ? '<p class="hint">체격·활동 관련 요인의 위협도가 아직 산정되지 않았어요.</p>'
+      : item.code === "viscera"
       ? '<p class="hint">BMI·허리둘레·활동 관련 요인 중 가장 높은 위협도를 표시해요. 추천은 연결된 생활행동 요인을 기준으로 해요.</p>'
       : "";
   return `<${target ? 'div class="target-card"' : `button class="monster-card" data-monster="${item.monster_id}"`}>
-    ${sprite(item.code)}<div><h3>${escape(item.name)} ${badge(item.state)} ${pendingSpike ? '<span class="chip">산정 보류</span>' : ""} ${item.is_target ? '<span class="target-mark">공략 대상</span>' : ""}</h3>
+    ${sprite(item.code)}<div><h3>${escape(item.name)} ${pendingSpike ? '<span class="chip">산정 보류</span>' : badge(item.state)} ${item.is_target ? '<span class="target-mark">공략 대상</span>' : ""}</h3>
     <p>${escape(description)}</p><div class="threat-label">위협도 <b>${impact === null ? "—" : impact}</b></div>
     ${explanation}<div class="threat-rail"><i style="--fill:${impact === null ? 0 : Math.max(0, Math.min(100, impact))}%"></i></div></div></${target ? "div" : "button"}>`;
 }
