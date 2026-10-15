@@ -33,7 +33,7 @@ from app.services.model_artifact import ArtifactLoader, ArtifactSource, ModelArt
 
 MAX_CARDS = 3
 
-#: 1단계 추천에서 빼는 활성 카드. 비활성 2개(스파이크)는 is_enabled 로 빠진다.
+#: 1단계 추천에서 빼는 활성 카드. 비활성 3개(스파이크 2개·영양표시 카드 1개)는 is_enabled 로 빠진다.
 PHASE1_EXCLUDED_CODES = frozenset(
     {
         # 음주·흡연 욕구 발생형. 예정 기회를 미리 만들 수 없다

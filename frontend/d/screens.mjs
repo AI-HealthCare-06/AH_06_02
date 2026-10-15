@@ -315,7 +315,10 @@ export function mountDangoScreens(
             : item.status === "skipped"
               ? "건너뛴 기회"
               : "종료된 기회";
-    return `<article class="slot-wrap"><div class="slot ${done ? "done" : ""}"><div><h4>${escape(title)}</h4><p>${escape(label)}</p></div>${done ? '<span class="badge stable">완료</span>' : ""}</div>${controls}</article>`;
+    const dailyCloseHint = ["오늘 외식 안 하기", "오늘 술 안 마시기", "오늘 안 피우기"].includes(mission.title)
+      ? '<p class="hint">해당 날짜의 하루를 마친 뒤 기록해주세요.</p>'
+      : "";
+    return `<article class="slot-wrap"><div class="slot ${done ? "done" : ""}"><div><h4>${escape(title)}</h4><p>${escape(label)}</p></div>${done ? '<span class="badge stable">완료</span>' : ""}</div>${dailyCloseHint}${controls}</article>`;
   }
   function renderToday() {
     if (!state.missions.length)
