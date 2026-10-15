@@ -29,6 +29,7 @@ app = [
     "httpx>=0.28.1",
     "orjson>=3.11.5",
     "passlib[bcrypt]>=1.7.4",
+    "pillow>=12.0.0",
     "pyjwt>=2.10.1",
     "tortoise-orm>=0.25.3",
     "uvicorn>=0.40.0",

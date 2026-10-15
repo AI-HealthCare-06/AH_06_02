@@ -13,7 +13,7 @@
 | 3 | predictions | 예측 결과 | 최병주 (C) | /predictions | 16 |  |
 | 4 | prediction_contributions | 기여요인 | 최병주 (C) | /predictions | 8 | 신규 — 기여요인을 별도 테이블로 분리 (배수빈 확인 — 10/3, PR #9 머지) |
 | 5 | monsters | 캐릭터 마스터 | 김이경 (D) | /monsters | 11 | 신규 — 도감 상태 저장이 기존 8개 안에 없었음 |
-| 6 | user_monsters | 사용자 캐릭터 상태 | 김이경 (D) | /monsters | 16 | is_target 제거안. 공략 중 여부는 active 주기와 대상 조인에서 계산. 제거안 행 제외 집계. |
+| 6 | user_monsters | 사용자 캐릭터 상태 | 김이경 (D) | /monsters | 17 | is_target 제거안. 공략 중 여부는 active 주기와 대상 조인에서 계산. 제거안 행 제외 집계. |
 | 7 | challenges | 챌린지 마스터 | 김이경 (D) | /challenges | 27 | personalization_policy 추가 제안(10/2). 기존 context_priority는 조건부 후보 순위로 정합화. 새 JSON은 구조 검토 전. |
 | 8 | user_challenges | 사용자 챌린지 | 김이경 (D) | /challenges | 24 | target_user_monster_id→cycle_id FK, cycle_week 저장 제거안. 개인 목표 snapshot 유지·공통 날짜는 주기에서 계산. 제거안 제외. |
 | 9 | challenge_logs | 수행 기록 | 김이경 (D) | /challenges | 17 |  |
@@ -139,7 +139,7 @@
 | 11 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
 
 ### user_monsters — 사용자 캐릭터 상태
-담당 김이경 (D) · 16컬럼
+담당 김이경 (D) · 17컬럼
 
 | No | 컬럼명 | 타입 | NULL | 키 | 기본값 | 설명 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -154,12 +154,13 @@
 | 9 | seal_count | SMALLINT | NN |  | 0 | 누적 봉인 횟수. 도감 기록용 | 확정 |
 | 10 | impact_source | ENUM('contribution','measured','global') | NN |  | 'contribution' | 이 사용자의 위협도를 산출한 실제 방식. contribution=미진단자 SHAP · measured=실측(스파이크) · global=진단자 전역중요도 | 신규 — 9/28 진단자 경로 |
 | 11 | last_prediction_id | BIGINT | NULL | FK |  | → predictions.id · contribution 방식일 때 근거 예측. 진단자·실측은 NULL | 확정 |
-| 12 | last_health_record_id | BIGINT | NULL | FK |  | → health_records.id · measured·global 방식일 때 근거 입력. contribution은 NULL | 신규 — 9/28 진단자 경로 |
+| 12 | last_health_record_id | BIGINT | NULL | FK |  | → health_records.id · 위협도 산정에 사용한 건강기록. contribution·global·measured 모두 기록하며 새 산정 불가 시 기존 참조 보존. | 신규 — 9/28 진단자 경로 |
 | 13 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
 | 14 | weekly_progress | SMALLINT | NN |  | 0 | 이번 주 누적 공략 점수. 챌린지 수행 시 즉시 증가하며 저장값에 상한을 두지 않는다. 100은 화면 게이지의 주간 목표이고 DB 상한이 아니다. 위협도는 건드리지 않는다 (REQ-PRED-011). 100 미달에 불이익은 없고 게임 진행 표시용이다. | 개정 — 2026.10.09 A·D 합의. 저장값 누적, 화면 게이지만 100% 최대 |
 | 15 | progress_week_start | DATE | NULL |  |  | 공략 점수 누적 기준 주 시작일. 해당 주 월요일 날짜를 저장한다. 월요일 00:00 KST에 weekly_progress를 0으로 초기화한다. C의 대시보드 week_start와 같은 달력 주간 기준 | 확정 — 9/29 월요일 기준 |
 |  | is_target | BOOLEAN | NN |  | False | 제거안: 공략 중 여부는 active 주기의 target_user_monster_id에서 계산한다. user_monsters.is_target 저장을 제거해 두 곳의 대상 상태 불일치를 막는다. API 표시 값은 주기 조인으로 계산 가능. | 제거안 — 주기 테이블로 대체. 검토 이력 보존용 행·컬럼 집계 제외 |
 | 16 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
+| 17 | impact_explanation_snapshot | JSON | NULL |  |  | 산정 당시 질환×요인 점수·출처·대표 요인·모델/정책 버전·건강기록/예측 참조·시각. 위협도와 원자적 저장. 기존 행 NULL 유지, 과거 설명 역산 금지. | 추가 — 2026.10.15 D 제안·C 확인, 구현 대기 |
 
 ### challenges — 챌린지 마스터
 담당 김이경 (D) · 27컬럼

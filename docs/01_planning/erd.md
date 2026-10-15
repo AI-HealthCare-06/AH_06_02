@@ -143,6 +143,7 @@ erDiagram
         enum impact_source
         bigint last_prediction_id FK
         bigint last_health_record_id FK
+        json impact_explanation_snapshot
         smallint weekly_progress
         date progress_week_start
         datetime created_at

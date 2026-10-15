@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { withPage } from "./browser-harness.mjs";
 
 /** 예정일·대상 변경·재시도 계약을 실제 DOM과 HTTP 요청으로 확인한다. 응답은 테스트 전용이다. */
-async function fixture(page, { recommendationError } = {}) {
+async function fixture(
+  page,
+  { recommendationError, recommendationReason, impactExplanation } = {},
+) {
   let changed = false;
   const calls = [];
   const targets = () => [
@@ -14,6 +17,7 @@ async function fixture(page, { recommendationError } = {}) {
       name: "비세라",
       state: "rage",
       impact_score: 80,
+      impact_explanation: impactExplanation,
       weekly_progress: 135,
       seal_count: 2,
       is_target: !changed,
@@ -56,6 +60,7 @@ async function fixture(page, { recommendationError } = {}) {
             success: false,
             error: {
               code: "CHLG_RECOMMENDATION_UNAVAILABLE",
+              reason: recommendationReason,
               message: recommendationError,
             },
           },
@@ -175,5 +180,58 @@ test("완료 직후 추천만 두 번 더 호출하고 최종 서버 오류를 �
     await page.getByRole("button", { name: "다시 확인하기" }).click();
     await page.getByText(error, { exact: true }).waitFor();
     assert.equal(generates().length, 4);
+  });
+});
+
+test("추가 후보가 없으면 진행 중인 공략으로 안내하고 재시도하지 않는다", async () => {
+  await withPage(async (page, dUrl) => {
+    const calls = await fixture(page, {
+      recommendationError:
+        "현재 공략 대상에 추가로 추천할 챌린지가 없어요. 진행 중인 챌린지를 이어가세요.",
+      recommendationReason: "no_additional_candidates",
+    });
+    await page.goto(`${dUrl.replace("/frontend/d/", "/frontend/")}#reco`);
+    await page
+      .getByRole("heading", { name: "진행 중인 공략을 이어가세요" })
+      .waitFor();
+    await page.getByRole("button", { name: "진행 중인 공략 보기" }).click();
+    await page.waitForURL("**/#today");
+    assert.equal(
+      calls.filter((call) =>
+        call.path.endsWith("/challenge-recommendations/generate"),
+      ).length,
+      1,
+    );
+  });
+});
+
+test("도감은 서버가 저장한 대표 산정 요인을 표시한다", async () => {
+  await withPage(async (page, dUrl) => {
+    await fixture(page, {
+      impactExplanation: {
+        status: "available",
+        model_version: "stored-test-model",
+        winners: [
+          {
+            disease: "diabetes",
+            factor_key: "bmi_high",
+            score: 80,
+            source: "contribution",
+          },
+          {
+            disease: "hypertension",
+            factor_key: "physical_activity_low",
+            score: 80,
+            source: "global",
+          },
+        ],
+      },
+    });
+    await page.goto(`${dUrl.replace("/frontend/d/", "/frontend/")}#monsters`);
+    await page
+      .getByText(
+        "현재 위협도를 대표하는 요인: 당뇨 · 체질량지수, 고혈압 · 신체활동",
+      )
+      .waitFor();
   });
 });

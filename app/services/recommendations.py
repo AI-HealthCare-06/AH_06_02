@@ -183,12 +183,16 @@ class RecommendationService:
         today = today_kst(current)
         artifact = self.artifact_source()
         if artifact is None:
-            raise AppError(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE)
+            raise AppError(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE, extra={"reason": "model_unavailable"})
 
         await self.cycles.close_expired(user.id, today, current)
         cycle = await self.cycles.get_or_create_for_recommendation(user.id)
         if cycle is None:
-            raise AppError(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE)
+            raise AppError(
+                ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE,
+                message="공략할 수 있는 요인이 아직 산정되지 않았어요.",
+                extra={"reason": "target_unavailable"},
+            )
         monster = await self.cycles.target_monster(cycle)
 
         active = UserChallenge.filter(user_id=user.id, status=UserChallengeStatus.ACTIVE)
@@ -199,7 +203,11 @@ class RecommendationService:
             today=today,
         )
         if slots <= 0:
-            raise AppError(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE)
+            raise AppError(
+                ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE,
+                message="현재 주기에 추가로 시작할 수 있는 챌린지가 없어요. 진행 중인 챌린지를 이어가세요.",
+                extra={"reason": "slots_unavailable"},
+            )
 
         blocked = await self._blocked_challenge_ids(user.id, current)
         candidates = [
@@ -207,6 +215,16 @@ class RecommendationService:
             for challenge in await phase1_candidates()
             if challenge.factor_key in monster.factor_keys and challenge.id not in blocked
         ]
+
+        if not candidates:
+            has_active = await active.filter(cycle_id=cycle.id).exists()
+            reason = "no_additional_candidates" if has_active else "no_eligible_candidates"
+            message = (
+                "현재 공략 대상에 추가로 추천할 챌린지가 없어요. 진행 중인 챌린지를 이어가세요."
+                if has_active
+                else "현재 공략 대상에 추천할 수 있는 챌린지가 없어요."
+            )
+            raise AppError(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE, message=message, extra={"reason": reason})
 
         scores, missing_prediction = await self._factor_scores(user, monster, artifact)
         scored = [
@@ -217,7 +235,11 @@ class RecommendationService:
         if not scored:
             if missing_prediction:
                 raise AppError(ErrorCode.PRED_NOT_FOUND)
-            raise AppError(ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE)
+            raise AppError(
+                ErrorCode.CHLG_RECOMMENDATION_UNAVAILABLE,
+                message="현재 기록으로 추천 조건을 충족하는 챌린지가 없어요.",
+                extra={"reason": "no_positive_factors"},
+            )
 
         scored.sort(key=lambda pair: (-pair[1].score, pair[0].context_priority or 255, pair[0].id))
         items: list[ChallengeRecommendation] = []

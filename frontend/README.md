@@ -128,11 +128,25 @@ PRED 상태는 실제 API의 `pending`·`done`·`failed`를 사용한다. HTTP 2
 
 ## 사진 업로드 연결
 
-사진 업로드 API가 준비되면 C의 함수를 `startApplication`의 `uploadPhoto` 옵션에 전달하거나
-기본 시작 전에 `window.dangoEvidence.uploadPhoto`를 제공한다.
-입력은 File이고 출력은 `{evidence_url: 비공개_참조값}`이다. 업로드 실패 시 수행 로그를 만들지 않는다.
-`api()`에 FormData를 넘길 수 있다. multipart의 Content-Type은 브라우저가 정하므로 직접 붙이지 않는다.
-아직 없는 업로드 API를 있다고 가정해서 호출하지 않는다.
+이 변경은 HLTH-03 서버·참조값 검증과 프론트를 함께 포함한다. 기본값은 활성이다.
+서버가 없는 이전 환경에서는 `window.dangoConfig.evidencePhotosEnabled = false`로 비활성화한다.
+프론트만 분리 배포하지 않는다.
+
+서버가 `POST /api/v1/evidence/photos`를 제공하면 앱 시작 전에
+`window.dangoConfig = { ...window.dangoConfig, evidencePhotosEnabled: true }`로 설정하거나,
+직접 `startApplication(root, { evidencePhotosEnabled: true })`로 시작한다.
+공통 세션의 API 클라이언트가 `photo`와 `user_challenge_id`를 FormData로 전송한다.
+클라이언트에서 JPEG/PNG·빈 파일·최대 10 MiB를 검사하며 서버에서도 검증해야 한다.
+
+C의 별도 업로드 함수를 주입하는 방법도 유지한다.
+`uploadPhoto(file, { userChallengeId, occurrenceId, signal }) -> { evidence_url }` 계약을 따른다.
+`window.dangoEvidence.uploadPhoto`도 같은 인자를 받는다. occurrenceId는 화면 문맥이며
+HLTH-03 multipart 필드에는 포함하지 않는다. multipart Content-Type은 브라우저가 정한다.
+
+비공개 증빙 참조값을 받은 뒤에만 해당 미션의 CHLG-07로 수행 기록을 전송한다.
+업로드 실패·응답 이상·계정 변경·화면 이탈 시에는 새 수행 로그를 만들지 않는다.
+업로드 쓰기 요청을 인증 갱신 후 자동 재전송하지 않는다.
+업로드 파일의 소유권·활성 미션·내용·보관 기간은 C 서버에서 검증해야 한다.
 
 ## 검증
 

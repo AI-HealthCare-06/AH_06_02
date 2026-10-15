@@ -60,12 +60,13 @@ services:
       # environment 가 env_file 보다 우선한다.
       DB_HOST: mysql
       VALKEY_URL: redis://valkey:6379/0
-    command: | 
+    command: |
       sh -c "uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     volumes:
       - ./app:/app/app  # 로컬의 app 디렉토리를 컨테이너의 /app/app에 마운트(수정사항 즉시 반영)
       - ./data:/app/data  # 모델 아티팩트. data/ 는 gitignore 라 이미지에 안 들어간다
       - static_volume:/app/templates
+      - evidence_volume:/app/media/evidence  # API 전용 비공개 증빙 저장소
     restart: always
     ports:
       - "8000:8000"
@@ -120,6 +121,7 @@ services:
 
 volumes:
   mysql_data:
+  evidence_volume:
   static_volume:
 
 networks:

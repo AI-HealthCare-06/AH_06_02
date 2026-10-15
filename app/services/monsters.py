@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Any
 
+from pydantic import ValidationError
+
 from app.core import config
+from app.dtos.impact_explanation import ImpactExplanationSnapshot
 from app.models.challenges import AttackCycleStatus, Monster, MonsterState, UserMonster
 from app.services.attack_cycles import TARGETABLE_STATES, AttackCycleService, today_kst
 from app.services.challenges import week_start_for
@@ -53,6 +56,35 @@ class MonsterService:
                     "seal_count": state.seal_count if state else 0,
                     "reawakened_at": state.reawakened_at if state else None,
                     "impact_source": state.impact_source if state else None,
+                    "impact_explanation": saved_impact_explanation(state),
                 }
             )
         return items
+
+
+def saved_impact_explanation(state: UserMonster | None) -> dict[str, Any]:
+    """산정 점수·출처·참조가 일치하는 snapshot만 도감으로 전달한다."""
+    if state is None or state.impact_score is None:
+        return {"status": "pending", "winners": []}
+    unavailable = {"status": "unavailable", "winners": []}
+    try:
+        snapshot = ImpactExplanationSnapshot.model_validate(state.impact_explanation_snapshot)
+    except ValidationError:
+        return unavailable
+    expected = [item for item in snapshot.candidates if item.score == snapshot.impact_score]
+    if (
+        snapshot.impact_score != state.impact_score
+        or snapshot.impact_source != state.impact_source
+        or snapshot.health_record_id != state.last_health_record_id
+        or snapshot.prediction_id != state.last_prediction_id
+        or max(item.score for item in snapshot.candidates) != snapshot.impact_score
+        or snapshot.winners != expected
+    ):
+        return unavailable
+    return {
+        "status": "available",
+        "model_version": snapshot.model_version,
+        "policy_version": snapshot.policy_version,
+        "calculated_at": snapshot.calculated_at.isoformat(),
+        "winners": [item.model_dump() for item in snapshot.winners],
+    }

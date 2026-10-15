@@ -109,3 +109,20 @@ test("계정 변경이나 화면 이탈 후에는 예약된 재시도를 보내�
     assert.equal(calls, 1);
   }
 });
+
+test("추천 후보 소진이 확인되면 예측 완료 직후에도 재시도하지 않는다", async () => {
+  let calls = 0;
+  const ready = new PredictionReadiness({ wait: async () => {} });
+  ready.markDone({ status: "done", prediction_id: 501 });
+  await assert.rejects(
+    ready.request(async () => {
+      calls++;
+      throw {
+        status: 409,
+        code: "CHLG_RECOMMENDATION_UNAVAILABLE",
+        details: { reason: "no_additional_candidates" },
+      };
+    }),
+  );
+  assert.equal(calls, 1);
+});

@@ -5,9 +5,12 @@ from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 import pytest
+from httpx import ASGITransport, AsyncClient
 from tortoise.contrib.test import TestCase
 
 from app.core.errors import AppError
+from app.dependencies.security import get_request_user
+from app.main import app
 from app.models.challenges import DefaultImpactSource, ImpactSource, Monster, MonsterState, UserMonster
 from app.models.health_records import HealthRecord, InputMode
 from app.models.predictions import ContributionDirection, Disease, Prediction, PredictionContribution, PredictionStatus
@@ -15,6 +18,7 @@ from app.models.users import User
 from app.services.attack_cycles import AttackCycleService
 from app.services.impacts import ImpactService, impact_state
 from app.services.model_artifact import FactorReference, ModelArtifact
+from app.services.monsters import saved_impact_explanation
 from scripts.seed.seed_challenges import DEFAULT_CSV, parse_rows, read_csv, upsert_challenges
 
 NOW = datetime(2026, 10, 7, 12, tzinfo=ZoneInfo("Asia/Seoul"))
@@ -214,3 +218,76 @@ class TestImpactService(TestCase):
         with pytest.raises(AppError):
             await ImpactService(lambda: artifact()).from_prediction(user.id + 1, prediction.id)
         assert await UserMonster.all().count() == 0
+
+
+class TestImpactExplanation(TestCase):
+    setup_data = TestImpactService.setup_data
+    prediction = TestImpactService.prediction
+
+    async def test_snapshot_keeps_tied_factors_and_api_uses_saved_model(self):
+        user, record, monster = await self.setup_data(factors=("smoking_current", "physical_activity_low"))
+        prediction = await self.prediction(
+            user, record, {"smoking_current": Decimal("0.08"), "physical_activity_low": Decimal("0.08")}
+        )
+        await ImpactService(lambda: artifact(("smoking_current", "physical_activity_low"))).from_prediction(
+            user.id, prediction.id
+        )
+        row = await UserMonster.get(user_id=user.id, monster_id=monster.id)
+        assert row.impact_explanation_snapshot["model_version"] == VERSION
+        winners = row.impact_explanation_snapshot["winners"]
+        assert len(winners) == 4
+        app.dependency_overrides[get_request_user] = lambda: user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.get("/api/v1/monsters/me")
+            explanation = response.json()["data"]["items"][0]["impact_explanation"]
+            assert explanation["status"] == "available"
+            assert explanation["model_version"] == VERSION
+            assert len(explanation["winners"]) == 4
+        finally:
+            app.dependency_overrides.clear()
+
+    async def test_legacy_and_mismatched_snapshot_do_not_guess_factors(self):
+        user, record, monster = await self.setup_data()
+        row = await UserMonster.create(user_id=user.id, monster_id=monster.id, impact_score=80, state=MonsterState.RAGE)
+        assert saved_impact_explanation(row) == {"status": "unavailable", "winners": []}
+        prediction = await self.prediction(user, record, {"smoking_current": Decimal("0.08")})
+        await ImpactService(lambda: artifact()).from_prediction(user.id, prediction.id)
+        await row.refresh_from_db()
+        row.impact_score = 79
+        assert saved_impact_explanation(row)["status"] == "unavailable"
+        row.impact_score = None
+        assert saved_impact_explanation(row)["status"] == "pending"
+
+    async def test_pending_new_input_preserves_old_score_and_explanation(self):
+        user, record, monster = await self.setup_data()
+        prediction = await self.prediction(user, record, {"smoking_current": Decimal("0.08")})
+        service = ImpactService(lambda: artifact())
+        await service.from_prediction(user.id, prediction.id)
+        row = await UserMonster.get(user_id=user.id, monster_id=monster.id)
+        snapshot = row.impact_explanation_snapshot
+        latest = await HealthRecord.create(
+            user_id=user.id, recorded_at=NOW + timedelta(days=1), input_mode=InputMode.SIMPLE
+        )
+        await service.from_health_record(user.id, latest.id)
+        await row.refresh_from_db()
+        assert row.impact_score == 80
+        assert row.impact_explanation_snapshot == snapshot
+        assert saved_impact_explanation(row)["model_version"] == VERSION
+
+    async def test_zero_and_global_scores_keep_their_original_sources(self):
+        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
+        user, record, monster = await self.setup_data(diagnosed=True)
+        await ImpactService(lambda: artifact()).from_health_record(user.id, record.id)
+        row = await UserMonster.get(user_id=user.id, monster_id=monster.id)
+        assert saved_impact_explanation(row)["status"] == "available"
+        assert {item["source"] for item in row.impact_explanation_snapshot["winners"]} == {"global"}
+        assert row.impact_score == 60
+        user.dm_diagnosed = False
+        user.htn_diagnosed = False
+        await user.save()
+        prediction = await self.prediction(user, record, {"smoking_current": Decimal("-0.08")})
+        await ImpactService(lambda: artifact()).from_prediction(user.id, prediction.id)
+        await row.refresh_from_db()
+        assert row.impact_score == 0
+        assert saved_impact_explanation(row)["status"] == "available"

@@ -7,7 +7,7 @@
 import math
 from collections.abc import Callable
 from datetime import datetime
-from typing import TypedDict
+from typing import Any, TypedDict
 
 from tortoise.transactions import in_transaction
 
@@ -134,11 +134,14 @@ class ImpactService:
         mapped = {card.factor_key for card in await phase1_candidates()}
         updated = 0
         for monster in await Monster.filter(is_enabled=True).order_by("no"):
+            factor_details: list[dict[str, Any]] = []
             if monster.default_impact_source == DefaultImpactSource.MEASURED:
                 score = self.measured_scorer(record) if self.measured_scorer else None
                 source = ImpactSource.MEASURED
             else:
-                score, source = self._contribution_score(monster, user, record, artifact, prediction, signed, mapped)
+                score, source = self._contribution_score(
+                    monster, user, record, artifact, prediction, signed, mapped, factor_details
+                )
             if score is None:
                 # 결과 부재는 갱신 실패/미평가다. 이전 성공 이력을 현재 입력의 결과로 다시 저장하지 않는다.
                 # 첫 측정 전은 도감이 기본 unmeasured로 보여준다. 기존 값은 그 출처와 함께 남긴다.
@@ -158,6 +161,23 @@ class ImpactService:
                 state=row.state,
                 impact_score=score,
                 impact_source=source,
+                impact_explanation_snapshot={
+                    "schema_version": "v1",
+                    "policy_version": "max-factor-v1",
+                    "model_version": artifact.model_version,
+                    "calculated_at": current.isoformat(),
+                    "health_record_id": record.id,
+                    "prediction_id": prediction.id if prediction and source == ImpactSource.CONTRIBUTION else None,
+                    "contribution_prediction_id": prediction.id
+                    if prediction and any(item["source"] == "contribution" for item in factor_details)
+                    else None,
+                    "impact_score": score,
+                    "impact_source": str(source),
+                    "candidates": factor_details,
+                    "winners": [item for item in factor_details if item["score"] == score],
+                }
+                if artifact and factor_details
+                else None,
                 last_health_record_id=record.id,
                 last_prediction_id=prediction.id if prediction and source == ImpactSource.CONTRIBUTION else None,
                 resolved_at=row.resolved_at,
@@ -177,6 +197,7 @@ class ImpactService:
         prediction: Prediction | None,
         signed: dict[tuple[Disease, str], float],
         mapped: set[str],
+        factor_details: list[dict[str, Any]] | None = None,
     ) -> tuple[int | None, ImpactSource]:
         if artifact is None:
             return None, ImpactSource.CONTRIBUTION
@@ -204,6 +225,10 @@ class ImpactService:
                         return None, source
                     continue
                 values.append((value, source))
+                if factor_details is not None:
+                    factor_details.append(
+                        {"disease": str(disease), "factor_key": factor, "score": value, "source": str(source)}
+                    )
         if not values:
             return None, ImpactSource.CONTRIBUTION
         # 합산으로 100 초과·factor 수에 따른 유리함을 만들지 않는다. 최대 요인을 대표값으로 제안한다.
