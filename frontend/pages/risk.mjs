@@ -11,6 +11,35 @@ const DISEASES = [
   { disease: "hypertension", prefix: "htn", icon: "♡", label: "고혈압" },
 ];
 
+/** factor_key → 한글 라벨 */
+const FACTOR_LABELS = {
+  age: "나이",
+  sex: "성별",
+  family_history_dm: "당뇨 가족력",
+  family_history_htn: "고혈압 가족력",
+  bmi_high: "높은 체질량지수",
+  waist_high: "높은 허리둘레",
+  physical_activity_low: "낮은 신체활동",
+  strength_activity_low: "낮은 근력활동",
+  sedentary_time_high: "긴 좌식시간",
+  smoking_current: "흡연",
+  alcohol_frequency: "음주 빈도",
+  alcohol_amount: "음주량",
+  sodium_behavior: "나트륨 섭취 습관",
+};
+
+/** factor_key → 연결된 몬스터 */
+const FACTOR_MONSTER = {
+  alcohol_frequency: "알데",
+  alcohol_amount: "알데",
+  smoking_current: "코티니",
+  bmi_high: "비세라",
+  waist_high: "비세라",
+  physical_activity_low: "비세라",
+  strength_activity_low: "비세라",
+  sedentary_time_high: "비세라",
+};
+
 const MEDICAL_NOTICE =
   '<div class="notice"><b>의료 고지</b><p>이 서비스는 의학적 진단·치료를 대신하지 않습니다.<br>정확한 평가는 의료 전문가와 상담해 주세요.</p></div>';
 
@@ -41,17 +70,50 @@ function tile({ icon, label }, risk, isManaged) {
   return `<article class="risk-tile"><span>${icon} ${label} 위험</span><strong>${percent}<small>%</small></strong><p>${escape(meta.join(" · "))}</p></article>`;
 }
 
+/** PRED-03 기여요인 Top3 렌더링 (increase만, 질환별) */
+function factorSection(diseases) {
+  if (!diseases || !diseases.length) return "";
+  const sections = diseases
+    .map(({ disease, items }) => {
+      const found = DISEASES.find((d) => d.disease === disease);
+      const label = (found || {}).label || disease;
+      const increases = (items || [])
+        .filter((item) => item.direction === "increase")
+        .sort((a, b) => b.contribution - a.contribution)
+        .slice(0, 3);
+      if (!increases.length) return "";
+      const cards = increases
+        .map((item) => {
+          const name = FACTOR_LABELS[item.factor_key] || item.factor_key;
+          const value = item.contribution * 100;
+          const pct = value < 0.1 ? "+0.1%p 미만" : `+${value.toFixed(1)}%p`;
+          const monster = FACTOR_MONSTER[item.factor_key];
+          const tag = item.modifiable
+            ? monster
+              ? `<button type="button" class="factor-monster" data-route="monsters">${escape(monster)}</button>`
+              : ""
+            : '<span class="factor-fixed">바꿀 수 없는 요인</span>';
+          return `<div class="factor-card"><strong>${escape(name)}</strong><span class="factor-contrib">${pct}</span>${tag}</div>`;
+        })
+        .join("");
+      return `<h3>${escape(label)} 주요 요인</h3><div class="factor-list">${cards}</div>`;
+    })
+    .join("");
+  if (!sections) return "";
+  return `<h2>지금, 이 요인에 주목해 보세요</h2><p class="small-copy">내 위험도를 올린 요인이에요.</p>${sections}`;
+}
+
 /**
  * 현재 위험도. v4 시안 risk 화면에서 예시 수치를 빼고 DASH-01 결과로 채운다.
- * 기여 요인(PRED-03)은 1단계에서 빼고 D 도감·추천으로 잇는다. 추이(DASH-02)는 2단계다.
- * 예측 완료 뒤에는 waiting 이 추천으로 보낸다. 이 화면은 하단 메뉴로 직접 들어온다.
+ * 기여 요인(PRED-03)은 DASH-01의 prediction_id로 조회해 질환별 Top3(increase)를 표시한다.
+ * 추이(DASH-02)는 2단계다. 예측 완료 뒤에는 waiting 이 추천으로 보낸다. 이 화면은 하단 메뉴로 직접 들어온다.
  */
 export function mount({ root, ui, api, router, route, signal }) {
   root.innerHTML = `<section class="risk"><h1>${escape(route.title)}</h1><div data-body></div>${MEDICAL_NOTICE}</section>`;
   const body = root.querySelector("[data-body]");
   const unbindRoutes = bindRoutes(root, router);
 
-  function render(user, summary) {
+  function render(user, summary, contributions) {
     const latest = summary.latest_health_record;
     const byDisease = Object.fromEntries((summary.risks || []).map((risk) => [risk.disease, risk]));
     const flags = DISEASES.map((item) => managed(user, item.prefix));
@@ -68,9 +130,10 @@ export function mount({ root, ui, api, router, route, signal }) {
     else if (shown.length) lead = '<p class="small-copy">먼저 공략할 요인을 찾아봐요.</p>';
     else
       lead = `<p class="small-copy">아직 완료된 예측이 없어요.</p>${latest ? `<button type="button" class="primary" data-route="waiting?record_id=${latest.health_record_id}">최근 기록으로 예측 요청하기 ${ARROW}</button>` : ""}`;
+    const factors = factorSection(contributions);
     body.innerHTML = `${caption}${lead}
 <div class="risk-grid">${DISEASES.map((item, index) => tile(item, byDisease[item.disease], flags[index])).join("")}</div>
-<h2>지금, 이 요인에 주목해 보세요</h2><p class="small-copy">생활습관과 연결된 요인을 함께 살펴봐요.</p>
+${factors}
 <button type="button" class="primary" data-route="monsters">내 위험요인 보기 ${ARROW}</button>
 <button type="button" class="secondary" data-route="reco">챌린지 고르기</button>`;
   }
@@ -83,7 +146,19 @@ export function mount({ root, ui, api, router, route, signal }) {
         api("/users/me"),
         api("/dashboard/summary"),
       ]);
-      if (!signal.aborted) render(user, summary);
+      // PRED-03 기여요인 조회 (prediction_id가 있을 때만)
+      let contributions = null;
+      const predictionId = summary?.prediction_id;
+      if (predictionId) {
+        try {
+          const res = await api(`/predictions/${predictionId}/contributions`);
+          contributions = res?.diseases || null;
+        } catch {
+          // 기여요인 조회 실패는 화면 전체를 막지 않는다
+          contributions = null;
+        }
+      }
+      if (!signal.aborted) render(user, summary, contributions);
     } catch (error) {
       if (signal.aborted || error.name === "AbortError") return;
       body.replaceChildren(

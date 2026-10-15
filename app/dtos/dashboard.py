@@ -25,6 +25,7 @@ class LatestHealthRecord(BaseModel):
 
 class DashboardSummaryResponse(BaseModel):
     prediction_available: bool
+    prediction_id: int | None
     risks: list[RiskSummary]
     latest_health_record: LatestHealthRecord | None
 
