@@ -381,7 +381,7 @@ export function mountDangoScreens(
         .map(([key]) => `<li>${badge(key)}</li>`)
         .join(
           "",
-        )}</ul><p class="legend-note">위협도 0은 현재 기여 없음, 값이 없으면 미측정이에요. 28일 기간 종료로 새 봉인이 생기지는 않아요.</p></div>
+        )}</ul><p class="legend-note">위협도 0은 현재 기여 없음, 값이 없으면 미측정이에요. 스파이크는 혈당 입력 여부와 관계없이 위협도 산정이 보류되어 미측정으로 표시돼요. 28일 기간 종료로 새 봉인이 생기지는 않아요.</p></div>
       <button class="primary" data-route="reco">챌린지 고르기</button>`;
   }
   function render() {

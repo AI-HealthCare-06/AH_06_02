@@ -40,7 +40,7 @@ ${stepperHtml("health3")}
 <h2 class="section-gap">지질</h2>
 <div class="measurement-fields">${field("triglyceride", "중성지방", "mg/dL")}${field("hdl", "HDL", "mg/dL")}</div>
 <div class="guide-card"><span class="sprite spike" aria-hidden="true"></span><p>혈당 정보는 저장해요.<br><b>스파이크 위협도는 산정 기준이 정해진 뒤 보여드려요.</b></p></div>
-<p class="skip-note">이 단계는 건너뛸 수 있어요. 비워두면 간편 모드로 저장되고, 스파이크는 미측정으로 남아요.</p>
+<p class="skip-note">이 단계는 건너뛸 수 있어요. 비워두면 간편 모드로 저장돼요. 혈당을 입력해도 스파이크 위협도는 아직 표시되지 않아요.</p>
 <div data-feedback aria-live="polite"></div>
 <button class="primary" type="submit">저장하고 예측하기</button>
 </form>
