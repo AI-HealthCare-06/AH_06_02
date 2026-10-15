@@ -7,8 +7,8 @@
 대화형 추천 기록(challenge_recommendations.conversation_snapshot)도 같이 비운다.
 D 테이블이지만 지우는 시점이 이 배치라 table-spec 에서 A 작업으로 잡혀 있다 (REQ-CHLG-012).
 
-챌린지 인증 사진(NFR-SEC-005)은 아직 범위 밖이다. 업로드(HLTH-03)가 구현되지 않아
-challenge_logs.evidence_url 에 지울 대상이 없다. 업로드와 저장소가 정해지면 여기에 붙인다.
+챌린지 인증 사진도 같은 시점에 지운다 (REQ-USER-009 · NFR-SEC-005). 파일은 HLTH-03 저장소의
+EvidenceService 가 지우고, 참조값 challenge_logs.evidence_url 은 비운다. 수행 기록 자체는 남긴다.
 """
 
 import secrets
@@ -16,8 +16,9 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from app.core.utils.security import hash_password
-from app.models.challenges import ChallengeRecommendation
+from app.models.challenges import ChallengeLog, ChallengeRecommendation, UserChallenge
 from app.repositories.user_repository import UserRepository
+from app.services.evidence import EvidenceService
 
 
 @dataclass(frozen=True)
@@ -34,9 +35,10 @@ class PurgeResult:
 class RetentionService:
     def __init__(self) -> None:
         self.users = UserRepository()
+        self.evidence = EvidenceService()
 
     async def purge_withdrawn(self, now: datetime | None = None, dry_run: bool = False) -> PurgeResult:
-        """기한이 지난 탈퇴 계정의 이메일·닉네임·비밀번호 해시와 대화 기록을 지운다.
+        """기한이 지난 탈퇴 계정의 이메일·닉네임·비밀번호 해시와 대화 기록·인증 사진을 지운다.
 
         now 를 주면 그 시각 기준으로 본다. 테스트와 수동 실행에서 쓴다.
         dry_run 이면 대상만 세고 쓰지 않는다.
@@ -49,6 +51,11 @@ class RetentionService:
         for user in targets:
             # 식별정보보다 먼저 지운다. 중간에 멈춰도 계정이 아직 대상이라 다음 실행에서 다시 걸린다
             await ChallengeRecommendation.filter(user_id=user.id).update(conversation_snapshot=None)
+            self.evidence.delete_user_photos(user.id)
+            missions = await UserChallenge.filter(user_id=user.id).values_list("id", flat=True)
+            await ChallengeLog.filter(user_challenge_id__in=missions, evidence_url__isnull=False).update(
+                evidence_url=None
+            )
             # 아무도 모르는 값이라 이 해시로는 로그인할 수 없다. 컬럼 형식은 그대로 둔다
             await self.users.purge_identifiers(user, hash_password(secrets.token_urlsafe(32)))
             purged.append(user.id)

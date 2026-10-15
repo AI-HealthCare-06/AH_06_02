@@ -115,6 +115,21 @@ class EvidenceService:
 
         return evidence_url, uploaded_at
 
+    def delete_user_photos(self, user_id: int) -> int:
+        """탈퇴 파기용. 그 사용자의 증빙 파일을 모두 지우고 지운 개수를 돌려준다.
+
+        파일 이름 규칙(사용자_미션_토큰)으로 찾으므로 DB 참조가 먼저 지워져도 남는 파일이 없다.
+        """
+        if not MEDIA_EVIDENCE_DIR.is_dir():
+            return 0
+        pattern = re.compile(rf"{user_id}_\d+_[0-9a-f]{{32}}\.(?:jpg|png)")
+        removed = 0
+        for path in MEDIA_EVIDENCE_DIR.iterdir():
+            if pattern.fullmatch(path.name) and path.is_file() and not path.is_symlink():
+                path.unlink()
+                removed += 1
+        return removed
+
     async def verify_reference(self, user_id: int, user_challenge_id: int, reference: str | None) -> bool:
         """D 수행 기록에서 사용한다. 사용자·미션이 일치하는 실제 비공개 파일만 인정한다."""
         if not isinstance(reference, str):

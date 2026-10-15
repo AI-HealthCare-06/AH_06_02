@@ -6,9 +6,12 @@
 컨테이너가 여러 대여도 중복 실행이 데이터를 망가뜨리지 않는다. 이미 지운 계정은
 다시 고르지 않으므로 여러 번 돌려도 결과가 같다.
 
-지우는 것은 users 의 email·nickname·password_hash 와 challenge_recommendations 의
-conversation_snapshot 이다 (REQ-USER-009 · REQ-CHLG-012). 행은 남기고 건강기록과
-예측 결과도 지우지 않는다. 챌린지 인증 사진은 업로드(HLTH-03)가 아직 없어 범위 밖이다.
+지우는 것은 users 의 email·nickname·password_hash, challenge_recommendations 의
+conversation_snapshot, 챌린지 인증 사진 파일과 challenge_logs.evidence_url 이다
+(REQ-USER-009 · REQ-CHLG-012 · NFR-SEC-005). 행은 남기고 건강기록과 예측 결과도 지우지 않는다.
+
+사진은 fastapi 컨테이너의 evidence_volume 에만 있으므로 그 컨테이너 안에서 돌린다.
+    docker exec fastapi uv run python -m scripts.purge_withdrawn
 """
 
 import argparse

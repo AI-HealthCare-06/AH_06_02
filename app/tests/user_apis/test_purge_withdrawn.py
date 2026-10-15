@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 import pytest
@@ -6,7 +8,14 @@ from tortoise.contrib.test import TestCase
 
 from app.core import config
 from app.core.utils.security import hash_password, verify_password
-from app.models.challenges import ChallengeRecommendation, RecommendationSourceType
+from app.models.challenges import (
+    Challenge,
+    ChallengeLog,
+    ChallengeRecommendation,
+    RecommendationSourceType,
+    UserChallenge,
+    VerificationMethod,
+)
 from app.models.users import User, UserStatus
 from app.repositories.user_repository import (
     PURGE_AFTER_DAYS,
@@ -153,3 +162,57 @@ class TestPurgeWithdrawn(TestCase):
         purged = await User.get(id=user.id)
         assert purged.email == f"withdrawn-{user.id}{PURGED_EMAIL_SUFFIX}"
         assert purged.nickname == PURGED_NICKNAME
+
+    async def test_deletes_evidence_photos_and_references_of_purged_accounts_only(self):
+        # REQ-USER-009: 챌린지 인증 사진도 식별정보와 같은 시점에 지운다
+        old = await make_user("photo-old@example.com", withdrawn_days_ago=PURGE_AFTER_DAYS + 1)
+        recent = await make_user("photo-recent@example.com", withdrawn_days_ago=PURGE_AFTER_DAYS - 1)
+        with TemporaryDirectory() as directory, patch("app.services.evidence.MEDIA_EVIDENCE_DIR", Path(directory)):
+            old_log = await make_photo_log(old, Path(directory), "a" * 32)
+            recent_log = await make_photo_log(recent, Path(directory), "b" * 32)
+            # 앞자리만 같은 다른 사용자 번호의 파일은 지우면 안 된다 (예: 1 과 12)
+            lookalike = Path(directory) / f"{old.id}0_1_{'c' * 32}.jpg"
+            lookalike.write_bytes(b"photo")
+
+            await RetentionService().purge_withdrawn()
+
+            assert sorted(path.name for path in Path(directory).iterdir()) == sorted(
+                [lookalike.name, recent_log.evidence_url.removeprefix("evidence://")]
+            )
+        assert (await ChallengeLog.get(id=old_log.id)).evidence_url is None
+        assert (await ChallengeLog.get(id=recent_log.id)).evidence_url == recent_log.evidence_url
+
+    async def test_dry_run_keeps_evidence_photos(self):
+        user = await make_user("photo-dry@example.com", withdrawn_days_ago=PURGE_AFTER_DAYS + 1)
+        with TemporaryDirectory() as directory, patch("app.services.evidence.MEDIA_EVIDENCE_DIR", Path(directory)):
+            log = await make_photo_log(user, Path(directory), "d" * 32)
+
+            await RetentionService().purge_withdrawn(dry_run=True)
+
+            assert len(list(Path(directory).iterdir())) == 1
+        assert (await ChallengeLog.get(id=log.id)).evidence_url == log.evidence_url
+
+
+async def make_photo_log(user: User, directory: Path, token: str) -> ChallengeLog:
+    """사진 인증 기록 한 건과 그 비공개 파일. 파일 이름 규칙은 EvidenceService 와 같다."""
+    card = await Challenge.create(
+        code=f"purge-photo-{token[:4]}", title="사진", category="diet", goal_type="boolean", verification_type="photo"
+    )
+    today = datetime.now(config.TIMEZONE).date()
+    mission = await UserChallenge.create(
+        user_id=user.id,
+        challenge_id=card.id,
+        start_date=today,
+        end_date=today + timedelta(days=27),
+        duration_days_snapshot=28,
+        daily_target_count_snapshot=1,
+    )
+    filename = f"{user.id}_{mission.id}_{token}.jpg"
+    (directory / filename).write_bytes(b"photo")
+    return await ChallengeLog.create(
+        user_challenge_id=mission.id,
+        log_date=today,
+        occurred_at=datetime.now(config.TIMEZONE),
+        verification_method=VerificationMethod.PHOTO,
+        evidence_url=f"evidence://{filename}",
+    )
