@@ -27,7 +27,7 @@ def evaluate() -> dict[str, Any]:
         EvidenceCard.model_validate(card.model_dump() | {"status": "approved", "approved_by": "평가 fixture"})
         for card in draft
     ]
-    cases = json.loads((FOLDER / "golden-cases-20261012.json").read_text())
+    cases = json.loads((FOLDER / "golden-cases-20261012.json").read_text(encoding="utf-8"))
     results = []
     for case in cases:
         answers = SituationAnswers.model_validate(case["answers"])
@@ -67,7 +67,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=FOLDER / "evaluation-fixture-20261012.json")
     args = parser.parse_args()
     report = evaluate()
-    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+    args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"평가 fixture: {report['passed']}/{report['total']} 통과. 실제 LLM·운영 승인 평가는 별도입니다.")
     if report["passed"] != report["total"]:
         raise SystemExit(1)

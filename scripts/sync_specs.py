@@ -294,8 +294,8 @@ def main() -> int:
         workbook.close()
 
         target = args.out / out_name
-        before = target.read_text() if target.exists() else ""
-        target.write_text(text)
+        before = target.read_text(encoding="utf-8") if target.exists() else ""
+        target.write_text(text, encoding="utf-8")
         mark = "그대로" if before == text else f"{len(before)} → {len(text)}자"
         print(f"{out_name:<20} ← {path.name}  ({mark})")
 

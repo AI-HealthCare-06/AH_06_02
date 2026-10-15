@@ -29,7 +29,9 @@ from scripts.seed.seed_challenges import DEFAULT_CSV, parse_rows, read_csv, upse
 
 
 class TestDStartContracts(TestCase):
-    async def prepare(self, client: AsyncClient) -> tuple[User, dict[str, str], UserAttackCycle]:
+    async def prepare(
+        self, client: AsyncClient, factor_keys: list[str] | None = None
+    ) -> tuple[User, dict[str, str], UserAttackCycle]:
         await client.post("/api/v1/auth/signup", json=signup_body(email="d-contract@example.com"))
         response = await client.post(
             "/api/v1/auth/login", json={"email": "d-contract@example.com", "password": "dango1234"}
@@ -37,12 +39,12 @@ class TestDStartContracts(TestCase):
         user = await User.get(email="d-contract@example.com")
         headers = {"Authorization": f"Bearer {response.json()['data']['access_token']}"}
         await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
-        cycle = await make_cycle(user.id, ["physical_activity_low", "smoking_current"])
+        cycle = await make_cycle(user.id, factor_keys or ["physical_activity_low", "smoking_current"])
         return user, headers, cycle
 
     async def test_disabled_card_rejects_start_without_creating_missions(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            user, headers, cycle = await self.prepare(client)
+            user, headers, cycle = await self.prepare(client, ["sodium_behavior"])
             challenge = await Challenge.get(code="CH_CHECK_LABEL")
             challenge.is_enabled = True
             await challenge.save()
