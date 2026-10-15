@@ -1,6 +1,6 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-14 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-15 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -77,9 +77,9 @@
 | 테이블 | 쓰기 (INSERT/UPDATE) | 읽기 | 담당 영역 | 비고 |
 | --- | --- | --- | --- | --- |
 | users | 배수빈 (A) | 전원 | 회원·인증 | XP 지급은 A가 grant_xp()로 제공. D가 직접 UPDATE 하지 않는다 |
-| health_records | 최병주 (C) | 홍서윤 (B) · 김이경 (D) | 건강정보 | B는 예측 입력으로, D는 진단 질환의 챌린지 추천·실측 위협도 산출로 읽는다. D가 의존하는 필드는 아래 '읽기 계약' 참고 |
-| predictions | 홍서윤 (B) | 최병주 (C) · 김이경 (D) | 예측 | C는 대시보드 추이, D는 추천 근거로 읽는다 |
-| prediction_contributions | 홍서윤 (B) | 김이경 (D) | 예측 | D는 factor_key로 챌린지를 매칭할 때 읽는다 |
+| health_records | 최병주 (C) | 김이경 (D) | 건강정보 | D는 진단 질환의 챌린지 추천·실측 위협도 산출로 읽는다. D가 의존하는 필드는 아래 '읽기 계약' 참고 |
+| predictions | 최병주 (C) | 김이경 (D) | 예측 | D는 추천 근거로 읽는다 |
+| prediction_contributions | 최병주 (C) | 김이경 (D) | 예측 | D는 factor_key로 챌린지를 매칭할 때 읽는다 |
 | monsters | 김이경 (D) | 전원 | 도감 | 마스터 데이터. 시드로 관리하고 운영 중 변경 없음 |
 | user_monsters | 김이경 (D) | — | 도감 | 위협도 갱신은 B가 예측 저장 직후 refresh_impact_from_prediction()을 호출해 D가 쓴다 |
 | challenges | 김이경 (D) | — | 챌린지 | 마스터 데이터 |
@@ -99,10 +99,10 @@
 | 함수 | 제공 | 호출 | 호출 시점 | 인자 | 반환 |
 | --- | --- | --- | --- | --- | --- |
 | grant_xp() | 배수빈 (A) | 김이경 (D) | 챌린지 로그가 reward_eligible=TRUE로 저장된 직후 | user_id, amount, source('challenge'\|'seal'\|'bonus') | { level_up: bool, new_level: int, total_xp: int } |
-| refresh_impact_from_prediction() | 김이경 (D) | 홍서윤 (B) | predictions와 prediction_contributions 저장이 끝난 직후. 미진단 질환 경로 | user_id, prediction_id | { updated: int, sealed: [monster_code] } |
+| refresh_impact_from_prediction() | 김이경 (D) | 최병주 (C) | predictions와 prediction_contributions 저장이 끝난 직후. 미진단 질환 경로 | user_id, prediction_id | { updated: int, sealed: [monster_code] } |
 | refresh_impact_from_health_record() | 김이경 (D) | 최병주 (C) | health_records 저장이 끝난 직후. 항상 호출한다 — 질환별 진단 여부 분기는 D 내부에서 한다 | user_id, health_record_id | { updated: int, sealed: [monster_code] } |
-| get_top_contributions() | 홍서윤 (B) | 김이경 (D) | 미진단 질환의 챌린지 추천 카드 3장을 만들 때 | prediction_id, disease, limit | [{ factor_key, contribution, direction, rank }] |
-| get_global_importance() | 홍서윤 (B) | 김이경 (D) | 진단 질환의 챌린지 추천·위협도 산출. 모델 버전당 고정값이라 캐시 가능 | disease, limit | [{ factor_key, importance, normalized_score, rank, model_version }] |
+| get_top_contributions() | 최병주 (C) | 김이경 (D) | 미진단 질환의 챌린지 추천 카드 3장을 만들 때 | prediction_id, disease, limit | [{ factor_key, contribution, direction, rank }] |
+| get_global_importance() | 최병주 (C) | 김이경 (D) | 진단 질환의 챌린지 추천·위협도 산출. 모델 버전당 고정값이라 캐시 가능 | disease, limit | [{ factor_key, importance, normalized_score, rank, model_version }] |
 | ※ 함수 시그니처가 바뀌면 제공하는 쪽이 채널에 먼저 올립니다. 호출하는 쪽이 먼저 바꾸지 않습니다. |  |  |  |  |  |
 
 ## A · 회원·인증 · 11개
@@ -254,7 +254,7 @@
 
 ## B · 예측·모델
 
-담당 홍서윤 · [배수빈 -> 초안 작성하였습니다. 확인 후 확정 부탁드립니다. ]
+담당 최병주 (C)
 
 ### API ID · 기능
 

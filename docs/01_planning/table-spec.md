@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-14 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-15 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -10,8 +10,8 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | users | 회원 | 배수빈 (A) | /auth /users | 21 | 레벨·경험치 컬럼 2개 추가 (9/24 결정) |
 | 2 | health_records | 건강정보 기록 | 최병주 (C) | /health-records | 26 |  |
-| 3 | predictions | 예측 결과 | 홍서윤 (B) | /predictions | 16 |  |
-| 4 | prediction_contributions | 기여요인 | 홍서윤 (B) | /predictions | 8 | 신규 — 기여요인을 별도 테이블로 분리 (배수빈 확인 — 10/3, PR #9 머지) |
+| 3 | predictions | 예측 결과 | 최병주 (C) | /predictions | 16 |  |
+| 4 | prediction_contributions | 기여요인 | 최병주 (C) | /predictions | 8 | 신규 — 기여요인을 별도 테이블로 분리 (배수빈 확인 — 10/3, PR #9 머지) |
 | 5 | monsters | 캐릭터 마스터 | 김이경 (D) | /monsters | 11 | 신규 — 도감 상태 저장이 기존 8개 안에 없었음 |
 | 6 | user_monsters | 사용자 캐릭터 상태 | 김이경 (D) | /monsters | 16 | is_target 제거안. 공략 중 여부는 active 주기와 대상 조인에서 계산. 제거안 행 제외 집계. |
 | 7 | challenges | 챌린지 마스터 | 김이경 (D) | /challenges | 27 | personalization_policy 추가 제안(10/2). 기존 context_priority는 조건부 후보 순위로 정합화. 새 JSON은 구조 검토 전. |
@@ -86,7 +86,7 @@
 | 26 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
 
 ### predictions — 예측 결과
-담당 홍서윤 (B) · 16컬럼
+담당 최병주 (C) · 16컬럼
 
 | No | 컬럼명 | 타입 | NULL | 키 | 기본값 | 설명 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -108,7 +108,7 @@
 | 16 | failure | JSON | NULL |  |  | 작업 실패 사유 { code, message, retryable }. PRED-02 응답의 failure 로 그대로 나간다. Valkey 는 TTL 이 지나면 사유가 사라져 다시 조회할 수 없어 컬럼으로 둔다 (NFR-REL-001) | 신규 — 2026.10.09 |
 
 ### prediction_contributions — 기여요인
-담당 홍서윤 (B) · 8컬럼
+담당 최병주 (C) · 8컬럼
 
 | No | 컬럼명 | 타입 | NULL | 키 | 기본값 | 설명 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -387,8 +387,7 @@
 | 상태 · 신규 | 9월 24일 회의에서 새로 결정된 것입니다 |
 | ■ 채워주실 것 — 자기 테이블만 보시면 됩니다 |  |
 | 배수빈 (A) | users |
-| 홍서윤 (B) | predictions · prediction_contributions |
-| 최병주 (C) | health_records |
+| 최병주 (C) | predictions · prediction_contributions · health_records |
 | 김이경 (D) | monsters · user_monsters · challenges · user_challenges · challenge_logs · challenge_recommendations · rewards · user_rewards |
 | 보는 방법 | '테이블 명세' 시트에서 담당 열로 필터를 거시면 본인 것만 나옵니다 |
 | 고칠 것 | 빠진 컬럼 추가 · 타입 수정 · 노란 칸 확정. 컬럼을 지우실 때는 이유를 상태 칸에 적어주세요 |
