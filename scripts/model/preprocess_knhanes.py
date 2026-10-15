@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import pyreadstat
 
-VERSION = "knhanes-ix-v2"
+VERSION = "knhanes-ix-v3"
 RAW_COLUMNS = [
     "ID",
     "year",
@@ -39,6 +39,8 @@ RAW_COLUMNS = [
     "HE_HPfh3",
     "HE_DM_HbA1c",
     "HE_HP",
+    "HE_sbp",
+    "HE_dbp",
     "L_OUT_FQ",
     "LS_VEG2",
     "DE1_dg",
@@ -54,6 +56,32 @@ def category(values, valid, missing):
     if unexpected:
         raise ValueError(f"Unexpected codes in {values.name}: {sorted(unexpected)}")
     return values.where(values.isin(valid))
+
+
+# 원시 파일과 코드 분포로 대조를 마친 제8기 연도. 그 밖의 2022년 이전 연도는 받지 않는다.
+EIGHTH_CYCLE_YEARS = {2019}
+
+
+def hypertension_code(frame):
+    """HE_HP 를 제9기 4단계 정의로 맞춘다.
+
+    제8기는 1 정상 · 2 전단계(120~139/80~89) · 3 고혈압 의 3단계이고,
+    제9기는 1 정상 · 2 주의(120~129/<80) · 3 전단계(130~139/80~89) · 4 고혈압 이다.
+    제8기 3 은 제9기 4 와 같은 정의라 그대로 옮기고, 제8기 2 는 측정 혈압으로 주의와 전단계를 가른다.
+    """
+    unverified = sorted(set(frame.year[frame.year.lt(2022) & ~frame.year.isin(EIGHTH_CYCLE_YEARS)]))
+    if unverified:
+        raise ValueError(f"코드북 대조를 하지 않은 연도: {unverified}")
+    eighth = frame.year.isin(EIGHTH_CYCLE_YEARS)
+    ninth_codes = category(frame.HE_HP[~eighth], [1, 2, 3, 4], [])
+    eighth_codes = category(frame.HE_HP[eighth], [1, 2, 3], [])
+    pre = eighth_codes.eq(2)
+    sbp, dbp = frame.HE_sbp[eighth], frame.HE_dbp[eighth]
+    if (pre & (sbp.isna() | dbp.isna())).any():
+        raise ValueError("제8기 HE_HP 전단계인데 측정 혈압이 없어 제9기 코드로 나눌 수 없다")
+    caution = sbp.lt(130) & dbp.lt(80)
+    mapped = eighth_codes.map({1: 1, 3: 4}).mask(pre & caution, 2).mask(pre & ~caution, 3)
+    return pd.concat([ninth_codes, mapped]).reindex(frame.index)
 
 
 def minutes(hours, mins):
@@ -102,7 +130,7 @@ def canonicalize(raw):
     out["family_history_dm"] = family_history(frame, "HE_DMfh")
     out["family_history_htn"] = family_history(frame, "HE_HPfh")
     out["HE_DM_HbA1c"] = category(frame.HE_DM_HbA1c, [1, 2, 3], [])
-    out["HE_HP"] = category(frame.HE_HP, [1, 2, 3, 4], [])
+    out["HE_HP"] = hypertension_code(frame)
     # Evaluation masks only. Never expose diagnosis/medication as model features.
     out["eligible_diabetes"] = frame.DE1_dg.eq(0) & frame.DE1_31.isin([0, 8]) & frame.DE1_32.isin([0, 8])
     out["eligible_hypertension"] = frame.DI1_dg.eq(0) & frame.DI1_2.isin([5, 8])
