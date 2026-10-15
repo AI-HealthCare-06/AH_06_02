@@ -124,9 +124,9 @@ they still appear in code or docs.
 
 | Part | Owner | Tables |
 | --- | --- | --- |
-| A | 배수빈 | `users` · `predictions` · `prediction_contributions` |
-| B | (vacant) | 홍서윤 left on 2026-10-07. `predictions` · `prediction_contributions` are owned by A |
-| C | 최병주 | `health_records` |
+| A | 배수빈 | `users` |
+| B | (vacant) | 홍서윤 left on 2026-10-07. `predictions` · `prediction_contributions` moved to C |
+| C | 최병주 | `health_records` · `predictions` · `prediction_contributions` |
 | D | 김이경 | `monsters` · `user_monsters` · `challenges` · `user_challenges` · `user_challenge_occurrences` · `user_attack_cycles` · `challenge_logs` · `challenge_recommendations` · `rewards` · `user_rewards` |
 
 Never write to someone else's table directly. Call the internal function its
