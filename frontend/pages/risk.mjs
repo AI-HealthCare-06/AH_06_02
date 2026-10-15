@@ -85,7 +85,8 @@ function factorSection(diseases) {
       const cards = increases
         .map((item) => {
           const name = FACTOR_LABELS[item.factor_key] || item.factor_key;
-          const pct = `+${(item.contribution * 100).toFixed(1)}%p`;
+          const value = item.contribution * 100;
+          const pct = value < 0.1 ? "+0.1%p 미만" : `+${value.toFixed(1)}%p`;
           const monster = FACTOR_MONSTER[item.factor_key];
           const tag = item.modifiable
             ? monster
