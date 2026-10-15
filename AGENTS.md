@@ -17,12 +17,15 @@ Do not translate them into new English names.
 
 ## Read this first
 
-**If you are building a screen, read [`docs/02_team/design.md`](docs/02_team/design.md)
-before anything else.** Colors, spacing, typography and state representation live
-there. Skip it and the four of us ship four different-looking screens.
+**If you are building a screen, read the v4 prototype and
+[`docs/02_team/design.md`](docs/02_team/design.md) before anything else.** Skip
+them and the four of us ship four different-looking screens.
 
-The visual source of truth is Figma `Hi-Fi v1`. When Figma and
-`docs/02_team/design.md` disagree, Figma wins. Do not hand-edit that file; ask
+The visual source of truth is the HTML prototype v4,
+[`frontend/docs/prototype/당고킬러-모험시안_v4.html`](frontend/docs/prototype/당고킬러-모험시안_v4.html).
+Take colors, spacing, typography and copy from it. `docs/02_team/design.md`
+adds the meaning, state representation and implementation rules the prototype
+does not show. When the two disagree, v4 wins. Do not hand-edit design.md; ask
 the team instead.
 
 ---
