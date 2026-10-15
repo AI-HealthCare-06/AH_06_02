@@ -358,11 +358,11 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { prediction_available, risks:[{ disease, probability, grade, delta, predicted_at }], latest_health_record:{ health_record_id, recorded_at } \| null }
+- **응답 (성공)**: { prediction_available, prediction_id, risks:[{ disease, probability, grade, delta, predicted_at }], latest_health_record:{ health_record_id, recorded_at } \| null }. prediction_id 는 risks 를 만든 최신 완료 예측의 id 이고, 예측이 없으면 null. 위험도 화면이 PRED-03(기여요인 Top3) 호출에 쓴다
 - **주요 에러**: UNAUTHORIZED
-- **관련 요구사항**: REQ-DASH-001·REQ-PRED-007
+- **관련 요구사항**: REQ-DASH-001·REQ-PRED-007·REQ-PRED-005
 - **사용 테이블**: predictions·health_records 읽기 (완료 예측만); 모델 계산 없음
-- **상태**: 제출안(risks는 미진단 질환만 포함 — 둘 다 진단이거나 예측 전일 때만 []; B 결과 형식 확인)
+- **상태**: 제출안(risks는 미진단 질환만 포함 — 둘 다 진단이거나 예측 전일 때만 []; B 결과 형식 확인) / prediction_id 추가 (위험도 화면 PRED-03 호출용) — 2026.10.15 배수빈
 
 ### DASH-02 · 위험도·건강수치 동일 기간 추이
 
