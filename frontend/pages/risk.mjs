@@ -99,7 +99,7 @@ function factorSection(diseases) {
     })
     .join("");
   if (!sections) return "";
-  return `<h2>지금, 이 요인에 주목해 보세요</h2><p class="small-copy">생활습관과 연결된 요인을 함께 살펴봐요.</p>${sections}`;
+  return `<h2>지금, 이 요인에 주목해 보세요</h2><p class="small-copy">내 위험도를 올린 요인이에요.</p>${sections}`;
 }
 
 /**

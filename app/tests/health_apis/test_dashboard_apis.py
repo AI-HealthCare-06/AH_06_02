@@ -60,7 +60,12 @@ class TestDashboardSummaryAPI(TestCase):
             response = await client.get("/api/v1/dashboard/summary", headers=_auth(token))
 
         assert response.status_code == status.HTTP_200_OK
-        assert response.json()["data"] == {"prediction_available": False, "prediction_id": None, "risks": [], "latest_health_record": None}
+        assert response.json()["data"] == {
+            "prediction_available": False,
+            "prediction_id": None,
+            "risks": [],
+            "latest_health_record": None,
+        }
 
     async def test_latest_risk_with_delta_in_percentage_points(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -84,7 +89,6 @@ class TestDashboardSummaryAPI(TestCase):
         assert risks["diabetes"]["grade"] is None
         assert risks["diabetes"]["predicted_at"].endswith("+09:00")
         assert data["latest_health_record"]["health_record_id"] == second.id
-
 
     async def test_prediction_id_is_latest_done_prediction(self):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
