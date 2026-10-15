@@ -24,6 +24,7 @@ import argparse
 import datetime as dt
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -261,7 +262,12 @@ def build_api_spec(wb: Any, today: str) -> str:
 
 def newest(src: Path, needle: str) -> Path | None:
     """이름이 needle 로 시작하는 xlsx 중 가장 최근 것. 여러 개면 나머지도 알려준다."""
-    hits = [p for p in src.glob("*.xlsx") if p.name.startswith(needle) and not p.name.startswith("~$")]
+    # 맥은 한글 파일 이름을 자모가 분리된 NFD 로 저장해서, NFC 로 맞춘 뒤 비교한다
+    hits = [
+        p
+        for p in src.glob("*.xlsx")
+        if unicodedata.normalize("NFC", p.name).startswith(needle) and not p.name.startswith("~$")
+    ]
     if not hits:
         return None
     hits.sort(key=lambda p: p.stat().st_mtime, reverse=True)
