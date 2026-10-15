@@ -1,13 +1,15 @@
 from datetime import date
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, File, Form, Query, UploadFile, status
 
 from app.dependencies.security import get_request_user
 from app.dtos.envelope import ok
+from app.dtos.evidence import EvidencePhotoUploadResponse
 from app.dtos.health_records import HealthRecordCreateRequest, HealthRecordCreateResponse
 from app.models.users import User
 from app.services.dashboard import DashboardService
+from app.services.evidence import EvidenceService
 from app.services.health_records import HealthRecordService
 
 health_router = APIRouter(tags=["health"])
@@ -55,3 +57,21 @@ async def dashboard_trends(
 ) -> dict[str, Any]:
     """DASH-02 위험도·건강수치 동일 기간 추이."""
     return ok((await service.trends(user, start_date=start_date, end_date=end_date)).model_dump(mode="json"))
+
+@health_router.post("/evidence/photos", status_code=status.HTTP_201_CREATED)
+async def upload_evidence_photo(
+    photo: Annotated[UploadFile, File()],
+    user_challenge_id: Annotated[int, Form()],
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[EvidenceService, Depends(EvidenceService)],
+) -> dict[str, Any]:
+    """HLTH-03 챌린지 PHOTO 증빙 업로드."""
+    evidence_url, uploaded_at = await service.upload_photo(
+        user=user, photo=photo, user_challenge_id=user_challenge_id
+    )
+    return ok(
+        EvidencePhotoUploadResponse(
+            evidence_url=evidence_url, uploaded_at=uploaded_at
+        ).model_dump(mode="json")
+    )
+
