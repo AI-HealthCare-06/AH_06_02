@@ -93,14 +93,38 @@ AP 는 평가셋의 양성률이 무작위 예측의 기준선이 되므로 평�
 | 당뇨 · 2024 | 4,853 (196) | 0.0404 | 2.68 / 2.75 / 2.82 | 0.7807 |
 | 당뇨 · 2019 | 5,345 (282) | 0.0528 | 2.87 / 2.97 / 2.98 | 0.7808 |
 | 고혈압 · 2024 | 4,226 (467) | 0.1105 | 2.02 / 2.04 / 2.06 | 0.7305 |
+| 고혈압 · 2019 | 4,659 (543) | 0.1165 | 1.90 / 1.91 / 1.92 | 0.7225 |
 
 2019 는 입력 조합 선택(2023 validation·과거 2024 비교), 학습(2022+2023), 운영 임계값(학습 연도 안 교차검증), P95 계산 어디에도 쓰지 않은 자료다. 그래서 선택 과정까지 포함한 독립 평가다. 2019 에서 당뇨 판별 성능은 2024 와 비슷했다. 서빙 모델인 seed 42 기준으로 2019 AUROC 0.7816, 2024 0.7793 이고, seed 세 개 중앙값으로는 0.7808 대 0.7807 이다.
 
-여기서 말할 수 있는 것은 쓰지 않은 자료에서도 판별 성능이 유지됐다는 데까지다. 두 값이 비슷하다는 것만으로 2024 를 입력 선택에 쓴 데서 오는 선택 편향이 작다고 확정하지는 않는다. 두 평가셋이 비슷한 난도일 가능성과, 2019 가 제8기 자료인데 제8기 코드북과 문항별 대조 기록이 아직 없다는 점을 함께 둔다. 그리고 이것은 당뇨에 한한 확인이다. 고혈압은 2019 의 `HE_HP` 에 코드 4 가 없어 양성이 0 이 되므로 2019 로 평가하지 못했다.
+여기서 말할 수 있는 것은 쓰지 않은 자료에서도 판별 성능이 유지됐다는 데까지다. 두 값이 비슷하다는 것만으로 2024 를 입력 선택에 쓴 데서 오는 선택 편향이 작다고 확정하지는 않는다. 두 평가셋이 비슷한 난도였을 가능성도 함께 둔다.
+
+고혈압도 2019 로 평가했다. 서빙 모델인 seed 42 기준으로 2019 AUROC 0.7225, AP 0.2221, Brier 0.0975, 운영 임계값(0.108273)에서 재현율 0.6575 · 특이도 0.6630 이다. 같은 모델의 2024 는 AUROC 0.7305 · AP 0.2255 다. 판별 성능이 쓰지 않은 자료에서 조금 낮아졌지만 같은 수준으로 유지됐다. 이 run 의 seed 42 모델은 학습 행·교차검증 지표·운영 임계값이 `data/experiment-refit` 서빙 모델과 같아서, 서비스가 쓰는 모델을 그대로 평가한 값이다.
+
+예전에는 2019 의 `HE_HP` 에 코드 4 가 없어 양성이 0 이 된다고 보고 고혈압 2019 평가를 하지 않았다. 아래 대조에서 보듯 제8기는 코드 체계가 달라 생긴 일이었다.
 
 학습 자료를 약 두 배로 늘렸지만 2024 지표는 거의 그대로였다. 이번 변경으로 얻은 것은 성능이 아니라 평가 구조다.
 
-2019 를 넣어 canonical 을 다시 만들었을 때 2022~2024 행 17,262 개는 기존 canonical 과 모든 셀이 같았다(열·행 순서 포함). 전처리는 결정적이다.
+2019 를 넣어 canonical 을 다시 만들었을 때 2022~2024 행 17,262 개는 기존 canonical 과 모든 셀이 같았다(열·행 순서 포함). 전처리는 결정적이다. `knhanes-ix-v3` 로 고혈압 라벨 매핑을 넣은 뒤에도 2022~2024 행은 v2 와 모든 셀이 같고, 2019 행은 `HE_HP` 열만 바뀐다.
+
+## 제8기(2019) 변수 대조
+
+`HN19_ALL.sav` 와 `HN22~24_ALL.sav` 의 SPSS 메타데이터(변수 설명·값 설명)와 연도별 코드 분포를 비교했다. 개인 단위 값은 밖으로 꺼내지 않고 집계만 봤다.
+
+- 모델이 쓰는 입력·라벨·제외 조건 변수는 2019 에도 모두 있다. 변수 설명 문구만 다르다(예: `L_OUT_FQ` "외식 횟수" → "최근 1년 동안 평균 외식 빈도").
+- 입력 변수의 코드 집합은 2019 와 2024 가 같다.
+- `HE_DM_HbA1c` 는 두 기 모두 1~3 이고 코드 3 은 두 해 모두 공복혈당 126 또는 HbA1c 6.5 기준을 전원 충족한다. 당뇨 2019 평가는 그대로 유효하다.
+- `HE_HP` 는 코드 체계가 다르다. 성인 실측 혈압 범위로 확인한 정의는 아래와 같다.
+
+| 기수 | 코드 | 혈압 범위 (성인 실측) | 의미 |
+|---|---|---|---|
+| 제8기 (2019) | 1 · 2 · 3 | <120/80 · 120~139/80~89 · ≥140/90 또는 혈압약 | 정상 · 전단계 · 고혈압 |
+| 제9기 (2022~2024) | 1 · 2 · 3 · 4 | <120/80 · 120~129/<80 · 130~139/80~89 · ≥140/90 또는 혈압약 | 정상 · 주의 · 전단계 · 고혈압 |
+
+  제8기 3 은 제9기 4 와 같은 정의다. 제8기 2 는 측정 혈압으로 주의(수축기 <130 이고 이완기 <80)와 전단계로 나눈다. 2019 성인 전단계 1,615 명은 모두 혈압 측정값이 있다. 고혈압 평가 대상(미진단·미복약) 양성률은 2019 11.7%, 2024 11.1% 로 비슷하다.
+- `DE1_*` · `DI1_*` 는 제9기에만 코드 9(모름)가 있다. 제외 규칙에는 영향이 없다.
+- 2019 성인의 걷기·좌식 문항 결측은 310 명으로 2024(2 명)보다 많고, 좌식 시간 최솟값이 2019 는 1 시간, 제9기는 0 시간이다. 정의 차이는 아니고 평가 표본 수에 영향을 준다.
+- 혈압 측정 기기·방법이 두 기에서 같은지는 원시 파일로 확인할 수 없다. 이용지침서 확인이 남아 있다.
 
 결과 원본은 ignored `data/experiment-seeds/` 아래에만 둔다.
 
@@ -163,4 +187,5 @@ uv run --group model python -m scripts.model.build_serving_artifact --diabetes d
 uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-seeds/diabetes-2024 --seeds 42 43 44 --train-years 2022 2023 --validation-years 2023 --final-variant sitting --diseases diabetes --reference-size 0
 uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-seeds/diabetes-2019 --seeds 42 43 44 --train-years 2022 2023 --validation-years 2023 --test-years 2019 --final-variant sitting --diseases diabetes --reference-size 0
 uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-seeds/hypertension-2024 --seeds 42 43 44 --train-years 2022 2023 --validation-years 2023 --final-variant sodium --diseases hypertension --reference-size 0
+uv run --group model --with 'shap==0.50.0' python scripts/model/run_baseline.py --data data/canonical.csv --out data/experiment-seeds/hypertension-2019 --seeds 42 43 44 --train-years 2022 2023 --validation-years 2023 --test-years 2019 --final-variant sodium --diseases hypertension --reference-size 0
 ```

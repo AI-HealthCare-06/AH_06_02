@@ -21,7 +21,7 @@ KNHANES 제9기(2022~2024)의 HN22_ALL.sav/HN23_ALL.sav/HN24_ALL.sav를 사용�
 
 ## canonical CSV
 
-원시자료를 바로 모델에 넣지 않고 단위와 코드를 검증한 CSV를 생성한다. core 열은 model.md의 첫 12개 feature다. 외식 빈도 `dining_out_freq`, 좌식 `sitting_minutes`, 채소 `vegetable_frequency`는 ablation 후보 열이다. 부가 열은 `survey_year`, `HE_DM_HbA1c`, `HE_HP`다. 한 사람 한 조사연도 한 행으로 중복 ID 검사 후 내보낸다. ID는 학습 feature가 아니다.
+원시자료를 바로 모델에 넣지 않고 단위와 코드를 검증한 CSV를 생성한다. core 열은 model.md의 첫 12개 feature다. 외식 빈도 `dining_out_freq`, 좌식 `sitting_minutes`, 채소 `vegetable_frequency`는 ablation 후보 열이다. 부가 열은 `survey_year`, `HE_DM_HbA1c`, `HE_HP`다. `HE_HP` 는 제9기 4단계 코드로 맞춘다. 제8기(2019)의 전단계(코드 2)를 주의·전단계로 나눌 때만 `HE_sbp`·`HE_dbp` 를 읽고, 두 값은 canonical 열로 내보내지 않는다. 한 사람 한 조사연도 한 행으로 중복 ID 검사 후 내보낸다. ID는 학습 feature가 아니다.
 
 서비스 열의 alcohol_frequency/alcohol_amount는 공식 코드 의미를 범주로 인코딩한다. 기본 모델은 범주형으로 처리하여 코드 차이를 실제 잔 수 차이라고 해석하지 않는다. 가족력 unknown, 유효한 비해당·비음주 상태, 실제 누락을 구별한다. 필수 입력 누락 서비스 요청은 거절하며 학습 결측 대치는 train에만 fit한다.
 
