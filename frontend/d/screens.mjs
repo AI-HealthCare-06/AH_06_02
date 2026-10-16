@@ -66,20 +66,48 @@ function monsterCard(item, target = false) {
   const impact = number(item.impact_score);
   const pendingSpike = item.code === "spike" && impact === null;
   const description = item.title || "위험요인 캐릭터";
+  const saved = item.impact_explanation;
+  const factorNames = {
+    bmi_high: "체질량지수",
+    waist_high: "허리둘레",
+    physical_activity_low: "신체활동",
+    strength_activity_low: "근력활동",
+    sedentary_time_high: "좌식시간",
+    smoking_current: "흡연",
+    alcohol_frequency: "음주 빈도",
+    alcohol_amount: "음주량",
+    vegetable_intake_low: "채소 섭취",
+  };
+  const provenance =
+    impact === null
+      ? ""
+      : saved?.status === "available"
+        ? impact === 0
+          ? '<p class="hint">이번 산정에서 위협도를 높인 요인이 없어요.</p>'
+          : `<p class="hint">현재 위협도를 대표하는 요인: ${(saved.winners || []).map((factor) => escape(`${factor.disease === "diabetes" ? "당뇨" : "고혈압"} · ${factorNames[factor.factor_key] || "기타 요인"}`)).join(", ")}</p>`
+        : '<p class="hint">이 점수의 개별 산정 요인 정보가 없어요.</p>';
   const explanation = pendingSpike
     ? '<p class="hint">혈당 입력 여부와 관계없이 위협도 산정이 보류 중이에요.</p>'
     : item.code === "viscera" && impact === null
       ? '<p class="hint">체격·활동 관련 요인의 위협도가 아직 산정되지 않았어요.</p>'
       : item.code === "viscera"
-      ? '<p class="hint">BMI·허리둘레·활동 관련 요인 중 가장 높은 위협도를 표시해요. 추천은 연결된 생활행동 요인을 기준으로 해요.</p>'
-      : "";
+        ? '<p class="hint">BMI·허리둘레·활동 관련 요인 중 가장 높은 위협도를 표시해요. 추천은 연결된 생활행동 요인을 기준으로 해요.</p>'
+        : "";
   return `<${target ? 'div class="target-card"' : `button class="monster-card" data-monster="${item.monster_id}"`}>
     ${sprite(item.code)}<div><h3>${escape(item.name)} ${pendingSpike ? '<span class="chip">산정 보류</span>' : badge(item.state)} ${item.is_target ? '<span class="target-mark">공략 대상</span>' : ""}</h3>
     <p>${escape(description)}</p><div class="threat-label">위협도 <b>${impact === null ? "—" : impact}</b></div>
-    ${explanation}<div class="threat-rail"><i style="--fill:${impact === null ? 0 : Math.max(0, Math.min(100, impact))}%"></i></div></div></${target ? "div" : "button"}>`;
+    ${explanation}${provenance}<div class="threat-rail"><i style="--fill:${impact === null ? 0 : Math.max(0, Math.min(100, impact))}%"></i></div></div></${target ? "div" : "button"}>`;
 }
 
 function errorMessage(error) {
+  if (
+    error.code === "CHLG_RECOMMENDATION_UNAVAILABLE" &&
+    ["no_additional_candidates", "slots_unavailable"].includes(
+      error.details?.reason,
+    )
+  )
+    return ["진행 중인 공략을 이어가세요", error.message, "today"];
+
   if (error.status === 401)
     return [
       "로그인이 필요해요",
@@ -308,7 +336,7 @@ export function mountDangoScreens(
       controls = `<div class="slot-controls"><button class="secondary" data-manual="${item.occurrence_id}">직접 수행 확인하기</button></div>`;
     else if (usable && mission.verification_type === "photo")
       controls = `<div class="slot-controls photo-controls">
-      ${uploadPhoto ? `<label>수행 사진 선택<input type="file" accept="image/*" capture="environment" data-photo="${item.occurrence_id}"></label><button class="secondary" data-upload="${item.occurrence_id}">사진으로 인증하기</button>` : '<p class="hint">지금은 사진 인증을 사용할 수 없어요. 잠시 후 다시 확인해주세요.</p>'}
+      ${uploadPhoto ? `<label>수행 사진 선택<input type="file" accept="image/jpeg,image/png" capture="environment" data-photo="${item.occurrence_id}"></label><button class="secondary" data-upload="${item.occurrence_id}">사진으로 인증하기</button>` : '<p class="hint">지금은 사진 인증을 사용할 수 없어요. 잠시 후 다시 확인해주세요.</p>'}
       ${mission.manual_fallback_allowed ? `<button class="secondary" data-fallback="${item.occurrence_id}">직접 수행 확인으로 대체</button>` : ""}</div>`;
     else if (usable)
       controls =
@@ -324,9 +352,13 @@ export function mountDangoScreens(
             : item.status === "skipped"
               ? "건너뛴 기회"
               : "종료된 기회";
-    const dailyCloseHint = usable && ["오늘 외식 안 하기", "오늘 술 안 마시기", "오늘 안 피우기"].includes(mission.title)
-      ? '<p class="hint">해당 날짜의 하루를 마친 뒤 기록해주세요.</p>'
-      : "";
+    const dailyCloseHint =
+      usable &&
+      ["오늘 외식 안 하기", "오늘 술 안 마시기", "오늘 안 피우기"].includes(
+        mission.title,
+      )
+        ? '<p class="hint">해당 날짜의 하루를 마친 뒤 기록해주세요.</p>'
+        : "";
     return `<article class="slot-wrap"><div class="slot ${done ? "done" : ""}"><div><h4>${escape(title)}</h4><p>${escape(label)}</p></div>${done ? '<span class="badge stable">완료</span>' : ""}</div>${dailyCloseHint}${controls}</article>`;
   }
   function renderToday() {
@@ -407,7 +439,7 @@ export function mountDangoScreens(
         '<div class="loading" role="status"><span class="spinner" aria-hidden="true"></span><p>공략 내용을 불러오고 있어요.</p></div>';
     else if (state.mode === "error") {
       const [title, copy, route] = errorMessage(state.error);
-      content.innerHTML = `<section class="scene"><div class="panel-pad"><div class="status-panel" role="alert"><h2>${escape(title)}</h2><p>${escape(copy)}</p>${route ? `<button class="primary" data-route="${route}">${route === "login" ? "로그인하기" : "예측 결과 확인하기"}</button>` : ""}<button class="secondary" data-reload>다시 확인하기</button></div>${state.page === "reco" ? excludedCards() : ""}</div></section>`;
+      content.innerHTML = `<section class="scene"><div class="panel-pad"><div class="status-panel" role="alert"><h2>${escape(title)}</h2><p>${escape(copy)}</p>${route ? `<button class="primary" data-route="${route}">${route === "login" ? "로그인하기" : route === "today" ? "진행 중인 공략 보기" : "예측 결과 확인하기"}</button>` : ""}<button class="secondary" data-reload>다시 확인하기</button></div>${state.page === "reco" ? excludedCards() : ""}</div></section>`;
     } else
       content.innerHTML = `<section class="scene ${state.page}"><div class="panel-pad">${{ reco: renderReco, today: renderToday, progress: renderProgress, monsters: renderMonsters }[state.page]()}</div></section>`;
     const title = content.querySelector("h1, h2");
@@ -430,6 +462,7 @@ export function mountDangoScreens(
     loadController = new AbortController();
     const signal = loadController.signal;
     state.page = page;
+    state.busy = false;
     state.mode = "loading";
     state.error = null;
     state.selected.clear();
@@ -831,6 +864,15 @@ export function mountDangoScreens(
         return;
       }
       if (!uploadPhoto) return;
+      const entry = findOccurrence(id);
+      if (!entry || entry.item.status !== "planned") return;
+      const version = state.version;
+      const identity = state.authEpoch;
+      const signal = loadController?.signal;
+      const stale = () =>
+        version !== state.version ||
+        identity !== state.authEpoch ||
+        signal?.aborted;
       if (
         !(await ask(
           "이 사진으로 인증할까요?",
@@ -838,21 +880,35 @@ export function mountDangoScreens(
         ))
       )
         return;
+      if (stale()) return;
       state.busy = true;
       button.disabled = true;
       try {
-        const uploaded = await uploadPhoto(file);
+        const uploaded = await uploadPhoto(file, {
+          userChallengeId: entry.mission.user_challenge_id,
+          occurrenceId: id,
+          signal,
+        });
+        if (stale()) return;
         if (
           typeof uploaded?.evidence_url !== "string" ||
-          !uploaded.evidence_url
+          !uploaded.evidence_url.trim() ||
+          uploaded.evidence_url.length > 255
         )
           throw new Error("사진 참조값이 없습니다.");
         state.busy = false;
         await record(id, "photo", { evidence_url: uploaded.evidence_url });
-      } catch {
-        message("사진을 올리지 못했어요. 다시 시도해주세요.", true);
+      } catch (error) {
+        if (stale()) return;
+        message(
+          error.message || "사진을 올리지 못했어요. 다시 시도해주세요.",
+          true,
+        );
         state.busy = false;
         render();
+      } finally {
+        if (identity === state.authEpoch && version === state.version)
+          state.busy = false;
       }
       return;
     }

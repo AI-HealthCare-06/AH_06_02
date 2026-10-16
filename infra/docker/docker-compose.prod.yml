@@ -52,6 +52,7 @@ services:
       - ./data:/app/data
       - static_volume:/app/templates
       - media_volume:/app/media
+      - evidence_volume:/app/media/evidence  # nginx와 공유하지 않는 비공개 증빙
     restart: always
     ports:
       - "8000:8000"
@@ -117,6 +118,7 @@ volumes:
     name: mysql_data
   static_volume:
     name: static_volume
+  evidence_volume:
   media_volume:
     name: media_volume
   certbot-conf:

@@ -1,6 +1,8 @@
 const retryable = (error) =>
   (error.status === 404 && error.code === "PRED_NOT_FOUND") ||
-  (error.status === 409 && error.code === "CHLG_RECOMMENDATION_UNAVAILABLE");
+  (error.status === 409 &&
+    error.code === "CHLG_RECOMMENDATION_UNAVAILABLE" &&
+    !error.details?.reason);
 const aborted = () =>
   new DOMException("화면 또는 로그인 상태가 바뀌었어요.", "AbortError");
 

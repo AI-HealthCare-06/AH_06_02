@@ -153,6 +153,7 @@ CREATE TABLE user_monsters (
   impact_source          ENUM('contribution','measured','global') NOT NULL DEFAULT 'contribution',
   last_prediction_id     BIGINT   NULL,
   last_health_record_id  BIGINT   NULL,
+  impact_explanation_snapshot JSON NULL COMMENT '산정 당시 요인·점수·출처·모델/정책 버전',
   weekly_progress        SMALLINT NOT NULL DEFAULT 0 COMMENT '주간 공략 점수. 상한 100',
   progress_week_start    DATE     NULL COMMENT '월요일 00:00 KST에 초기화',
   created_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

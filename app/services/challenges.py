@@ -41,6 +41,7 @@ from app.services.attack_cycles import (
     lock_user,
     today_kst,
 )
+from app.services.evidence import EvidenceService
 from app.services.recommendations import target_monster_body
 
 logger = logging.getLogger(__name__)
@@ -346,6 +347,10 @@ class ChallengeCoreService:
             occurred = self._occurred_in_period(mission, occurred_at, current)
             log_date = occurred.date()
             challenge = await Challenge.get(id=mission.challenge_id)
+            if verification_method == VerificationMethod.PHOTO and not await EvidenceService().verify_reference(
+                user_id, mission.id, evidence_url
+            ):
+                raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
             status = self._verify(challenge, mission, verification_method, value, evidence_url)
             self._check_slot(challenge, context_slot)
 

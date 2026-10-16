@@ -1,3 +1,4 @@
+import { createEvidenceUploader } from "../shared/evidence.mjs";
 import { createApiClient } from "../shared/api.mjs";
 import { mountDangoScreens } from "./screens.mjs";
 
@@ -39,6 +40,8 @@ mountDangoScreens(document.querySelector("[data-dango-screens]"), {
     );
   },
   uploadPhoto: window.dangoEvidence?.uploadPhoto
-    ? (file) => window.dangoEvidence.uploadPhoto(file)
-    : undefined,
+    ? (file, context) => window.dangoEvidence.uploadPhoto(file, context)
+    : configuration.evidencePhotosEnabled !== false
+      ? createEvidenceUploader(request)
+      : undefined,
 });

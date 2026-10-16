@@ -1,3 +1,4 @@
+import { createEvidenceUploader } from "./shared/evidence.mjs";
 import { AuthSession } from "./shared/auth.mjs";
 import { HashRouter, ROUTES } from "./shared/router.mjs";
 import { PredictionReadiness } from "./shared/prediction-readiness.mjs";
@@ -30,7 +31,11 @@ const backPages = {
 /** 화면 틀과 세션은 앱이 소유하고 각 페이지는 내용 영역만 사용한다. */
 export async function startApplication(
   root,
-  { fetchImpl = globalThis.fetch, uploadPhoto } = {},
+  {
+    fetchImpl = globalThis.fetch,
+    uploadPhoto,
+    evidencePhotosEnabled = true,
+  } = {},
 ) {
   const auth = new AuthSession({
     fetchImpl,
@@ -92,7 +97,11 @@ export async function startApplication(
                   }),
                 { signal },
               ),
-            uploadPhoto,
+            uploadPhoto:
+              uploadPhoto ||
+              (evidencePhotosEnabled
+                ? createEvidenceUploader(auth.api)
+                : undefined),
             navigate: (id) => router.navigate(id),
           });
         await dScreens.show(route.id);
@@ -232,8 +241,9 @@ const root = document.querySelector("[data-dango-app]");
 if (root)
   void startApplication(root, {
     uploadPhoto: window.dangoEvidence?.uploadPhoto
-      ? (file) => window.dangoEvidence.uploadPhoto(file)
+      ? (file, context) => window.dangoEvidence.uploadPhoto(file, context)
       : undefined,
+    evidencePhotosEnabled: window.dangoConfig?.evidencePhotosEnabled !== false,
   }).catch(() =>
     root.replaceChildren(
       ui.statePanel(

@@ -1,4 +1,5 @@
 from enum import StrEnum
+from typing import Any
 
 from tortoise import fields, models
 
@@ -132,6 +133,9 @@ class UserMonster(models.Model):
     impact_source = fields.CharEnumField(ImpactSource, default=ImpactSource.CONTRIBUTION)
     last_prediction_id = fields.BigIntField(null=True)
     last_health_record_id = fields.BigIntField(null=True)
+    impact_explanation_snapshot: dict[str, Any] | None = fields.JSONField(
+        null=True, description="산정 당시 요인·점수·출처·모델/정책 버전"
+    )
     created_at = fields.DatetimeField(auto_now_add=True)
     weekly_progress = fields.SmallIntField(default=0)
     progress_week_start = fields.DateField(null=True)

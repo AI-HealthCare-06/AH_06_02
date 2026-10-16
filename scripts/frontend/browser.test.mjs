@@ -223,7 +223,7 @@ test("네 화면은 서버 결과로 시작·타이머·점수·보상·도감 �
       fullPage: true,
     });
     await page.locator('.bottom-nav a[href="#monsters"]').click();
-    await page.getByRole("button", { name: /스파이크.*미측정/ }).waitFor();
+    await page.getByRole("button", { name: /스파이크.*산정 보류/ }).waitFor();
     assert.equal(
       await page.locator('[data-monster="1"] b').textContent(),
       "72",
