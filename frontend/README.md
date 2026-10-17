@@ -4,6 +4,14 @@
 React·Vite·TypeScript의 미사용 초기 템플릿을 제거했다. Node 20 이상이 필요하며 화면 실행에 번들러는 사용하지 않는다.
 화면·API·DB가 같은 저장소에 있다. `docs/prototype/당고킬러-모험시안_v4.html`은 11화면의 참고 시안으로 유지한다.
 
+## 팀 검토용 v5 시안
+
+`docs/prototype/당고킬러-모험시안_v5.html`은 모험 지도·가방·꾸미기·성장 화면을 검토하는 **API 미연결 제안 시안**이다. 실제 서비스 전환이나 팀 승인 완료를 뜻하지 않으며, v4는 현재 구현 기준으로 유지한다.
+
+저장소 루트에서 `python -m http.server 8766 --bind 127.0.0.1`로 실행한 뒤 `/frontend/docs/prototype/당고킬러-모험시안_v5.html#login`을 연다. 입력 없이 화면을 넘길 수 있고 모든 기록은 탭 메모리에만 남는다. 실제 계정이나 건강정보를 입력할 필요가 없다.
+
+변경 범위와 팀 확인 항목은 [v5 검토 제안](../docs/02_team/prototype-v5-proposal.md), 자산 출처·변환은 [자산 안내](docs/prototype/assets/README.md)에 정리했다. `npm run test:prototype`으로 전체 화면과 시안 규칙을 검사한다. 기존 서비스 검사는 아래 검증 명령을 그대로 사용한다.
+
 ## 실행
 
 백엔드는 기존 안내대로 저장소 루트에서 실행한다.

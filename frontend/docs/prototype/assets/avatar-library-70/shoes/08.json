@@ -1,0 +1,10 @@
+{
+  "category": "shoes",
+  "category_label": "신발",
+  "index": 8,
+  "name": "개구리 비 장화",
+  "description": "matching pair of yellow rain boots with green frog-face decorations",
+  "filename": "shoes/08.webp",
+  "prompt": "Create a BRAND NEW, distinctly designed game equipment asset: matching pair of yellow rain boots with green frog-face decorations. A MATCHING PAIR ONLY, two individual shoes side by side with a transparent gap, same baseline. No legs. Three-quarter view, toes point viewer-right. Art direction: polished cute 3D storybook RPG illustration, rounded cartoon proportions suitable for a big-eyed child adventurer, soft warm lighting, detailed tactile leather/fabric/metal as appropriate, rich but tasteful color. The requested unique SHAPE, MATERIAL, and COLOR are essential. Center entire object with 8% clear margin; do not crop. Genuinely transparent alpha background. No backdrop, no ground, no exterior shadow, no glow haze, no text, no labels, no watermark, no unrelated objects. Exactly one isolated equipment sprite (two shoes for footwear).",
+  "status": "complete"
+}
