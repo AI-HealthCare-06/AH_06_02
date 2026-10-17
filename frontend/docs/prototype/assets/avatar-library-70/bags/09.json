@@ -1,0 +1,10 @@
+{
+  "category": "bags",
+  "category_label": "가방",
+  "index": 9,
+  "name": "개구리 연못 가방",
+  "description": "light-green frog-shaped backpack with bulging eyes and yellow zipper",
+  "filename": "bags/09.webp",
+  "prompt": "Create a BRAND NEW, distinctly designed game equipment asset: light-green frog-shaped backpack with bulging eyes and yellow zipper. ONE BAG ONLY, no wearer or person. Three-quarter side view, straps toward viewer-right. Art direction: polished cute 3D storybook RPG illustration, rounded cartoon proportions suitable for a big-eyed child adventurer, soft warm lighting, detailed tactile leather/fabric/metal as appropriate, rich but tasteful color. The requested unique SHAPE, MATERIAL, and COLOR are essential. Center entire object with 8% clear margin; do not crop. Genuinely transparent alpha background. No backdrop, no ground, no exterior shadow, no glow haze, no text, no labels, no watermark, no unrelated objects. Exactly one isolated equipment sprite (two shoes for footwear).",
+  "status": "complete"
+}

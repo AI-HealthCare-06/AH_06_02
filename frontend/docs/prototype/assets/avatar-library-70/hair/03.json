@@ -1,0 +1,10 @@
+{
+  "category": "hair",
+  "category_label": "머리",
+  "index": 3,
+  "name": "꿀빛 곱슬머리",
+  "description": "rounded honey-blond curly hair with soft tight curls",
+  "filename": "hair/03.webp",
+  "prompt": "Create a BRAND NEW, distinctly designed game equipment asset: rounded honey-blond curly hair with soft tight curls. Hair/wig ONLY. The main defining silhouette MUST be rounded honey-blond curly hair with soft tight curls. Do not render default tousled hair unless specifically requested. Open underside for placement on a head; no face, eyes, ears, neck, head or mannequin. Three-quarter view pointing viewer-right. Art direction: polished cute 3D storybook RPG illustration, rounded cartoon proportions suitable for a big-eyed child adventurer, soft warm lighting, detailed tactile leather/fabric/metal as appropriate, rich but tasteful color. The requested unique SHAPE, MATERIAL, and COLOR are essential. Center entire object with 8% clear margin; do not crop. Genuinely transparent alpha background. No backdrop, no ground, no exterior shadow, no glow haze, no text, no labels, no watermark, no unrelated objects. Exactly one isolated equipment sprite (two shoes for footwear).",
+  "status": "complete"
+}

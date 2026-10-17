@@ -1,0 +1,10 @@
+{
+  "category": "hair",
+  "category_label": "머리",
+  "index": 1,
+  "name": "기본 갈색 헝클머리",
+  "description": "short tousled chestnut-brown hair with a small upward forelock",
+  "filename": "hair/01.webp",
+  "prompt": "Use case: stylized-concept / transparent game equipment sprite. Asset: short tousled chestnut-brown hair with a small upward forelock. HAIR ONLY, an isolated wig/hair sprite. Preserve the boy's three-quarter head direction facing viewer-right. NO face, eyes, ears, neck, skin or mannequin. Shape an open underside so this can be placed on the same boy's head. Match the attached DangoKiller boy reference: high-quality cute 3D storybook game rendering, rounded child-friendly proportions, tactile materials, warm soft studio lighting, same visual world and rendering detail. The reference is STYLE AND CAMERA only: do not copy the whole character. Isolate only the requested asset on a genuinely TRANSPARENT alpha background. Entire object centered, no crop, 8 percent transparent margin on all sides, no background color or gradient, no glow backdrop, no ground plane, no cast shadow outside the object. No text, labels, watermark, extra equipment or other objects. Exactly one sprite asset (a pair for footwear).",
+  "status": "complete"
+}
