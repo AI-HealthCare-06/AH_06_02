@@ -574,13 +574,18 @@ function renderEvolution() {
   const area = $(`.scene[data-page="${active}"] .panel-pad`);
   if (!area) return;
   const m = currentMonster();
+  // 외형 단계 기준(REQ-RECO-008)이 정해지기 전에는 서버가 seal_progress 를 주지 않아 외형이 바뀌지 않는다
+  const decided = m?.seal_progress != null;
+  const note = decided
+    ? "공략 진행률에 따라 외형이 변해요. 위험도·위협도는 재측정 후 갱신돼요."
+    : "외형이 바뀌는 기준은 아직 정해지지 않았어요. 지금은 단계별 모습을 미리보기로 보여드려요. 위험도·위협도는 재측정 후 갱신돼요.";
   area.innerHTML = `<h1>캐릭터 변화 도감</h1><div class="unified-tabs">${Object.entries(
     labels,
   )
     .map(([key, name]) => button(name, `data-live-evolution="${key}"`))
     .join(
       "",
-    )}</div><div class="evolution-strip">${[1, 2, 3, 4, 5].map((step) => `<div>${art(m?.code || "viscera", step)}<b>${step}단계</b></div>`).join("")}</div><p>공략 진행률에 따라 외형이 변해요. 위험도·위협도는 재측정 후 갱신돼요.</p>`;
+    )}</div>${decided ? "" : '<h2 class="live-preview-label">단계별 모습 · 미리보기</h2>'}<div class="evolution-strip">${[1, 2, 3, 4, 5].map((step) => `<div>${art(m?.code || "viscera", step)}<b>${step}단계</b></div>`).join("")}</div><p>${note}</p>`;
 }
 function checkRanges(page) {
   for (const [key, value] of Object.entries(healthValues(page))) {

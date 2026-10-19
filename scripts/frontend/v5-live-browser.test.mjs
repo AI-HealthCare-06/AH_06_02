@@ -112,7 +112,7 @@ async function mock(page, state = {}) {
             state: "caution",
             impact_score: 41,
             weekly_progress: state.completed ? 10 : 0,
-            seal_progress: 0,
+            seal_progress: null,
             impact_explanation: {
               status: "available",
               winners: [
@@ -871,4 +871,15 @@ test("메뉴에서 화면을 고르면 메뉴 창이 닫힌다", async () =>
     await menu.getByRole("button", { name: /가방 · 아이템과 보상/ }).click();
     await page.locator('.scene[data-page="rewards"]:not([hidden])').waitFor();
     assert.equal(await menu.evaluate((el) => el.open), false);
+  }));
+
+test("외형 변화 기준이 정해지기 전에는 단계별 모습을 미리보기로 안내한다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#evolution", base).href);
+    const area = page.locator('.scene[data-page="evolution"] .panel-pad');
+    await area.locator(".evolution-strip").waitFor();
+    const text = (await area.textContent()).replace(/\s+/g, " ");
+    assert.match(text, /미리보기/);
+    assert.doesNotMatch(text, /공략 진행률에 따라 외형이 변해요/);
   }));
