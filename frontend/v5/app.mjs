@@ -636,6 +636,40 @@ async function pollPrediction() {
   }
   message("예측을 처리 중이에요. 아래에서 결과를 다시 확인할 수 있어요.");
 }
+// v4 화면과 같은 안전 안내·난이도 문구를 쓴다
+const SAFETY_GUIDE =
+  "현재 건강상태에서 무리 없이 수행할 수 있을 때 시작해주세요. 통증이나 불편이 생기면 중단하세요.";
+const DIFFICULTIES = { easy: "쉬움", normal: "보통", challenge: "도전" };
+// 시작 전 카드 정보. 값이 없는 항목은 빼서 "하루 1회 ·" 처럼 끝이 비지 않게 한다
+function cardFacts(card) {
+  const goal = [
+    `하루 ${card.daily_target_count}회`,
+    card.target_value != null
+      ? `${Number(card.target_value)}${card.unit || ""}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const method =
+    { timer: "타이머", photo: "사진 업로드", manual: "직접 확인", value: "수치 기록" }[
+      card.verification_type
+    ] || "현재 지원 대기";
+  return [
+    goal,
+    `인증 방법: ${method}`,
+    card.context_label ? `상황: ${card.context_label}` : "",
+    [
+      DIFFICULTIES[card.difficulty] ? `난이도 ${DIFFICULTIES[card.difficulty]}` : "",
+      card.daily_xp ? `하루 목표 ${card.daily_xp} XP` : "",
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    "하나의 몬스터를 공략하는 28일 주기예요.",
+  ]
+    .filter(Boolean)
+    .map((line) => `<p>${escape(line)}</p>`)
+    .join("");
+}
 async function renderToday() {
   const area = $(".today .panel-pad");
   const card = selected;
@@ -645,11 +679,11 @@ async function renderToday() {
   }
   const mission = missions.find((m) => m.challenge_id === card.challenge_id);
   if (!mission) {
-    area.innerHTML = `<h1>${escape(card.title)}</h1><p class="small-copy">${escape(card.description || "실천 내용을 확인하고 내 생활에 맞게 시작해요.")}</p><div class="live-details"><p>하루 ${card.daily_target_count}회 · ${escape(card.target_value ?? "")} ${escape(card.unit || "")}</p><p>인증 방법: ${escape({ timer: "타이머", photo: "사진 업로드", manual: "직접 확인" }[card.verification_type] || "현재 지원 대기")}</p><p>${escape(card.context_label || "")}</p></div>${card.safety_check_required ? '<label class="live-check"><input type="checkbox" id="live-safety"> 운동 전 안전 안내를 확인했고 무리 없이 수행할 수 있어요.</label>' : ""}${card.context_type === "event" ? '<label>예정 이용일<input id="live-scheduled-date" type="date" min="' + dateKey() + '"></label><p class="small-copy">예정된 이용일을 선택해주세요.</p>' : ""}<button type="button" class="primary" data-live-start>이 챌린지 시작하기</button>${button("다른 챌린지 보기", "data-live-quests")}`;
+    area.innerHTML = `<h1>${escape(card.title)}</h1><p class="small-copy">${escape(card.description || "실천 내용을 확인하고 내 생활에 맞게 시작해요.")}</p><div class="live-details">${cardFacts(card)}</div>${card.safety_check_required ? `<p class="field-help">${SAFETY_GUIDE}</p><label class="live-check"><input type="checkbox" id="live-safety"> 운동 전 안전 안내를 확인했고 무리 없이 수행할 수 있어요.</label>` : ""}${card.context_type === "event" ? '<label>예정 이용일<input id="live-scheduled-date" type="date" min="' + dateKey() + '"></label><p class="small-copy">예정된 이용일을 선택해주세요.</p>' : ""}<button type="button" class="primary" data-live-start>이 챌린지 시작하기</button>${button("다른 챌린지 보기", "data-live-quests")}`;
     return;
   }
   selected = { ...mission, live: true };
-  area.innerHTML = `<h1>${escape(mission.title)}</h1><p class="small-copy">${mission.start_date} ~ ${mission.end_date} · 하루 ${mission.daily_target_count}회</p><p>수행률 ${mission.progress_rate === null ? "—" : Math.round(mission.progress_rate * 100) + "%"} · ${mission.completed_count}회 완료</p><div class="live-occurrences">${mission.today_occurrences.map((o) => `<article class="slot ${o.status === "completed" ? "done" : ""}" data-occurrence="${o.occurrence_id}"><h3>${escape({ lunch: "점심", dinner: "저녁" }[o.slot_code] || o.sequence_no + "회차")}</h3><p>${o.status === "completed" ? "인정 완료" : `${mission.target_value ?? ""} ${escape(mission.unit || "")} · 아직 기록 전`}</p>${o.status === "completed" ? "" : mission.verification_type === "timer" ? `<strong class="live-timer" data-timer-display="${o.occurrence_id}">00:00</strong><button type="button" class="verify" data-live-timer="${o.occurrence_id}">타이머 시작</button><button type="button" class="verify" data-live-complete="${o.occurrence_id}" disabled>시간을 채운 뒤 완료</button>` : mission.verification_type === "photo" ? `<label class="live-photo">사진 선택<input type="file" accept="image/jpeg,image/png" data-photo-for="${o.occurrence_id}"></label><button type="button" class="verify" data-live-complete="${o.occurrence_id}">사진 업로드하고 완료</button>` : mission.verification_type === "manual" ? `<label><input type="checkbox" data-manual-for="${o.occurrence_id}"> 실제로 수행했어요.</label><button type="button" class="verify" data-live-complete="${o.occurrence_id}">수행 기록하기</button>` : "<p>아직 지원하지 않는 인증 방식이에요.</p>"}</article>`).join("") || "<p>오늘 예정된 수행 기회가 없어요.</p>"}</div>${button("보상 확인", 'data-live-bag="draw"')}${button("다른 챌린지 보기", "data-live-quests")}${button("챌린지 중단", "data-live-stop")}`;
+  area.innerHTML = `<h1>${escape(mission.title)}</h1><p class="small-copy">${mission.start_date} ~ ${mission.end_date} · 하루 ${mission.daily_target_count}회</p><p>수행률 ${mission.progress_rate === null ? "—" : Math.round(mission.progress_rate * 100) + "%"} · ${mission.completed_count}회 완료</p><div class="live-occurrences">${mission.today_occurrences.map((o) => `<article class="slot ${o.status === "completed" ? "done" : ""}" data-occurrence="${o.occurrence_id}"><h3>${escape({ lunch: "점심", dinner: "저녁" }[o.slot_code] || o.sequence_no + "회차")}</h3><p>${o.status === "completed" ? "인정 완료" : (mission.target_value != null ? `${Number(mission.target_value)}${escape(mission.unit || "")} · ` : "") + "아직 기록 전"}</p>${o.status === "completed" ? "" : mission.verification_type === "timer" ? `<strong class="live-timer" data-timer-display="${o.occurrence_id}">00:00</strong><button type="button" class="verify" data-live-timer="${o.occurrence_id}">타이머 시작</button><button type="button" class="verify" data-live-complete="${o.occurrence_id}" disabled>시간을 채운 뒤 완료</button>` : mission.verification_type === "photo" ? `<label class="live-photo">사진 선택<input type="file" accept="image/jpeg,image/png" data-photo-for="${o.occurrence_id}"></label><button type="button" class="verify" data-live-complete="${o.occurrence_id}">사진 업로드하고 완료</button>` : mission.verification_type === "manual" ? `<label><input type="checkbox" data-manual-for="${o.occurrence_id}"> 실제로 수행했어요.</label><button type="button" class="verify" data-live-complete="${o.occurrence_id}">수행 기록하기</button>` : "<p>아직 지원하지 않는 인증 방식이에요.</p>"}</article>`).join("") || "<p>오늘 예정된 수행 기회가 없어요.</p>"}</div>${button("보상 확인", 'data-live-bag="draw"')}${button("다른 챌린지 보기", "data-live-quests")}<button type="button" class="danger-link" data-live-stop>챌린지 중단</button>`;
   for (const o of mission.today_occurrences) {
     if (o.timer_session_id && o.status === "planned") {
       const timer = await api(
@@ -705,6 +739,7 @@ async function startChallenge() {
   }
   await api("/user-challenges", { method: "POST", body });
   await go("today");
+  message("챌린지를 시작했어요. 오늘 예정 기회를 확인해주세요.");
 }
 async function complete(occurrenceId) {
   const mission = selected,

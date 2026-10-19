@@ -445,3 +445,13 @@ button:focus-visible {
   border-radius: 50%;
   background: #e5484d;
 }
+
+.danger-link {
+  display: block;
+  margin: 18px auto 0;
+  border: 0;
+  background: none;
+  color: #b42318;
+  font-size: 13px;
+  text-decoration: underline;
+}
