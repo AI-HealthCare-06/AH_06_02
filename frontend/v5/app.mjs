@@ -653,12 +653,23 @@ function profile() {
   // 서버 가입 검증(app/core/validators/user_validators.py)과 같은 범위
   const latest = Number(dateKey().slice(0, 4)) - 14;
   const birth = Number(get("birth_year"));
+  if (!Number.isInteger(birth))
+    throw fieldError(
+      field("birth_year"),
+      "출생연도는 소수점 없이 입력해주세요.",
+    );
   if (birth < 1900 || birth > latest)
     throw fieldError(
       field("birth_year"),
       `출생연도는 1900~${latest}년 사이로 입력해주세요.`,
     );
   const height = Number(get("height"));
+  // 키는 소수점 아래 한 자리로 저장된다(users.height_cm). 자릿수가 더 많으면 서버가 말없이 반올림한다
+  if ((String(height).split(".")[1] || "").length > 1)
+    throw fieldError(
+      field("height"),
+      "키는 소수점 아래 한 자리까지 입력해주세요.",
+    );
   if (height < 100 || height > 250)
     throw fieldError(field("height"), "키는 100~250cm 사이로 입력해주세요.");
   return {

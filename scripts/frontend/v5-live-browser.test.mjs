@@ -36,7 +36,12 @@ const mission = {
 };
 async function fillSignup(
   page,
-  { walkingDays = "3", weight = "70", untilHealth = false } = {},
+  {
+    walkingDays = "3",
+    weight = "70",
+    height = "170",
+    untilHealth = false,
+  } = {},
 ) {
   await page.locator(".login .text-link[data-route=signup]").click();
   await page.locator("#nickname").fill("새 모험가");
@@ -49,7 +54,7 @@ async function fillSignup(
   await page.locator('.signup-form [type="submit"]').click();
   await page.getByRole("button", { name: "♂ 남성" }).click();
   await page.getByRole("spinbutton", { name: "출생연도" }).fill("1975");
-  await page.getByRole("spinbutton", { name: "키" }).fill("170");
+  await page.getByRole("spinbutton", { name: "키" }).fill(height);
   await page.getByRole("spinbutton", { name: "체중" }).fill(weight);
   await page.getByRole("spinbutton", { name: "허리둘레" }).fill("85");
   await page.locator('.health button[type="submit"]').click();
@@ -1046,4 +1051,32 @@ test("로그인하지 않은 채 회원가입 주소로 들어오면 바로 회�
       "signup",
     );
     assert.equal(new URL(page.url()).hash, "#signup");
+  }));
+
+test("키와 출생연도도 저장 형식에 맞지 않으면 그 칸에서 알려준다", async () =>
+  withPage(async (page, base) => {
+    const calls = await mock(page, { signedOut: true });
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page, { untilHealth: true, height: "170.55" });
+    await page.locator(".field-error").waitFor();
+    const height = page.getByRole("spinbutton", { name: "키" });
+    assert.equal(await height.getAttribute("aria-invalid"), "true");
+    assert.match(
+      await page.locator(".field-error").textContent(),
+      /소수점 아래 한 자리/,
+    );
+    await height.fill("170.5");
+    await page.getByRole("spinbutton", { name: "출생연도" }).fill("1975.5");
+    await page.locator('.health button[type="submit"]').click();
+    await page.locator(".field-error").waitFor();
+    assert.equal(
+      await page
+        .getByRole("spinbutton", { name: "출생연도" })
+        .getAttribute("aria-invalid"),
+      "true",
+    );
+    assert.equal(
+      calls.some((c) => c.path === "/auth/signup"),
+      false,
+    );
   }));
