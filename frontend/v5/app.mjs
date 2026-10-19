@@ -47,6 +47,27 @@ const labels = {
   cotinine: "코티니",
   spike: "스파이크",
 };
+// 건강정보 단계별 서버 필드와 입력칸 이름
+const HEALTH_FIELDS = {
+  health: { weight_kg: "체중", waist_cm: "허리둘레" },
+  health2: {
+    alcohol_frequency: "음주 빈도",
+    alcohol_amount: "1회 음주량",
+    walking_days: "주당 걷기 일수",
+    walking_minutes: "1회 걷기 시간",
+    strength_days: "주당 근력운동 일수",
+    sitting_minutes: "하루 앉아 있는 시간",
+    dining_out_freq: "외식 빈도",
+  },
+  health3: {
+    sbp: "수축기 혈압",
+    dbp: "이완기 혈압",
+    fasting_glucose: "공복혈당",
+    hba1c: "당화혈색소",
+    triglyceride: "중성지방",
+    hdl: "HDL 콜레스테롤",
+  },
+};
 const auth = new AuthSession();
 const api = auth.api;
 const upload = createEvidenceUploader(api);
@@ -531,27 +552,7 @@ function renderEvolution() {
 }
 function healthValues(page) {
   const get = (label) => $(`.${page} [aria-label="${label}"]`)?.value;
-  const fields =
-    page === "health"
-      ? { weight_kg: "체중", waist_cm: "허리둘레" }
-      : page === "health2"
-        ? {
-            alcohol_frequency: "음주 빈도",
-            alcohol_amount: "1회 음주량",
-            walking_days: "주당 걷기 일수",
-            walking_minutes: "1회 걷기 시간",
-            strength_days: "주당 근력운동 일수",
-            sitting_minutes: "하루 앉아 있는 시간",
-            dining_out_freq: "외식 빈도",
-          }
-        : {
-            sbp: "수축기 혈압",
-            dbp: "이완기 혈압",
-            fasting_glucose: "공복혈당",
-            hba1c: "당화혈색소",
-            triglyceride: "중성지방",
-            hdl: "HDL 콜레스테롤",
-          };
+  const fields = HEALTH_FIELDS[page];
   return Object.fromEntries(
     Object.entries(fields)
       .filter(([, label]) => get(label) !== "")
