@@ -299,3 +299,30 @@ test("320px에서도 가방·후보 도감·성장 달력이 가로로 넘치지
       );
     }
   }));
+
+test("건강정보 입력칸의 예시는 입력값과 구분되게 흐리게 보이고 '예:'로 시작한다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#health", base).href);
+    const field = page.getByRole("spinbutton", { name: "출생연도" });
+    await field.waitFor();
+    const look = await field.evaluate((el) => {
+      const value = getComputedStyle(el);
+      const hint = getComputedStyle(el, "::placeholder");
+      return {
+        placeholder: el.placeholder,
+        hintWeight: hint.fontWeight,
+        valueWeight: value.fontWeight,
+        hintColor: hint.color,
+        valueColor: value.color,
+      };
+    });
+    assert.match(look.placeholder, /^예: /);
+    assert.equal(look.hintWeight, "400");
+    assert.notEqual(look.hintColor, look.valueColor);
+    for (const label of ["수축기 혈압", "주당 걷기 일수"])
+      assert.match(
+        await page.locator(`[aria-label="${label}"]`).getAttribute("placeholder"),
+        /^예: /,
+      );
+  }));
