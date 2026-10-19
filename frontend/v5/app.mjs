@@ -68,6 +68,16 @@ const HEALTH_FIELDS = {
     hdl: "HDL 콜레스테롤",
   },
 };
+// 서버 허용 범위(app/core/validators/health_validators.py)와 같다. 계정을 만들기 전에 먼저 알린다
+const HEALTH_RANGES = {
+  weight_kg: [30, 200],
+  sbp: [70, 250],
+  fasting_glucose: [40, 500],
+  walking_days: [0, 7],
+  strength_days: [0, 7],
+  walking_minutes: [0, 1440],
+  sitting_minutes: [0, 1440],
+};
 const auth = new AuthSession();
 const api = auth.api;
 const upload = createEvidenceUploader(api);
@@ -554,6 +564,16 @@ function renderEvolution() {
       "",
     )}</div><div class="evolution-strip">${[1, 2, 3, 4, 5].map((step) => `<div>${art(m?.code || "viscera", step)}<b>${step}단계</b></div>`).join("")}</div><p>공략 진행률에 따라 외형이 변해요. 위험도·위협도는 재측정 후 갱신돼요.</p>`;
 }
+function checkRanges(page) {
+  for (const [key, value] of Object.entries(healthValues(page))) {
+    const range = HEALTH_RANGES[key];
+    if (range && (value < range[0] || value > range[1]))
+      throw fieldError(
+        $(`.${page} [aria-label="${HEALTH_FIELDS[page][key]}"]`),
+        `${range[0]}~${range[1]} 사이로 입력해주세요.`,
+      );
+  }
+}
 function healthValues(page) {
   const get = (label) => $(`.${page} [aria-label="${label}"]`)?.value;
   const fields = HEALTH_FIELDS[page];
@@ -576,6 +596,17 @@ function profile() {
   for (const key of ["dm", "htn", "dm_med", "htn_med"])
     if (get(key) === "")
       throw fieldError(field(key), "진단·복약 여부를 선택해주세요.");
+  // 서버 가입 검증(app/core/validators/user_validators.py)과 같은 범위
+  const latest = Number(dateKey().slice(0, 4)) - 14;
+  const birth = Number(get("birth_year"));
+  if (birth < 1900 || birth > latest)
+    throw fieldError(
+      field("birth_year"),
+      `출생연도는 1900~${latest}년 사이로 입력해주세요.`,
+    );
+  const height = Number(get("height"));
+  if (height < 100 || height > 250)
+    throw fieldError(field("height"), "키는 100~250cm 사이로 입력해주세요.");
   return {
     birth_year: Number(get("birth_year")),
     height_cm: Number(get("height")),
@@ -645,6 +676,7 @@ function validateHealth() {
       key === "smoking" ? smoking === undefined : body[key] === undefined;
     if (missing) throw fieldError(input(label), text);
   }
+  ["health", "health2", "health3"].forEach(checkRanges);
   body.smoking_current = smoking;
   if (body.alcohol_frequency === 1) body.alcohol_amount = 0;
   if (body.walking_days === 0) body.walking_minutes = 0;
@@ -1362,6 +1394,7 @@ document.addEventListener("submit", (event) => {
           $('.health [aria-label="허리둘레"]'),
           "허리둘레를 입력해주세요.",
         );
+      checkRanges("health");
       await go("health2");
       return;
     }

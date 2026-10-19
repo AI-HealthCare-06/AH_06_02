@@ -777,3 +777,26 @@ test("가입 중 서버가 건강정보를 거절하면 입력을 지키고 틀�
     assert.equal(posts("/auth/signup"), 1, "계정은 한 번만 만든다");
     assert.equal(posts("/health-records"), 2);
   }));
+
+test("허용 범위를 벗어난 값은 계정을 만들기 전에 그 단계에서 알려준다", async () =>
+  withPage(async (page, origin) => {
+    const calls = await mock(page, { signedOut: true });
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page, { walkingDays: "8" });
+    await page.locator(".field-error").waitFor();
+    assert.equal(
+      await page.evaluate(() => document.body.dataset.page),
+      "health2",
+    );
+    assert.equal(
+      await page
+        .getByRole("spinbutton", { name: "주당 걷기 일수" })
+        .getAttribute("aria-invalid"),
+      "true",
+    );
+    assert.match(await page.locator(".field-error").textContent(), /0~7/);
+    assert.equal(
+      calls.some((c) => c.path === "/auth/signup"),
+      false,
+    );
+  }));
