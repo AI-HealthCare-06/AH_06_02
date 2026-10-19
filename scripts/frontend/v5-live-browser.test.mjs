@@ -78,7 +78,9 @@ async function mock(page, state = {}) {
             seal_progress: 0,
             impact_explanation: {
               status: "available",
-              winners: [{ disease: "hypertension", factor_key: "bmi_high", score: 41 }],
+              winners: [
+                { disease: "hypertension", factor_key: "bmi_high", score: 41 },
+              ],
             },
           },
           {
@@ -165,10 +167,30 @@ async function mock(page, state = {}) {
           {
             disease: "diabetes",
             items: [
-              { factor_key: "age", contribution: -0.012, direction: "decrease", modifiable: false },
-              { factor_key: "family_history_dm", contribution: 0.0117, direction: "increase", modifiable: false },
-              { factor_key: "bmi_high", contribution: 0.0106, direction: "increase", modifiable: true },
-              { factor_key: "smoking_current", contribution: 0.0004, direction: "increase", modifiable: true },
+              {
+                factor_key: "age",
+                contribution: -0.012,
+                direction: "decrease",
+                modifiable: false,
+              },
+              {
+                factor_key: "family_history_dm",
+                contribution: 0.0117,
+                direction: "increase",
+                modifiable: false,
+              },
+              {
+                factor_key: "bmi_high",
+                contribution: 0.0106,
+                direction: "increase",
+                modifiable: true,
+              },
+              {
+                factor_key: "smoking_current",
+                contribution: 0.0004,
+                direction: "increase",
+                modifiable: true,
+              },
             ],
           },
         ],
@@ -347,7 +369,9 @@ test("건강정보 입력칸의 예시는 입력값과 구분되게 흐리게 �
     assert.notEqual(look.hintColor, look.valueColor);
     for (const label of ["수축기 혈압", "주당 걷기 일수"])
       assert.match(
-        await page.locator(`[aria-label="${label}"]`).getAttribute("placeholder"),
+        await page
+          .locator(`[aria-label="${label}"]`)
+          .getAttribute("placeholder"),
         /^예: /,
       );
   }));
@@ -361,9 +385,15 @@ test("건강정보에서 빠진 칸은 그 칸에 오류를 표시하고 그 칸
     await page.locator('.health button[type="submit"]').click();
     const height = page.getByRole("spinbutton", { name: "키" });
     assert.equal(await height.getAttribute("aria-invalid"), "true");
-    assert.equal(await height.evaluate((el) => el === document.activeElement), true);
+    assert.equal(
+      await height.evaluate((el) => el === document.activeElement),
+      true,
+    );
     const describedBy = await height.getAttribute("aria-describedby");
-    assert.match(await page.locator("#" + describedBy).textContent(), /키를 입력해주세요/);
+    assert.match(
+      await page.locator("#" + describedBy).textContent(),
+      /키를 입력해주세요/,
+    );
     await height.fill("170");
     assert.equal(await height.getAttribute("aria-invalid"), null);
     assert.equal(await page.locator(".field-error").count(), 0);
@@ -373,19 +403,28 @@ test("회원가입은 비밀번호 규칙을 미리 보여주고 틀린 칸에 �
   withPage(async (page, base) => {
     await mock(page);
     await page.goto(new URL(path + "#signup", base).href);
-    await page.getByText("영문과 숫자를 포함해 8자 이상", { exact: false }).waitFor();
+    await page
+      .getByText("영문과 숫자를 포함해 8자 이상", { exact: false })
+      .waitFor();
     await page.locator("#nickname").fill("모험가");
     await page.locator('.signup-form [type="email"]').fill("a@dangokiller.com");
-    const [password, confirm] = await page.locator('.signup-form [type="password"]').all();
+    const [password, confirm] = await page
+      .locator('.signup-form [type="password"]')
+      .all();
     await password.fill("testtest");
     await confirm.fill("testtest");
     await page.locator(".signup-form .consent input").check();
     await page.locator('.signup-form [type="submit"]').click();
     assert.equal(await password.getAttribute("aria-invalid"), "true");
-    assert.equal(await password.evaluate((el) => el === document.activeElement), true);
+    assert.equal(
+      await password.evaluate((el) => el === document.activeElement),
+      true,
+    );
     // 오류 문구가 나란한 두 칸 사이에 끼어 배치를 깨지 않는다
     const [left, right] = await Promise.all([
-      password.evaluate((el) => el.closest("label").getBoundingClientRect().top),
+      password.evaluate(
+        (el) => el.closest("label").getBoundingClientRect().top,
+      ),
       confirm.evaluate((el) => el.closest("label").getBoundingClientRect().top),
     ]);
     assert.equal(Math.round(left), Math.round(right));
@@ -413,8 +452,13 @@ test("전투 화면은 수행해도 위협도가 바로 줄지 않는 이유를 
   withPage(async (page, base) => {
     await mock(page, { mission: true, completed: true });
     await page.goto(new URL(path + "#reco", base).href);
-    await page.locator("#battle-score").filter({ hasText: "10 / 100" }).waitFor();
-    const note = page.locator(".fighter-panel.opponent").getByText("재측정 때 바뀌어요", { exact: false });
+    await page
+      .locator("#battle-score")
+      .filter({ hasText: "10 / 100" })
+      .waitFor();
+    const note = page
+      .locator(".fighter-panel.opponent")
+      .getByText("재측정 때 바뀌어요", { exact: false });
     assert.equal(await note.isVisible(), true);
     assert.equal(await page.locator("#battle-threat").textContent(), "41");
   }));
@@ -427,8 +471,15 @@ test("받을 보상이 있으면 가방 아이콘에 표시하고 가방을 카�
     await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
     assert.equal(await bag.getAttribute("aria-label"), "가방, 받을 보상 1개");
     await bag.click();
-    await page.getByText("5장 중 3장을 골라주세요", { exact: true }).waitFor({ timeout: 3000 });
-    assert.equal(await page.getByText("아직 획득한 보상이 없어요", { exact: false }).count(), 0);
+    await page
+      .getByText("5장 중 3장을 골라주세요", { exact: true })
+      .waitFor({ timeout: 3000 });
+    assert.equal(
+      await page
+        .getByText("아직 획득한 보상이 없어요", { exact: false })
+        .count(),
+      0,
+    );
   }));
 
 const card = (overrides) => ({
@@ -455,18 +506,31 @@ test("전투 카드 이름은 시안의 요인별 공격 이름을 쓴다", asyn
   withPage(async (page, base) => {
     await mock(page, {
       cards: [
-        card({ recommendation_id: 41, challenge_id: 4, title: "맨몸 근력 10분", factor_key: "strength_activity_low" }),
-        card({ recommendation_id: 42, challenge_id: 5, title: "업무 중 움직임 휴식", factor_key: "sedentary_time_high" }),
-        card({ recommendation_id: 43, challenge_id: 6, title: "계단으로 올라가기" }),
+        card({
+          recommendation_id: 41,
+          challenge_id: 4,
+          title: "맨몸 근력 10분",
+          factor_key: "strength_activity_low",
+        }),
+        card({
+          recommendation_id: 42,
+          challenge_id: 5,
+          title: "업무 중 움직임 휴식",
+          factor_key: "sedentary_time_high",
+        }),
+        card({
+          recommendation_id: 43,
+          challenge_id: 6,
+          title: "계단으로 올라가기",
+        }),
       ],
     });
     await page.goto(new URL(path + "#reco", base).href);
     await page.locator(".reco-card").first().waitFor();
-    assert.deepEqual(await page.locator(".reco-card .quest-card-label").allTextContents(), [
-      "근력 공격",
-      "휴식 공격",
-      "걷기 공격",
-    ]);
+    assert.deepEqual(
+      await page.locator(".reco-card .quest-card-label").allTextContents(),
+      ["근력 공격", "휴식 공격", "걷기 공격"],
+    );
   }));
 
 test("챌린지 상세는 빈 값 없이 목표·XP·난이도와 안전 안내를 보여주고 시작하면 알려준다", async () =>
@@ -480,11 +544,18 @@ test("챌린지 상세는 빈 값 없이 목표·XP·난이도와 안전 안내�
     assert.doesNotMatch(text, /회 ·\s*(인증|$)/);
     assert.match(text, /하루 목표 36 XP/);
     assert.match(text, /도전/);
-    await page.getByText("통증이나 불편이 생기면 중단하세요", { exact: false }).waitFor();
+    await page
+      .getByText("통증이나 불편이 생기면 중단하세요", { exact: false })
+      .waitFor();
     await page.locator("#live-safety").check();
     await page.getByRole("button", { name: "이 챌린지 시작하기" }).click();
     await page.getByText("챌린지를 시작했어요", { exact: false }).waitFor();
-    assert.equal(await page.locator("[data-live-stop]").evaluate((el) => el.classList.contains("danger-link")), true);
+    assert.equal(
+      await page
+        .locator("[data-live-stop]")
+        .evaluate((el) => el.classList.contains("danger-link")),
+      true,
+    );
   }));
 
 test("가족력은 해당 없을 때 비워두라는 안내를 바로 아래에 둔다", async () =>
@@ -493,7 +564,10 @@ test("가족력은 해당 없을 때 비워두라는 안내를 바로 아래에 
     await page.goto(new URL(path + "#health2", base).href);
     const block = page.locator(".health2 .medicine");
     await block.waitFor();
-    assert.match(await block.textContent(), /가족력이 없으면 두 항목 모두 선택하지 않아요/);
+    assert.match(
+      await block.textContent(),
+      /가족력이 없으면 두 항목 모두 선택하지 않아요/,
+    );
     assert.equal(await block.locator(".required-note").count(), 0);
   }));
 
@@ -503,15 +577,22 @@ test("v4 에서 맞춘 문구와 기여요인 Top3 를 v5 에도 보여준다", 
     await page.goto(new URL(path + "#risk", base).href);
     await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
     assert.equal(
-      await page.locator('[data-village-key="viscera"] .village-plaque span').textContent(),
+      await page
+        .locator('[data-village-key="viscera"] .village-plaque span')
+        .textContent(),
       "체격·활동 관련 요인",
     );
     // 가입·검진 화면은 같은 문서 안에 숨겨져 있어 문구만 확인한다
     assert.equal(
-      (await page.locator(".signup-form .consent").textContent()).replace(/\s+/g, " ").trim(),
+      (await page.locator(".signup-form .consent").textContent())
+        .replace(/\s+/g, " ")
+        .trim(),
       "의료 고지를 확인했습니다.*필수",
     );
-    assert.match(await page.locator(".health3").textContent(), /비워두면 간편 모드로 저장돼요/);
+    assert.match(
+      await page.locator(".health3").textContent(),
+      /비워두면 간편 모드로 저장돼요/,
+    );
     await page.goto(new URL(path + "#monsters", base).href);
     await page.reload();
     const top = page.locator(".live-top-factors");
@@ -530,14 +611,25 @@ test("도감은 휴대폰 화면에서 두 마리씩 보여주고 산정 설명�
     await page.goto(new URL(path + "#monsters", base).href);
     const cards = page.locator(".live-monster");
     await cards.first().waitFor();
-    const [first, second] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+    const [first, second] = await Promise.all([
+      cards.nth(0).boundingBox(),
+      cards.nth(1).boundingBox(),
+    ]);
     assert.equal(Math.round(first.y), Math.round(second.y));
     await cards.nth(0).locator("summary").click();
-    assert.match(await cards.nth(0).locator("details").textContent(), /높은 체질량지수 41/);
-    assert.doesNotMatch(await cards.nth(0).locator("details").textContent(), /bmi_high/);
+    assert.match(
+      await cards.nth(0).locator("details").textContent(),
+      /높은 체질량지수 41/,
+    );
+    assert.doesNotMatch(
+      await cards.nth(0).locator("details").textContent(),
+      /bmi_high/,
+    );
     await page.setViewportSize({ width: 320, height: 800 });
     assert.equal(
-      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
       true,
     );
   }));

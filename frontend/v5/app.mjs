@@ -465,8 +465,9 @@ async function topFactorsHtml() {
   if (!summary?.prediction_id) return "";
   let diseases;
   try {
-    diseases = (await api(`/predictions/${summary.prediction_id}/contributions`))
-      .diseases;
+    diseases = (
+      await api(`/predictions/${summary.prediction_id}/contributions`)
+    ).diseases;
   } catch {
     return "";
   }
@@ -548,7 +549,8 @@ function profile() {
     throw fieldError($('.health [aria-label="성별"]'), "성별을 선택해주세요.");
   if (get("birth_year") === "")
     throw fieldError(field("birth_year"), "출생연도를 입력해주세요.");
-  if (get("height") === "") throw fieldError(field("height"), "키를 입력해주세요.");
+  if (get("height") === "")
+    throw fieldError(field("height"), "키를 입력해주세요.");
   for (const key of ["dm", "htn", "dm_med", "htn_med"])
     if (get(key) === "")
       throw fieldError(field(key), "진단·복약 여부를 선택해주세요.");
@@ -602,8 +604,16 @@ function validateHealth() {
     ["alcohol_amount", "1회 음주량", "한 번에 마시는 양을 선택해주세요."],
     ["walking_days", "주당 걷기 일수", "주당 걷기 일수를 입력해주세요."],
     ["walking_minutes", "1회 걷기 시간", "1회 걷기 시간을 입력해주세요."],
-    ["strength_days", "주당 근력운동 일수", "주당 근력운동 일수를 입력해주세요."],
-    ["sitting_minutes", "하루 앉아 있는 시간", "하루 앉아 있는 시간을 입력해주세요."],
+    [
+      "strength_days",
+      "주당 근력운동 일수",
+      "주당 근력운동 일수를 입력해주세요.",
+    ],
+    [
+      "sitting_minutes",
+      "하루 앉아 있는 시간",
+      "하루 앉아 있는 시간을 입력해주세요.",
+    ],
     ["dining_out_freq", "외식 빈도", "외식 빈도를 선택해주세요."],
   ];
   for (const [key, label, text] of required) {
@@ -698,15 +708,20 @@ function cardFacts(card) {
     .filter(Boolean)
     .join(" · ");
   const method =
-    { timer: "타이머", photo: "사진 업로드", manual: "직접 확인", value: "수치 기록" }[
-      card.verification_type
-    ] || "현재 지원 대기";
+    {
+      timer: "타이머",
+      photo: "사진 업로드",
+      manual: "직접 확인",
+      value: "수치 기록",
+    }[card.verification_type] || "현재 지원 대기";
   return [
     goal,
     `인증 방법: ${method}`,
     card.context_label ? `상황: ${card.context_label}` : "",
     [
-      DIFFICULTIES[card.difficulty] ? `난이도 ${DIFFICULTIES[card.difficulty]}` : "",
+      DIFFICULTIES[card.difficulty]
+        ? `난이도 ${DIFFICULTIES[card.difficulty]}`
+        : "",
       card.daily_xp ? `하루 목표 ${card.daily_xp} XP` : "",
     ]
       .filter(Boolean)
@@ -1290,7 +1305,10 @@ document.addEventListener("submit", (event) => {
       profile();
       const values = healthValues("health");
       if (!values.weight_kg)
-        throw fieldError($('.health [aria-label="체중"]'), "체중을 입력해주세요.");
+        throw fieldError(
+          $('.health [aria-label="체중"]'),
+          "체중을 입력해주세요.",
+        );
       if (!values.waist_cm)
         throw fieldError(
           $('.health [aria-label="허리둘레"]'),
