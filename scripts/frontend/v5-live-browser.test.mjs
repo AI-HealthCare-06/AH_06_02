@@ -369,3 +369,11 @@ test("검진정보 제목은 선택 단계임을 밝힌다", async () =>
       .filter({ hasText: "검진 수치가 있으면 알려주세요(선택)" })
       .waitFor({ timeout: 3000 });
   }));
+
+test("실제 연결 모드의 예측 대기 화면에는 시안용 예시 결과 버튼이 없다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#waiting", base).href);
+    await page.locator('.scene[data-page="waiting"]:not([hidden])').waitFor();
+    assert.equal(await page.getByText("예시 결과 보기").count(), 0);
+  }));

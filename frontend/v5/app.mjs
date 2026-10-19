@@ -1265,6 +1265,8 @@ auth.subscribe((session) => {
   if (previous && !nextOwner)
     go("login").catch((error) => message(error.message, true));
 });
+// 실제 연결 모드는 예측이 끝나면 지도로 자동 이동한다. 시안용 예시 결과 버튼은 가짜 결과로 오해하게 한다
+$('[data-page="waiting"] [data-route="risk"]')?.remove();
 const initial = location.hash.slice(1);
 await run(async () => {
   if (await auth.restore()) await go(names[initial] ? initial : "risk", false);
