@@ -1087,11 +1087,11 @@ function renderDraw(panel) {
 }
 async function renderGrowth(ticket) {
   const [records, progress] = await Promise.all([
-    api("/health-records?size=100"),
+    allPages("/health-records"),
     api(`/adventure/progress?month=${month}`),
   ]);
   if (ticket !== navigation) return;
-  healthRecords = records.items;
+  healthRecords = records;
   calendar = progress;
   $$("[data-growth-tab]").forEach((b) =>
     b.setAttribute("aria-pressed", String(b.dataset.growthTab === growth)),

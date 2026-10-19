@@ -321,7 +321,27 @@ async function mock(page, state = {}) {
       data = { prediction_id: 5 };
     else if (p === "/predictions/5")
       data = { status: state.predicting ? "pending" : "done" };
-    else if (p === "/health-records") data = { items: [] };
+    else if (p === "/health-records" && state.manyRecords) {
+      // 최신순 101건 중 가장 오래된 1건만 체중이 99.9kg 이다
+      const page = Number(url.searchParams.get("page") || 1);
+      const size = Number(url.searchParams.get("size") || 20);
+      const all = Array.from({ length: 101 }, (_, i) => ({
+        health_record_id: 500 - i,
+        recorded_at: `2026-${i === 100 ? "01-02" : "10-01"}T08:00:00+09:00`,
+        input_mode: "daily",
+        weight_kg: i === 100 ? 99.9 : 70,
+        waist_cm: null,
+        sbp: null,
+        dbp: null,
+        fasting_glucose: null,
+      }));
+      data = {
+        items: all.slice((page - 1) * size, page * size),
+        total: all.length,
+        page,
+        size,
+      };
+    } else if (p === "/health-records") data = { items: [] };
     else if (p === "/adventure/progress")
       data = { days: [], missions: [], cycles: [] };
     else throw new Error("예상하지 않은 API: " + p);
@@ -1079,4 +1099,20 @@ test("키와 출생연도도 저장 형식에 맞지 않으면 그 칸에서 알
       calls.some((c) => c.path === "/auth/signup"),
       false,
     );
+  }));
+
+test("건강 기록이 100건을 넘어도 오래된 기록까지 보여준다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { manyRecords: true });
+    await page.goto(new URL(path + "#progress", base).href);
+    await page.locator('[data-growth-tab="health"]').click();
+    await page.locator(".live-health-history article").first().waitFor();
+    assert.equal(
+      await page.locator(".live-health-history article").count(),
+      101,
+    );
+    await page
+      .locator(".live-health-history")
+      .getByText("체중 99.9 kg", { exact: false })
+      .waitFor();
   }));
