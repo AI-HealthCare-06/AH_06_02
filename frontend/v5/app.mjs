@@ -130,7 +130,11 @@ function showFieldError(target, text) {
   note.id = id;
   note.setAttribute("role", "alert");
   note.textContent = text;
-  const box = target.closest(".two-columns, label, [role=group]") || target;
+  // 두 칸이 나란한 묶음 안에 끼우면 칸 배치가 깨져서 묶음 아래에 둔다
+  const box =
+    target.closest(".two-columns") ||
+    target.closest("label, [role=group]") ||
+    target;
   box.insertAdjacentElement("afterend", note);
   const focusable = target.matches("input, select, button")
     ? target

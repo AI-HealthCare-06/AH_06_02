@@ -443,9 +443,15 @@ button:focus-visible {
   font-size: 12px;
   font-weight: 600;
 }
-[aria-invalid="true"] {
+[role="group"][aria-invalid="true"],
+select[aria-invalid="true"],
+input[type="checkbox"][aria-invalid="true"] {
   outline: 2px solid #e5484d;
-  outline-offset: 1px;
+  outline-offset: 2px;
+}
+label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
+  border-color: #e5484d !important;
+  box-shadow: 0 0 0 1px #e5484d;
 }
 
 #adventure-nav [data-main-target="bag"].has-reward {

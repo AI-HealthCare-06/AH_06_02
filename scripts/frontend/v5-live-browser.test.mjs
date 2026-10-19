@@ -383,6 +383,12 @@ test("회원가입은 비밀번호 규칙을 미리 보여주고 틀린 칸에 �
     await page.locator('.signup-form [type="submit"]').click();
     assert.equal(await password.getAttribute("aria-invalid"), "true");
     assert.equal(await password.evaluate((el) => el === document.activeElement), true);
+    // 오류 문구가 나란한 두 칸 사이에 끼어 배치를 깨지 않는다
+    const [left, right] = await Promise.all([
+      password.evaluate((el) => el.closest("label").getBoundingClientRect().top),
+      confirm.evaluate((el) => el.closest("label").getBoundingClientRect().top),
+    ]);
+    assert.equal(Math.round(left), Math.round(right));
   }));
 
 test("검진정보 제목은 선택 단계임을 밝힌다", async () =>
