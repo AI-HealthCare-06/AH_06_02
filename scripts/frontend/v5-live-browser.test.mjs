@@ -43,6 +43,14 @@ async function mock(page, state = {}) {
       body = req.postDataJSON();
     calls.push({ path: p, method: req.method(), body });
     let data = { items: [] };
+    if (p === "/auth/refresh" && state.signedOut)
+      return route.fulfill({
+        status: 401,
+        json: {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "로그인이 필요합니다." },
+        },
+      });
     if (p === "/auth/refresh") data = { access_token: "v5-test-token" };
     else if (p === "/users/me")
       data = {
@@ -401,8 +409,9 @@ test("건강정보에서 빠진 칸은 그 칸에 오류를 표시하고 그 칸
 
 test("회원가입은 비밀번호 규칙을 미리 보여주고 틀린 칸에 오류를 표시한다", async () =>
   withPage(async (page, base) => {
-    await mock(page);
-    await page.goto(new URL(path + "#signup", base).href);
+    await mock(page, { signedOut: true });
+    await page.goto(new URL(path + "#login", base).href);
+    await page.locator(".login .text-link[data-route=signup]").click();
     await page
       .getByText("영문과 숫자를 포함해 8자 이상", { exact: false })
       .waitFor();
@@ -631,5 +640,26 @@ test("도감은 휴대폰 화면에서 두 마리씩 보여주고 산정 설명�
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
       true,
+    );
+  }));
+
+test("로그인된 상태에서는 회원가입 화면 대신 지도로 보내 기존 계정 정보를 덮어쓰지 않는다", async () =>
+  withPage(async (page, base) => {
+    const calls = await mock(page);
+    await page.goto(new URL(path + "#signup", base).href);
+    await page
+      .locator("#live-feedback")
+      .filter({ hasText: "이미 로그인되어 있어요" })
+      .waitFor();
+    assert.equal(await page.evaluate(() => document.body.dataset.page), "risk");
+    assert.equal(await page.locator(".signup-form").isVisible(), false);
+    assert.equal(
+      await page.locator('#app-menu [data-route="signup"]').count(),
+      0,
+      "메뉴에서도 회원가입 화면으로 들어가지 않는다",
+    );
+    assert.equal(
+      calls.some((c) => c.path === "/users/me" && c.method === "PATCH"),
+      false,
     );
   }));

@@ -248,6 +248,15 @@ async function go(id, push = true) {
     !["login", "signup", "health", "health2", "health3", "waiting"].includes(id)
   )
     id = "login";
+  // 로그인된 채로 가입을 마치면 새 계정이 아니라 지금 계정의 정보가 바뀐다
+  if (auth.signedIn && id === "signup") {
+    await go("risk", push);
+    if (active === "risk")
+      message(
+        "이미 로그인되어 있어요. 새 계정을 만들려면 메뉴에서 로그아웃해주세요.",
+      );
+    return;
+  }
   const ticket = ++navigation;
   clearInterval(timerPoll);
   timerPoll = null;
@@ -1374,6 +1383,7 @@ $(".waiting .panel-pad")?.insertAdjacentHTML(
 $(".health h1")?.nextElementSibling?.replaceChildren(
   document.createTextNode("현재 건강정보를 입력해 주세요."),
 );
+$('#app-menu [data-route="signup"]')?.remove();
 $("#app-menu").insertAdjacentHTML(
   "beforeend",
   button("로그아웃", "data-live-logout"),
