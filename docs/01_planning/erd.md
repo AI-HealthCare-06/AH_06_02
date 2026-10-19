@@ -326,3 +326,50 @@ erDiagram
 ## 날짜 필드
 
 `start_date` · `end_date` · `scheduled_date` · `progress_week_start` · `log_date` 는 KST 달력 날짜라 DATE로 저장합니다. UTC로 변환해 하루를 밀지 않습니다. 그 밖의 시각은 KST(Asia/Seoul) naive DATETIME입니다. `TORTOISE_ORM` 이 `timezone: Asia/Seoul` 이고 `use_tz` 를 켜지 않아 저장 단계에서 UTC로 변환하지 않습니다.
+
+## v5 API 추가 테이블
+
+2026-10-18 명세 사본에서 생성. 기존 테이블 유지, 3테이블·26컬럼·FK 7개 추가.
+
+```mermaid
+erDiagram
+    users ||--o{ challenge_timer_sessions : "user_id"
+    user_challenges ||--o{ challenge_timer_sessions : "user_challenge_id"
+    user_challenge_occurrences ||--o| challenge_timer_sessions : "occurrence_id"
+    challenge_logs |o--o| challenge_timer_sessions : "completed_log_id"
+    challenge_timer_sessions {
+        bigint id PK
+        bigint user_id FK
+        bigint user_challenge_id FK
+        bigint occurrence_id FK, UK
+        datetime started_at
+        int target_seconds
+        datetime expires_at
+        bigint completed_log_id FK, UK
+        datetime created_at
+    }
+    users ||--o{ reward_draws : "user_id"
+    challenge_logs ||--o| reward_draws : "challenge_log_id"
+    reward_draws {
+        bigint id PK
+        bigint user_id FK
+        bigint challenge_log_id FK, UK
+        json cards
+        json selected_positions
+        json results
+        datetime claimed_at
+        datetime created_at
+        datetime updated_at
+    }
+    users ||--o| adventurer_states : "user_id"
+    adventurer_states {
+        bigint id PK
+        bigint user_id FK, UK
+        json equipment
+        json room
+        int materials
+        smallint item_stage
+        datetime created_at
+        datetime updated_at
+    }
+```

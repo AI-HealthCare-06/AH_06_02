@@ -48,3 +48,4 @@ class ChallengeLogRequest(BaseModel):
     value: Annotated[Decimal, Field(max_digits=6, decimal_places=1)] | None = None
     verification_method: VerificationMethod
     evidence_url: str | None = Field(default=None, max_length=255)
+    timer_session_id: int | None = Field(default=None, gt=0, strict=True)

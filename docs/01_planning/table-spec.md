@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-15 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-18 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -23,6 +23,9 @@
 | 13 | user_attack_cycles | 사용자 공략 주기 | 김이경 (D) | /challenges | 10 | 집중 공략 수용 구조안. 사용자당 active1개·대상1개·공통D28. 팀 확정 전·DB 미반영. |
 | 14 | user_challenge_occurrences | 예정 기회 | 김이경 (D) | /challenges | 10 | 신규 — 10/3 A 결정. 예정 기회를 행으로 분리해 수행률 분모로 사용. 같은 기회 중복 완료는 유니크 제약으로 방지 |
 |  | 수용 구조안: 14테이블·222컬럼·FK23 (예정 기회 테이블 10개 컬럼, 종료 집계 컬럼 5개 반영, completion_summary_snapshot JSON 제거). active 주기 유니크용 생성 컬럼과 소유권 복합 FK는 ERD·DDL 단계에서 반영. DB 미반영 |  |  |  |  |  |
+| 15 | challenge_timer_sessions | 챌린지 타이머 세션 | 김이경 (D) | /user-challenges/*/timers | 9 | v5 API 연결. 기존 테이블 유지·추가 전용 |
+| 16 | reward_draws | 완료 보상 뽑기 | 김이경 (D) | /reward-draws | 9 | v5 API 연결. 기존 테이블 유지·추가 전용 |
+| 17 | adventurer_states | 모험가 꾸미기 상태 | 김이경 (D) | /adventurer/me | 8 | v5 API 연결. 기존 테이블 유지·추가 전용 |
 
 ## 테이블별 컬럼 명세
 
@@ -337,6 +340,50 @@
 | 9 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 신규 — 10/3 A 결정 |
 | 10 | updated_at | DATETIME | NN |  | ON UPDATE |  | 신규 — 10/3 A 결정 |
 
+### challenge_timer_sessions — 챌린지 타이머 세션
+담당 김이경 (D) · 9컬럼
+
+| No | 컬럼명 | 타입 | NULL | 키 | 기본값 | 설명 | 상태 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | id | BIGINT | NN | PK | AUTO_INCREMENT | 타이머 식별자 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 2 | user_id | BIGINT | NN | FK |  | → users.id. 본인 세션만 조회 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 3 | user_challenge_id | BIGINT | NN | FK |  | → user_challenges.id | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 4 | occurrence_id | BIGINT | NN | FK, UNIQUE |  | → user_challenge_occurrences.id. 예정 기회당 세션 1개 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 5 | started_at | DATETIME | NN |  |  | 서버 KST 시작 시각. 재요청으로 초기화하지 않음 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 6 | target_seconds | INT | NN |  |  | 개인 목표 분 단위를 초로 변환한 서버 기준값 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 7 | expires_at | DATETIME | NN |  |  | 해당 예정일 다음날 00:00 KST. 주기 종료 이후 불가 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 8 | completed_log_id | BIGINT | Y | FK, UNIQUE |  | → challenge_logs.id. 완료 전 NULL | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 9 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 생성 시각 | v5 API 연결 — 2026.10.18 사용자 요청 |
+
+### reward_draws — 완료 보상 뽑기
+담당 김이경 (D) · 9컬럼
+
+| No | 컬럼명 | 타입 | NULL | 키 | 기본값 | 설명 | 상태 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | id | BIGINT | NN | PK | AUTO_INCREMENT | 뽑기 식별자 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 2 | user_id | BIGINT | NN | FK |  | → users.id | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 3 | challenge_log_id | BIGINT | NN | FK, UNIQUE |  | → challenge_logs.id. 인정 완료 1건당 1회 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 4 | cards | JSON | NN |  |  | 서버가 정한 카드 5장. 수령 전 보상 코드는 응답에 노출하지 않음 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 5 | selected_positions | JSON | Y |  |  | 선택 위치 3개(0~4, 중복 불가) | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 6 | results | JSON | Y |  |  | 획득·중복 재료 전환 영수증. 같은 선택 재요청은 동일 응답 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 7 | claimed_at | DATETIME | Y |  |  | 수령 시각. 다른 선택으로 재수령 불가 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 8 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 생성 시각 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 9 | updated_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 수정 시각 | v5 API 연결 — 2026.10.18 사용자 요청 |
+
+### adventurer_states — 모험가 꾸미기 상태
+담당 김이경 (D) · 8컬럼
+
+| No | 컬럼명 | 타입 | NULL | 키 | 기본값 | 설명 | 상태 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | id | BIGINT | NN | PK | AUTO_INCREMENT | 꾸미기 상태 식별자 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 2 | user_id | BIGINT | NN | FK, UNIQUE |  | → users.id. 사용자당 1개 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 3 | equipment | JSON | NN |  | {} | 소유한 모자·가방·손 아이템·신발 장착 코드. null은 해제 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 4 | room | JSON | NN |  | {} | 침대·컴퓨터·조명·의자·배경·장식 적용 코드. 기본 가구 무료 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 5 | materials | INT | NN |  | 0 | 중복 common 2개·rare 3개 또는 재료 카드로 획득 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 6 | item_stage | SMALLINT | NN |  | 1 | 재료 5개로 1단계 상승. 최대 3단계 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 7 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 생성 시각 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 8 | updated_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 수정 시각 | v5 API 연결 — 2026.10.18 사용자 요청 |
+
 ## 관계 (FK)
 
 | No | FROM | TO | 관계 | 설명 | 합의 필요 |
@@ -364,6 +411,13 @@
 | 21 | challenge_recommendations.cycle_id | user_attack_cycles.id | N : 1 | 종료/다른 주기 추천으로 미션 시작 금지 | 김이경 |
 | 22 | user_challenge_occurrences.user_challenge_id | user_challenges.id | N : 1 | 미션 1개당 예정 기회 여러 개. 같은 기회 중복은 UNIQUE(user_challenge_id, scheduled_date, slot_code, sequence_no)로 방지 | 배수빈 ↔ 김이경 |
 | 23 | user_challenge_occurrences.completed_log_id | challenge_logs.id | 1 : 1 | NULL 허용. 이 기회를 인정한 수행 기록. 목표를 초과한 로그는 기회에 연결되지 않는다 | 배수빈 ↔ 김이경 |
+| 24 | challenge_timer_sessions.user_id | users.id | N : 1 | → users.id. 본인 세션만 조회 | v5 API 연결 — 2026.10.18 |
+| 25 | challenge_timer_sessions.user_challenge_id | user_challenges.id | N : 1 | → user_challenges.id | v5 API 연결 — 2026.10.18 |
+| 26 | challenge_timer_sessions.occurrence_id | user_challenge_occurrences.id | 1 : 1 | → user_challenge_occurrences.id. 예정 기회당 세션 1개 | v5 API 연결 — 2026.10.18 |
+| 27 | challenge_timer_sessions.completed_log_id | challenge_logs.id | 1 : 1 | → challenge_logs.id. 완료 전 NULL | v5 API 연결 — 2026.10.18 |
+| 28 | reward_draws.user_id | users.id | N : 1 | → users.id | v5 API 연결 — 2026.10.18 |
+| 29 | reward_draws.challenge_log_id | challenge_logs.id | 1 : 1 | → challenge_logs.id. 인정 완료 1건당 1회 | v5 API 연결 — 2026.10.18 |
+| 30 | adventurer_states.user_id | users.id | 1 : 1 | → users.id. 사용자당 1개 | v5 API 연결 — 2026.10.18 |
 
 ## 규칙과 범례
 

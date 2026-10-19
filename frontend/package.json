@@ -6,7 +6,8 @@
     "dev": "node ../scripts/frontend/dev-server.mjs",
     "test:prototype": "node --test --test-concurrency=1 ../scripts/frontend/prototype-v5.test.mjs ../scripts/frontend/prototype-v5-browser.test.mjs",
     "test:unit": "node --test ../scripts/frontend/api.test.mjs ../scripts/frontend/evidence.test.mjs ../scripts/frontend/auth.test.mjs ../scripts/frontend/router.test.mjs ../scripts/frontend/model.test.mjs ../scripts/frontend/dev-server.test.mjs ../scripts/frontend/prediction-readiness.test.mjs",
-    "test:browser": "node --test ../scripts/frontend/browser.test.mjs ../scripts/frontend/evidence-browser.test.mjs ../scripts/frontend/health-d-integration.test.mjs ../scripts/frontend/common-browser.test.mjs ../scripts/frontend/start-contracts-browser.test.mjs ../scripts/frontend/auth-browser.test.mjs"
+    "test:browser": "node --test ../scripts/frontend/browser.test.mjs ../scripts/frontend/evidence-browser.test.mjs ../scripts/frontend/health-d-integration.test.mjs ../scripts/frontend/common-browser.test.mjs ../scripts/frontend/start-contracts-browser.test.mjs ../scripts/frontend/auth-browser.test.mjs",
+    "test:v5": "node --test ../scripts/frontend/v5-live-browser.test.mjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"

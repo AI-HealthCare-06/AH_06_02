@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { withPage } from "./browser-harness.mjs";
 
-const prototypePath = `/frontend/docs/prototype/${encodeURIComponent("당고킬러-모험시안_v5.html")}`;
+const prototypePath = `/frontend/docs/prototype/${encodeURIComponent("당고킬러-모험시안_v5.html")}?demo=1`;
 const prototypeUrl = (dUrl) => new URL(prototypePath, dUrl).href;
 
 test("v5는 모든 화면에서 팀 검토용 시안임을 알리고 실행 오류가 없다", async () => {

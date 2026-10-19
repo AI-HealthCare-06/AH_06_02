@@ -1,0 +1,422 @@
+/* 기존 v5의 색·캐릭터·반응형 틀 안에서 실제 데이터 상태를 표시한다. */
+#live-feedback {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: #e6f7ed;
+  color: #235f40;
+  padding: 12px 20px;
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-line;
+}
+#live-feedback.error {
+  background: #fde8e3;
+  color: #9e342f;
+}
+.live-empty {
+  padding: 24px;
+  color: #64707a;
+  background: #fff;
+  border-radius: 16px;
+}
+.live-book {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+.live-monster {
+  background: #fff;
+  border: 1px solid #e0e3de;
+  border-radius: 18px;
+  padding: 18px;
+}
+.live-monster > button {
+  width: 100%;
+  background: transparent;
+  color: #1f2b3a;
+}
+.live-monster .evolution-art {
+  width: 140px;
+  height: 155px;
+  display: block;
+  margin: auto;
+}
+.live-monster p {
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 8px;
+}
+.live-monster details {
+  font-size: 12px;
+  margin: 12px 0;
+}
+.live-details {
+  padding: 20px;
+  border-radius: 18px;
+  background: #f0ecfe;
+  line-height: 2;
+  margin: 20px 0;
+}
+.live-mission {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e0e3de;
+  color: #1f2b3a;
+  margin: 12px 0;
+  gap: 12px;
+  text-align: left;
+}
+.live-mission span {
+  font-size: 12px;
+}
+.live-occurrences {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.live-occurrences .slot {
+  display: block;
+  padding: 20px;
+}
+.live-occurrences button {
+  display: block;
+  margin-top: 10px;
+  width: 100%;
+}
+.live-occurrences p {
+  margin: 10px 0;
+}
+.live-timer {
+  display: block;
+  font-size: 23px;
+  color: #5542b5;
+}
+.live-photo input {
+  display: block;
+  margin: 14px 0;
+  max-width: 100%;
+}
+.live-check {
+  display: block;
+  margin: 20px 0;
+}
+.live-avatar-layout,
+.live-room-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 28px;
+  align-items: start;
+  margin: 24px 0;
+}
+.live-avatar-layout .growth-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse, #fff, #eeebf5);
+  border-radius: 24px;
+  padding: 30px;
+  min-height: 390px;
+}
+.live-avatar-layout .avatar-rig {
+  width: 230px;
+  height: 345px;
+}
+.live-avatar-layout section {
+  padding: 24px;
+  background: #fff;
+  border-radius: 18px;
+}
+.live-avatar-layout h1 {
+  margin: 18px 0;
+}
+.live-avatar-layout p {
+  line-height: 2;
+}
+.live-room-layout .room-preview {
+  position: sticky;
+  top: 20px;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 22px;
+  background: #e9e0ce;
+}
+.live-room-layout .room-stage {
+  position: absolute;
+  inset: 8%;
+}
+.room-stage .room-base {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.room-stage .room-furniture {
+  position: absolute;
+  object-fit: contain;
+}
+.room-stage .room-bed {
+  width: 45%;
+  height: 45%;
+  left: 49%;
+  top: 43%;
+}
+.room-stage .room-desk {
+  width: 43%;
+  height: 43%;
+  left: 12%;
+  top: 18%;
+}
+.room-stage .room-chair {
+  width: 25%;
+  height: 30%;
+  left: 23%;
+  top: 39%;
+}
+.room-stage .room-light {
+  width: 20%;
+  height: 33%;
+  left: 76%;
+  top: 27%;
+}
+.room-stage .room-ornament {
+  width: 20%;
+  height: 25%;
+  left: 7%;
+  top: 49%;
+}
+.live-token {
+  display: grid;
+  place-items: center;
+  height: 120px;
+  font-size: 50px;
+  color: #705ee0;
+}
+.live-draw-cards {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 26px 0;
+}
+.live-card-back {
+  aspect-ratio: 2/3;
+  border: 2px solid #bcabef;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(140deg, #8d77d6, #49347e);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  box-shadow: 0 6px 12px #29204022;
+}
+.live-card-back span {
+  font-size: 38px;
+}
+.live-card-back b {
+  font-size: 12px;
+}
+.live-card-back.selected {
+  border: 3px solid #edbd5c;
+  transform: translateY(-8px);
+  box-shadow: 0 8px 16px #b58d4d44;
+}
+.live-daily-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+  margin: 20px 0;
+}
+.live-daily-fields label {
+  font-size: 13px;
+}
+.live-daily-fields input {
+  width: 100%;
+  margin-top: 7px;
+  padding: 12px;
+  border: 1px solid #d8dbe0;
+  border-radius: 10px;
+}
+.live-health-history article {
+  padding: 18px 0;
+  border-bottom: 1px solid #e0e3de;
+}
+.live-health-history p {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.calendar-day {
+  position: relative;
+  min-height: 70px;
+  display: grid;
+  place-items: center;
+}
+.calendar-day .stamp-mark {
+  display: grid;
+  place-items: center;
+  border: 2px solid #705ee0;
+  color: #5542b5;
+  font-size: 9px;
+  border-radius: 50%;
+  background: #f0ecfecc;
+  text-align: center;
+}
+.calendar-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 20px 0;
+}
+.quest-history ul {
+  margin: 8px 0 18px;
+  padding-left: 20px;
+}
+.quest-history li {
+  line-height: 1.8;
+  font-size: 13px;
+}
+.quest-history h3 {
+  font-size: 14px;
+  margin-top: 15px;
+}
+.history-week-card > .evolution-art {
+  width: 110px;
+  height: 130px;
+  flex-shrink: 0;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+button:focus-visible {
+  outline: 3px solid #705ee0;
+  outline-offset: 3px;
+}
+#live-bag-panel > .avatar-catalog {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+.catalog-card img {
+  max-width: 100%;
+}
+.catalog-card .item-lock {
+  display: block;
+  font-size: 11px;
+  color: #64707a;
+}
+.battle-hero .avatar-rig {
+  width: 100%;
+  height: 100%;
+}
+.live-book .evolution-art,
+.live-monster .evolution-art {
+  display: block;
+}
+.scene[data-page="evolution"] .panel-pad,
+.scene[data-page="evolution-complete"] .panel-pad {
+  max-width: 100%;
+}
+.evolution-strip .evolution-art {
+  display: block;
+  width: 100%;
+  height: 200px;
+}
+@media (max-width: 760px) {
+  .live-avatar-layout,
+  .live-room-layout {
+    grid-template-columns: 1fr;
+  }
+  .live-room-layout .room-preview {
+    position: relative;
+    max-width: 420px;
+    margin: auto;
+  }
+  .live-book {
+    grid-template-columns: 1fr;
+  }
+  .live-daily-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .live-draw-cards {
+    gap: 5px;
+  }
+  .live-card-back {
+    border-radius: 9px;
+  }
+  .live-card-back span {
+    font-size: 25px;
+  }
+  .live-card-back b {
+    font-size: 8px;
+  }
+  .live-avatar-layout .growth-avatar {
+    min-height: 320px;
+  }
+  .live-avatar-layout .avatar-rig {
+    width: 190px;
+    height: 285px;
+  }
+  #live-bag-panel > .avatar-catalog {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .live-mission {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .evolution-strip {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .evolution-strip .evolution-art {
+    height: 90px;
+  }
+  .live-occurrences {
+    grid-template-columns: 1fr;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-card-back {
+    transform: none;
+    transition: none;
+  }
+}
+
+.scene.live-loading {
+  visibility: hidden;
+}
+
+/* 달력·이력 이동 버튼은 좁은 화면에서도 날짜 제목을 밀어내지 않는다. */
+.calendar-toolbar {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+}
+.calendar-toolbar > button {
+  width: 44px;
+  min-width: 0;
+  padding: 0;
+}
+.calendar-toolbar > h2 {
+  min-width: 0;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.calendar-day {
+  min-width: 0;
+  aspect-ratio: auto;
+}
+@media (max-width: 760px) {
+  .calendar-day {
+    min-height: 48px;
+  }
+}

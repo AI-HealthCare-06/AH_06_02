@@ -401,3 +401,47 @@ class UserReward(models.Model):
     class Meta:
         table = "user_rewards"
         unique_together = (("user_id", "reward_id"),)
+
+
+class ChallengeTimerSession(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user_id = fields.BigIntField()
+    user_challenge_id = fields.BigIntField()
+    occurrence_id = fields.BigIntField(unique=True)
+    started_at = fields.DatetimeField()
+    target_seconds = fields.IntField()
+    expires_at = fields.DatetimeField()
+    completed_log_id = fields.BigIntField(null=True, unique=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "challenge_timer_sessions"
+
+
+class RewardDraw(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user_id = fields.BigIntField()
+    challenge_log_id = fields.BigIntField(unique=True)
+    cards: list[str] = fields.JSONField()
+    selected_positions: list[int] | None = fields.JSONField(null=True)
+    results: list[dict[str, Any]] | None = fields.JSONField(null=True)
+    claimed_at = fields.DatetimeField(null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "reward_draws"
+
+
+class AdventurerState(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user_id = fields.BigIntField(unique=True)
+    equipment: dict[str, str | None] = fields.JSONField(default=dict)
+    room: dict[str, str | None] = fields.JSONField(default=dict)
+    materials = fields.IntField(default=0)
+    item_stage = fields.SmallIntField(default=1)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "adventurer_states"

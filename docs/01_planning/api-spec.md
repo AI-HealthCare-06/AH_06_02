@@ -1,6 +1,6 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-15 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-19 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -193,7 +193,7 @@
 
 - **인증**: 필요
 - **요청 파라미터**: —
-- **요청 본문**: nickname?, height_cm?, motivation_type?
+- **요청 본문**: nickname?, height_cm?, motivation_type?, email?, birth_year?, sex?, dm_diagnosed?, htn_diagnosed?, dm_medication?, htn_medication? (기존 구현 필드 문서 보완)
 - **응답 (성공)**: { 수정된 내 정보 }
 - **주요 에러**: VALIDATION_ERROR, UNAUTHORIZED
 - **관련 요구사항**: REQ-USER-006·008
@@ -390,9 +390,9 @@
 - **사용 테이블**: D CHLG-06·CHLG-08 조회 결과 재사용; D 테이블 직접 접근 없음
 - **상태**: 제출안(D 주간 달성률 산식 확인)
 
-## D · 챌린지·보상·도감 · 12개
+## D · 챌린지·보상·도감 · 21개
 
-담당 김이경 · 작성 완료 2026-09-29
+담당 김이경 · 작성 완료 2026-09-29 · v5 추가 · (2026.10.18)
 
 ### CHLG-01 · 추천 생성
 
@@ -466,7 +466,7 @@
 - **인증**: 필요
 - **요청 파라미터**: ?status=active&page=1&size=20
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, title, factor_key, difficulty, verification_type, context_type, context_label, cycle_id, cycle_week, target_monster: { monster_id, code, name }, start_date, end_date, completed_count, daily_target_count, target_value, goal_config_snapshot, scheduled_opportunity_count, progress_rate, habit_established }], total, page, size } ※ difficulty·목표·슬롯은 사용자 snapshot. completed_count=인정 완료한 예정 기회, progress_rate=완료 기회/해당 기간 예정 기회(0~1, 분모 0이면 NULL). weekly_progress 게임 점수와 별개. 초기 최대 2개, 2주차부터 적합 후보+사용자 희망일 때 주기당 하나 추가·진행 포함 최대 3개. 1단계 habit_established=NULL 미평가, 습관 졸업 표시 없음. ※ cycle_week는 주기 start_date로 계산한 응답값이며 DB 중복 저장하지 않는다. 대상·공통 종료는 cycle_id의 주기에서 조회.
+- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, title, factor_key, difficulty, verification_type, context_type, context_label, cycle_id, cycle_week, target_monster: { monster_id, code, name }, start_date, end_date, completed_count, daily_target_count, target_value, goal_config_snapshot, scheduled_opportunity_count, progress_rate, habit_established }], total, page, size } ※ difficulty·목표·슬롯은 사용자 snapshot. completed_count=인정 완료한 예정 기회, progress_rate=완료 기회/해당 기간 예정 기회(0~1, 분모 0이면 NULL). weekly_progress 게임 점수와 별개. 초기 최대 2개, 2주차부터 적합 후보+사용자 희망일 때 주기당 하나 추가·진행 포함 최대 3개. 1단계 habit_established=NULL 미평가, 습관 졸업 표시 없음. ※ cycle_week는 주기 start_date로 계산한 응답값이며 DB 중복 저장하지 않는다. 대상·공통 종료는 cycle_id의 주기에서 조회. ※ v5 새로고침 복원: today_occurrences 각 항목에 timer_session_id?: int 추가. 이미 시작한 서버 타이머가 있는 기회만 식별자를 반환하며 조회만으로 타이머를 시작하지 않는다.
 - **주요 에러**: UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-003·004·005·011 · REQ-RECO-006
 - **사용 테이블**: user_challenges·challenges·challenge_logs 읽기 / user_attack_cycles·user_monsters·monsters 읽기
@@ -478,8 +478,8 @@
 
 - **인증**: 필요
 - **요청 파라미터**: path: user_challenge_id
-- **요청 본문**: occurred_at, context_slot?, value?, verification_method, evidence_url?. snapshot의 기간·예정 기회·슬롯·회당 목표·단위로 완료를 판정한다. 타이머는 회차별로 목표 이상이어야 하며 부족분/초과시간을 다른 회차로 환산하지 않는다. 선택하지 않은 슬롯·중복·종료 이후 요청은 기존 오류로 처리. photo는 C 업로드의 비공개 참조값만 사용. ※ cycle_id가 있는 미션은 연결 주기 active 여부·공통 종료 경계도 검사. 점수 대상은 기존 factor_key 매핑이며 주기 대상과 일치해야 함. 종료된 주기의 로그 기록/보상 지급 불가.
-- **응답 (성공)**: { log_id, result, verification_status, reward_eligible, xp_granted, weekly_progress, level_up, new_level, reward? }
+- **요청 본문**: occurred_at, context_slot?, value?, verification_method, evidence_url?. snapshot의 기간·예정 기회·슬롯·회당 목표·단위로 완료를 판정한다. 타이머는 회차별로 목표 이상이어야 하며 부족분/초과시간을 다른 회차로 환산하지 않는다. 선택하지 않은 슬롯·중복·종료 이후 요청은 기존 오류로 처리. photo는 C 업로드의 비공개 참조값만 사용. ※ cycle_id가 있는 미션은 연결 주기 active 여부·공통 종료 경계도 검사. 점수 대상은 기존 factor_key 매핑이며 주기 대상과 일치해야 함. 종료된 주기의 로그 기록/보상 지급 불가. ※ v5 선택 추가: timer_session_id?: int. 서버 타이머 사용 시 본인 세션·예정 기회·서버 경과 시간·만료를 검증한다. 기존 value 방식은 하위 호환 유지.
+- **응답 (성공)**: { log_id, result, verification_status, reward_eligible, xp_granted, weekly_progress, level_up, new_level, reward?, reward_draw_id? }
 - **주요 에러**: CHLG_NOT_ACTIVE, CHLG_LOG_DUPLICATED, CHLG_VERIFICATION_FAILED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-003·004·007·008 · REQ-RECO-003·004 · REQ-PRED-011
 - **사용 테이블**: user_challenges·challenges 읽기 / challenge_logs·user_monsters·user_rewards 쓰기 / A grant_xp() 호출 / user_attack_cycles 읽기
@@ -549,3 +549,120 @@
 - **관련 요구사항**: REQ-RECO-006
 - **사용 테이블**: user_attack_cycles 쓰기, user_monsters 읽기 (본인 소유만)
 - **상태**: A 제안 — 10/6. REQ-RECO-006에 "사용자가 도감에서 직접 변경할 수 있다"가 있으나 엔드포인트가 없어 추가 제안. 구현 완료. 1단계는 챌린지 시작 전 draft 주기에서만 본인 공략 가능 대상으로 변경. 기존 미응답 추천 무효화, 수행·XP·봉인 보존. 진행 중 변경은 후속 범위. D 확인 완료 — 2026.10.12 김이경
+
+### CHLG-11 · 서버 타이머 시작
+
+`POST /api/v1/user-challenges/{user_challenge_id}/timers`
+
+- **인증**: 필요
+- **요청 파라미터**: path: user_challenge_id
+- **요청 본문**: { context_slot? }
+- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed }
+- **주요 에러**: VALIDATION_ERROR, UNAUTHORIZED, CHLG_NOT_FOUND, CHLG_NOT_ACTIVE, CHLG_LOG_DUPLICATED, CHLG_VERIFICATION_FAILED
+- **관련 요구사항**: REQ-CHLG-013
+- **사용 테이블**: challenge_timer_sessions 쓰기 / user_challenges·user_challenge_occurrences 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### CHLG-12 · 서버 타이머 조회
+
+`GET /api/v1/user-challenges/{user_challenge_id}/timers/{timer_session_id}`
+
+- **인증**: 필요
+- **요청 파라미터**: path: user_challenge_id, timer_session_id
+- **요청 본문**: —
+- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed }
+- **주요 에러**: UNAUTHORIZED, CHLG_NOT_FOUND
+- **관련 요구사항**: REQ-CHLG-013
+- **사용 테이블**: challenge_timer_sessions·user_challenges 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### RWRD-02 · 보상 카탈로그
+
+`GET /api/v1/rewards/catalog`
+
+- **인증**: 필요
+- **요청 파라미터**: —
+- **요청 본문**: —
+- **응답 (성공)**: { items: [{ code, name, slot, rarity, asset, starter, owned }], materials, item_stage }
+- **주요 에러**: UNAUTHORIZED
+- **관련 요구사항**: REQ-RECO-010·011
+- **사용 테이블**: rewards·user_rewards·adventurer_states 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### RWRD-03 · 보상 뽑기 조회
+
+`GET /api/v1/reward-draws`
+
+- **인증**: 필요
+- **요청 파라미터**: ?page=1&size=20
+- **요청 본문**: —
+- **응답 (성공)**: { items: [{ draw_id, challenge_log_id, card_count:5, claimed_at, selected_positions?, results? }], total, page, size }. 수령 전 카드 내용 비공개
+- **주요 에러**: UNAUTHORIZED, VALIDATION_ERROR
+- **관련 요구사항**: REQ-RECO-010
+- **사용 테이블**: reward_draws 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### RWRD-04 · 보상 카드 3장 수령
+
+`POST /api/v1/reward-draws/{draw_id}/claim`
+
+- **인증**: 필요
+- **요청 파라미터**: path: draw_id
+- **요청 본문**: { positions: [0,2,4] } (0~4 중 서로 다른 3개)
+- **응답 (성공)**: { draw_id, selected_positions, results: [{ code, name, slot, rarity, asset, duplicate, materials }], claimed_at }. 동일 선택 재요청은 동일 영수증 반환, 선택 변경은 거절
+- **주요 에러**: UNAUTHORIZED, CHLG_NOT_FOUND, VALIDATION_ERROR
+- **관련 요구사항**: REQ-RECO-010
+- **사용 테이블**: reward_draws·user_rewards·adventurer_states 쓰기 / rewards 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### RWRD-05 · 모험가·방 상태 조회
+
+`GET /api/v1/adventurer/me`
+
+- **인증**: 필요
+- **요청 파라미터**: —
+- **요청 본문**: —
+- **응답 (성공)**: { equipment, room, materials, item_stage }
+- **주요 에러**: UNAUTHORIZED
+- **관련 요구사항**: REQ-RECO-011·012
+- **사용 테이블**: adventurer_states 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### RWRD-06 · 장비·방 꾸미기 저장
+
+`PATCH /api/v1/adventurer/me`
+
+- **인증**: 필요
+- **요청 파라미터**: —
+- **요청 본문**: { equipment?: {hat?,bag?,hand?,shoes?}, room?: {bed?,computer?,light?,chair?,background?,ornament?} }. 코드 또는 null. 본인 소유·슬롯 일치 검증
+- **응답 (성공)**: { equipment, room, materials, item_stage }
+- **주요 에러**: UNAUTHORIZED, VALIDATION_ERROR
+- **관련 요구사항**: REQ-RECO-011
+- **사용 테이블**: adventurer_states 쓰기 / rewards·user_rewards 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### RWRD-07 · 아이템 단계 상승
+
+`POST /api/v1/adventurer/me/upgrade`
+
+- **인증**: 필요
+- **요청 파라미터**: —
+- **요청 본문**: —
+- **응답 (성공)**: { equipment, room, materials, item_stage }. 재료 5개 차감, 최대 3단계
+- **주요 에러**: UNAUTHORIZED, VALIDATION_ERROR
+- **관련 요구사항**: REQ-RECO-012
+- **사용 테이블**: adventurer_states 쓰기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### PROG-01 · 나의 성장 기록 조회
+
+`GET /api/v1/adventure/progress`
+
+- **인증**: 필요
+- **요청 파라미터**: ?month=YYYY-MM (생략 시 현재 KST 월)
+- **요청 본문**: —
+- **응답 (성공)**: { month, days: [{date,count}], missions, cycles }. 본인 인정 수행일만 도장, 주기·미션 기록과 개인 목표 반환
+- **주요 에러**: UNAUTHORIZED, VALIDATION_ERROR
+- **관련 요구사항**: REQ-CHLG-003·004
+- **사용 테이블**: user_challenges·challenge_logs·user_attack_cycles 읽기
+- **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
