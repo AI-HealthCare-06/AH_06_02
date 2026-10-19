@@ -326,3 +326,36 @@ test("건강정보 입력칸의 예시는 입력값과 구분되게 흐리게 �
         /^예: /,
       );
   }));
+
+test("건강정보에서 빠진 칸은 그 칸에 오류를 표시하고 그 칸으로 이동한다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#health", base).href);
+    await page.getByRole("button", { name: "♂ 남성" }).click();
+    await page.getByRole("spinbutton", { name: "출생연도" }).fill("1975");
+    await page.locator('.health button[type="submit"]').click();
+    const height = page.getByRole("spinbutton", { name: "키" });
+    assert.equal(await height.getAttribute("aria-invalid"), "true");
+    assert.equal(await height.evaluate((el) => el === document.activeElement), true);
+    const describedBy = await height.getAttribute("aria-describedby");
+    assert.match(await page.locator("#" + describedBy).textContent(), /키를 입력해주세요/);
+    await height.fill("170");
+    assert.equal(await height.getAttribute("aria-invalid"), null);
+    assert.equal(await page.locator(".field-error").count(), 0);
+  }));
+
+test("회원가입은 비밀번호 규칙을 미리 보여주고 틀린 칸에 오류를 표시한다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#signup", base).href);
+    await page.getByText("영문과 숫자를 포함해 8자 이상", { exact: false }).waitFor();
+    await page.locator("#nickname").fill("모험가");
+    await page.locator('.signup-form [type="email"]').fill("a@dangokiller.com");
+    const [password, confirm] = await page.locator('.signup-form [type="password"]').all();
+    await password.fill("testtest");
+    await confirm.fill("testtest");
+    await page.locator(".signup-form .consent input").check();
+    await page.locator('.signup-form [type="submit"]').click();
+    assert.equal(await password.getAttribute("aria-invalid"), "true");
+    assert.equal(await password.evaluate((el) => el === document.activeElement), true);
+  }));

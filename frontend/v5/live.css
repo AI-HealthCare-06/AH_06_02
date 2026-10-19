@@ -420,3 +420,14 @@ button:focus-visible {
     min-height: 48px;
   }
 }
+
+.field-error {
+  margin: -4px 2px 12px;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 600;
+}
+[aria-invalid="true"] {
+  outline: 2px solid #e5484d;
+  outline-offset: 1px;
+}

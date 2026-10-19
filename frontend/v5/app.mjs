@@ -103,6 +103,39 @@ function message(text, error = false) {
   el.classList.toggle("error", error);
   el.hidden = !text;
 }
+// 오류가 난 입력칸에 바로 표시하고 그 칸으로 옮긴다. 화면 위 안내만으로는 어느 칸인지 알 수 없었다
+function fieldError(target, text) {
+  const error = new Error(text);
+  error.field = target;
+  return error;
+}
+function clearFieldErrors() {
+  $$(".field-error").forEach((el) => el.remove());
+  $$('[aria-invalid="true"]').forEach((el) => {
+    el.removeAttribute("aria-invalid");
+    el.removeAttribute("aria-describedby");
+  });
+}
+function showFieldError(target, text) {
+  clearFieldErrors();
+  const id = "field-error-" + Date.now();
+  const note = document.createElement("p");
+  note.className = "field-error";
+  note.id = id;
+  note.setAttribute("role", "alert");
+  note.textContent = text;
+  const box = target.closest(".two-columns, label, [role=group]") || target;
+  box.insertAdjacentElement("afterend", note);
+  const focusable = target.matches("input, select, button")
+    ? target
+    : target.querySelector("button, input, select");
+  for (const el of new Set([target, focusable].filter(Boolean))) {
+    el.setAttribute("aria-invalid", "true");
+    el.setAttribute("aria-describedby", id);
+  }
+  focusable?.focus({ preventScroll: true });
+  box.scrollIntoView({ block: "center" });
+}
 async function run(action, control) {
   if (busy) return;
   busy = true;
@@ -112,7 +145,12 @@ async function run(action, control) {
   try {
     await action();
   } catch (error) {
-    if (owner === auth.user?.id || !owner || control?.closest(".login-form"))
+    if (error.field) showFieldError(error.field, error.message);
+    else if (
+      owner === auth.user?.id ||
+      !owner ||
+      control?.closest(".login-form")
+    )
       message(error.message || "잠시 후 다시 시도해주세요.", true);
   } finally {
     busy = false;
@@ -429,12 +467,17 @@ function healthValues(page) {
   );
 }
 function profile() {
-  const get = (key) =>
-    $(`[data-page="health"] [data-profile-field="${key}"]`).value;
-  for (const key of ["birth_year", "height", "dm", "htn", "dm_med", "htn_med"])
+  const field = (key) =>
+    $(`[data-page="health"] [data-profile-field="${key}"]`);
+  const get = (key) => field(key).value;
+  if (!sex)
+    throw fieldError($('.health [aria-label="성별"]'), "성별을 선택해주세요.");
+  if (get("birth_year") === "")
+    throw fieldError(field("birth_year"), "출생연도를 입력해주세요.");
+  if (get("height") === "") throw fieldError(field("height"), "키를 입력해주세요.");
+  for (const key of ["dm", "htn", "dm_med", "htn_med"])
     if (get(key) === "")
-      throw new Error("기본 정보와 진단·복약 여부를 모두 확인해주세요.");
-  if (!sex) throw new Error("성별을 선택해주세요.");
+      throw fieldError(field(key), "진단·복약 여부를 선택해주세요.");
   return {
     birth_year: Number(get("birth_year")),
     height_cm: Number(get("height")),
@@ -476,23 +519,26 @@ function validateHealth() {
     ...healthValues("health2"),
     ...healthValues("health3"),
   };
-  if (
-    smoking === undefined ||
-    [
-      "weight_kg",
-      "waist_cm",
-      "alcohol_frequency",
-      "walking_days",
-      "strength_days",
-      "sitting_minutes",
-      "dining_out_freq",
-    ].some((key) => body[key] === undefined)
-  )
-    throw new Error("필수 항목을 모두 입력해주세요.");
-  if (body.alcohol_frequency !== 1 && body.alcohol_amount === undefined)
-    throw new Error("한 번에 마시는 양을 선택해주세요.");
-  if (body.walking_days !== 0 && body.walking_minutes === undefined)
-    throw new Error("1회 걷기 시간을 입력해주세요.");
+  const input = (label) => $(`[aria-label="${label}"]`);
+  const required = [
+    ["weight_kg", "체중", "체중을 입력해주세요."],
+    ["waist_cm", "허리둘레", "허리둘레를 입력해주세요."],
+    ["smoking", "현재 흡연 여부", "흡연 여부를 선택해주세요."],
+    ["alcohol_frequency", "음주 빈도", "마시는 빈도를 선택해주세요."],
+    ["alcohol_amount", "1회 음주량", "한 번에 마시는 양을 선택해주세요."],
+    ["walking_days", "주당 걷기 일수", "주당 걷기 일수를 입력해주세요."],
+    ["walking_minutes", "1회 걷기 시간", "1회 걷기 시간을 입력해주세요."],
+    ["strength_days", "주당 근력운동 일수", "주당 근력운동 일수를 입력해주세요."],
+    ["sitting_minutes", "하루 앉아 있는 시간", "하루 앉아 있는 시간을 입력해주세요."],
+    ["dining_out_freq", "외식 빈도", "외식 빈도를 선택해주세요."],
+  ];
+  for (const [key, label, text] of required) {
+    if (key === "alcohol_amount" && body.alcohol_frequency === 1) continue;
+    if (key === "walking_minutes" && body.walking_days === 0) continue;
+    const missing =
+      key === "smoking" ? smoking === undefined : body[key] === undefined;
+    if (missing) throw fieldError(input(label), text);
+  }
   body.smoking_current = smoking;
   if (body.alcohol_frequency === 1) body.alcohol_amount = 0;
   if (body.walking_days === 0) body.walking_minutes = 0;
@@ -863,6 +909,7 @@ async function renderGrowth(ticket) {
   }</div>`;
 }
 function chooseButton(button) {
+  if (button.parentElement.getAttribute("aria-invalid")) clearFieldErrors();
   button.parentElement.querySelectorAll("button").forEach((b) => {
     b.classList.toggle("selected", b === button);
     b.setAttribute("aria-pressed", String(b === button));
@@ -1098,18 +1145,23 @@ document.addEventListener("submit", (event) => {
     }
     if (form.classList.contains("signup-form")) {
       const passwords = form.querySelectorAll('[type="password"]');
-      if (!form.querySelector('[type="checkbox"]').checked)
-        throw new Error("의료 고지 동의가 필요해요.");
-      if (passwords[0].value !== passwords[1].value)
-        throw new Error("비밀번호가 서로 달라요.");
-      if (
-        !$("#nickname").value.trim() ||
-        !form.querySelector('[type="email"]').validity.valid ||
-        !form.querySelector('[type="email"]').value
-      )
-        throw new Error("닉네임과 이메일을 확인해주세요.");
+      const email = form.querySelector('[type="email"]');
+      if (!$("#nickname").value.trim())
+        throw fieldError($("#nickname"), "닉네임을 입력해주세요.");
+      if (!email.value || !email.validity.valid)
+        throw fieldError(email, "이메일 형식을 확인해주세요.");
       if (!/^(?=.*[A-Za-z])(?=.*\d).{8,}$/.test(passwords[0].value))
-        throw new Error("비밀번호는 영문·숫자를 포함해 8자 이상 입력해주세요.");
+        throw fieldError(
+          passwords[0],
+          "비밀번호는 영문·숫자를 포함해 8자 이상 입력해주세요.",
+        );
+      if (passwords[0].value !== passwords[1].value)
+        throw fieldError(passwords[1], "비밀번호가 서로 달라요.");
+      if (!form.querySelector('[type="checkbox"]').checked)
+        throw fieldError(
+          form.querySelector('[type="checkbox"]'),
+          "의료 고지 동의가 필요해요.",
+        );
       signupDraft = {
         email: form.querySelector('[type="email"]').value.trim(),
         password: passwords[0].value,
@@ -1123,8 +1175,13 @@ document.addEventListener("submit", (event) => {
     if (form.closest(".health")) {
       profile();
       const values = healthValues("health");
-      if (!values.weight_kg || !values.waist_cm)
-        throw new Error("체중과 허리둘레를 입력해주세요.");
+      if (!values.weight_kg)
+        throw fieldError($('.health [aria-label="체중"]'), "체중을 입력해주세요.");
+      if (!values.waist_cm)
+        throw fieldError(
+          $('.health [aria-label="허리둘레"]'),
+          "허리둘레를 입력해주세요.",
+        );
       await go("health2");
       return;
     }
@@ -1160,7 +1217,10 @@ $("#alcohol-frequency").addEventListener("change", (event) => {
   if (zero) $("#alcohol-amount").value = "";
 });
 $$("input,select").forEach((el) =>
-  el.addEventListener("input", () => message("")),
+  el.addEventListener("input", () => {
+    message("");
+    if (el.getAttribute("aria-invalid")) clearFieldErrors();
+  }),
 );
 const motion = matchMedia("(prefers-reduced-motion: reduce)");
 document.body.classList.toggle("reduce-motion", motion.matches);
