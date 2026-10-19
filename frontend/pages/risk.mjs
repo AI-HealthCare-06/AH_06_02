@@ -4,41 +4,18 @@ import {
   escape,
   formatDateTime,
 } from "./health-flow.mjs";
+import {
+  FACTOR_LABELS,
+  FACTOR_MONSTER,
+  formatContribution,
+  topIncreases,
+} from "../shared/factors.mjs";
 
 /** 질환별 표시와 users 의 진단·복약 컬럼 접두사. */
 const DISEASES = [
   { disease: "diabetes", prefix: "dm", icon: "♧", label: "당뇨" },
   { disease: "hypertension", prefix: "htn", icon: "♡", label: "고혈압" },
 ];
-
-/** factor_key → 한글 라벨 */
-const FACTOR_LABELS = {
-  age: "나이",
-  sex: "성별",
-  family_history_dm: "당뇨 가족력",
-  family_history_htn: "고혈압 가족력",
-  bmi_high: "높은 체질량지수",
-  waist_high: "높은 허리둘레",
-  physical_activity_low: "낮은 신체활동",
-  strength_activity_low: "낮은 근력활동",
-  sedentary_time_high: "긴 좌식시간",
-  smoking_current: "흡연",
-  alcohol_frequency: "음주 빈도",
-  alcohol_amount: "음주량",
-  sodium_behavior: "나트륨 섭취 습관",
-};
-
-/** factor_key → 연결된 몬스터 */
-const FACTOR_MONSTER = {
-  alcohol_frequency: "알데",
-  alcohol_amount: "알데",
-  smoking_current: "코티니",
-  bmi_high: "비세라",
-  waist_high: "비세라",
-  physical_activity_low: "비세라",
-  strength_activity_low: "비세라",
-  sedentary_time_high: "비세라",
-};
 
 const MEDICAL_NOTICE =
   '<div class="notice"><b>의료 고지</b><p>이 서비스는 의학적 진단·치료를 대신하지 않습니다.<br>정확한 평가는 의료 전문가와 상담해 주세요.</p></div>';
@@ -77,16 +54,12 @@ function factorSection(diseases) {
     .map(({ disease, items }) => {
       const found = DISEASES.find((d) => d.disease === disease);
       const label = (found || {}).label || disease;
-      const increases = (items || [])
-        .filter((item) => item.direction === "increase")
-        .sort((a, b) => b.contribution - a.contribution)
-        .slice(0, 3);
+      const increases = topIncreases(items);
       if (!increases.length) return "";
       const cards = increases
         .map((item) => {
           const name = FACTOR_LABELS[item.factor_key] || item.factor_key;
-          const value = item.contribution * 100;
-          const pct = value < 0.1 ? "+0.1%p 미만" : `+${value.toFixed(1)}%p`;
+          const pct = formatContribution(item.contribution);
           const monster = FACTOR_MONSTER[item.factor_key];
           const tag = item.modifiable
             ? monster
