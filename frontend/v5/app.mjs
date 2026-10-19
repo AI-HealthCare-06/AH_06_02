@@ -244,6 +244,15 @@ function reset() {
   clearInterval(timerPoll);
   timerPoll = null;
 }
+// 목록 API 는 한 번에 100건까지만 준다. 오래된 미수령 보상이 밀리지 않게 끝까지 이어 받는다
+async function allPages(path) {
+  const items = [];
+  for (let page = 1; ; page++) {
+    const data = await api(`${path}?page=${page}&size=100`);
+    items.push(...data.items);
+    if (!data.items.length || !(items.length < data.total)) return items;
+  }
+}
 async function load() {
   const owner = auth.user?.id;
   const values = await Promise.all([
@@ -254,7 +263,7 @@ async function load() {
     api("/user-challenges?size=100"),
     api("/rewards/catalog"),
     api("/adventurer/me"),
-    api("/reward-draws?size=100"),
+    allPages("/reward-draws"),
   ]);
   if (owner !== auth.user?.id) return false;
   [user, level, summary] = values;
@@ -262,7 +271,7 @@ async function load() {
   missions = values[4].items;
   catalog = values[5].items;
   adventurer = values[6];
-  draws = values[7].items;
+  draws = values[7];
   syncBagBadge();
   return true;
 }

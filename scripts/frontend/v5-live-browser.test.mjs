@@ -159,6 +159,23 @@ async function mock(page, state = {}) {
         materials: 0,
         item_stage: 1,
       };
+    } else if (p === "/reward-draws" && state.manyDraws) {
+      // 최신순 101건 중 가장 오래된 1건만 아직 받지 않았다
+      const page = Number(url.searchParams.get("page") || 1);
+      const size = Number(url.searchParams.get("size") || 20);
+      const all = Array.from({ length: 101 }, (_, i) => ({
+        draw_id: 1000 - i,
+        challenge_log_id: 1000 - i,
+        card_count: 5,
+        claimed_at: i === 100 ? null : "2026-10-01T12:00:00+09:00",
+        results: i === 100 ? null : [],
+      }));
+      data = {
+        items: all.slice((page - 1) * size, page * size),
+        total: all.length,
+        page,
+        size,
+      };
     } else if (p === "/reward-draws")
       data = {
         items: state.draw
@@ -882,4 +899,17 @@ test("외형 변화 기준이 정해지기 전에는 단계별 모습을 미리�
     const text = (await area.textContent()).replace(/\s+/g, " ");
     assert.match(text, /미리보기/);
     assert.doesNotMatch(text, /공략 진행률에 따라 외형이 변해요/);
+  }));
+
+test("받을 보상이 오래돼 다음 페이지에 있어도 가방에 표시한다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { manyDraws: true });
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    assert.equal(
+      await page
+        .locator('#adventure-nav [data-main-target="bag"]')
+        .getAttribute("aria-label"),
+      "가방, 받을 보상 1개",
+    );
   }));
