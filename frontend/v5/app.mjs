@@ -425,11 +425,28 @@ async function renderBattle(ticket) {
     ? entries
         .map(
           (card, index) =>
-            `<button type="button" class="reco-card" data-live-card="${index}"><span class="quest-card-heading"><span class="quest-card-label">${escape(card.factor_key?.includes("activity") ? "걷기 공격" : card.verification_type === "photo" ? "식단 공격" : "습관 공격")}</span></span><span class="quest-card-subtitle">${escape(card.title)}${card.live ? " · 진행 중" : ""}</span></button>`,
+            `<button type="button" class="reco-card" data-live-card="${index}"><span class="quest-card-heading"><span class="quest-card-label">${escape(attackName(card))}</span></span><span class="quest-card-subtitle">${escape(card.title)}${card.live ? " · 진행 중" : ""}</span></button>`,
         )
         .join("")
     : '<p class="live-empty">지금 시작할 수 있는 챌린지가 없어요. 건강정보를 다시 확인해 주세요.</p>';
   $(".reco-list")._cards = entries;
+}
+// 카드 이름은 v5 시안(presentQuestCards)에 정한 공격 이름을 그대로 쓴다. 새 이름을 만들지 않는다
+function attackName(card) {
+  const byFactor = {
+    physical_activity_low: "걷기 공격",
+    sedentary_time_high: "휴식 공격",
+    strength_activity_low: "근력 공격",
+    alcohol_frequency: "금주 공략",
+  };
+  if (byFactor[card.factor_key]) return byFactor[card.factor_key];
+  if (card.factor_key === "alcohol_amount")
+    return card.verification_type === "value" ? "기록 공격" : "대체 공격";
+  if (card.factor_key === "smoking_current")
+    return card.verification_type === "timer" ? "습관 공격" : "기록 공격";
+  if (card.verification_type === "value")
+    return card.title?.includes("물") ? "음료 공격" : "기록 공격";
+  return "습관 공격";
 }
 function renderBook() {
   const area = $('.scene[data-page="monsters"] .panel-pad');
