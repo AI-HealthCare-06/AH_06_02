@@ -1,6 +1,12 @@
 /** v5 실제 연결. 시안 체험은 ?demo=1로 분리하고 서버 응답만 진행 상태로 표시한다. */
 import { AuthSession } from "../shared/auth.mjs";
 import { createEvidenceUploader } from "../shared/evidence.mjs";
+import {
+  FACTOR_LABELS,
+  FACTOR_MONSTER,
+  formatContribution,
+  topIncreases,
+} from "../shared/factors.mjs";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -278,7 +284,7 @@ async function go(id, push = true) {
     if (!(await load()) || ticket !== navigation) return;
     message("");
     if (id === "risk") renderHome();
-    if (id === "monsters") renderBook();
+    if (id === "monsters") await renderBook(ticket);
     if (id === "evolution" || id === "evolution-complete") renderEvolution();
     if (id === "reco") await renderBattle(ticket);
     if (id === "today") await renderToday();
@@ -333,6 +339,8 @@ function renderHome() {
       m && isAvailable(m) && (!activeTarget || activeTarget === m.code);
     b.disabled = !available;
     b.classList.toggle("locked", !available);
+    // 부제는 몬스터 마스터(title)를 따른다. 시안에 박힌 "활동량 · 허리둘레"는 #61 에서 바꾼 부제와 달랐다
+    if (m?.title) b.querySelector(".village-plaque span").textContent = m.title;
     b.querySelector(".village-character").innerHTML = art(
       b.dataset.villageKey,
       stage(m),
@@ -448,9 +456,44 @@ function attackName(card) {
     return card.title?.includes("물") ? "음료 공격" : "기록 공격";
   return "습관 공격";
 }
-function renderBook() {
+// 위험도를 올린 요인 Top3. v4 위험도 화면(#62)과 같은 형식으로 "내 위험요인 보기"에 보여준다
+async function topFactorsHtml() {
+  if (!summary?.prediction_id) return "";
+  let diseases;
+  try {
+    diseases = (await api(`/predictions/${summary.prediction_id}/contributions`))
+      .diseases;
+  } catch {
+    return "";
+  }
+  const sections = (diseases || [])
+    .map(({ disease, items }) => {
+      const rows = topIncreases(items)
+        .map((item) => {
+          const monster = FACTOR_MONSTER[item.factor_key];
+          const tag = !item.modifiable
+            ? '<span class="factor-fixed">바꿀 수 없는 요인</span>'
+            : monster
+              ? `<span class="factor-monster">${escape(monster)}</span>`
+              : "";
+          return `<div class="factor-card"><strong>${escape(FACTOR_LABELS[item.factor_key] || item.factor_key)}</strong><span class="factor-contrib">${formatContribution(item.contribution)}</span>${tag}</div>`;
+        })
+        .join("");
+      return rows
+        ? `<h3>${disease === "diabetes" ? "당뇨" : "고혈압"} 주요 요인</h3><div class="factor-list">${rows}</div>`
+        : "";
+    })
+    .join("");
+  return sections
+    ? `<section class="live-top-factors"><h2>지금, 이 요인에 주목해 보세요</h2><p class="small-copy">내 위험도를 올린 요인이에요.</p>${sections}</section>`
+    : "";
+}
+async function renderBook(ticket) {
   const area = $('.scene[data-page="monsters"] .panel-pad');
   area.innerHTML = `<h1>내 위험요인 보기</h1><p class="small-copy">위협도와 공략 점수는 서로 다른 값이에요.</p><div class="live-book">${monsters.map((m) => `<article class="live-monster"><button type="button" data-live-evolution="${escape(m.code)}">${art(m.code, stage(m))}<h2>${escape(m.name)}</h2></button><p>위협도 ${m.impact_score ?? "산정 대기"} · 공략 점수 ${m.weekly_progress}</p><p>${escape({ rage: "주의가 필요해요", caution: "살펴볼 요인이에요", stable: "안정", not_contributing: "현재 위험 기여 없음", resolved: "요인 해소됨", sealed: "봉인 완료", unmeasured: "산정 대기" }[m.state])}</p><details><summary>산정 설명</summary><p>${m.impact_explanation?.status === "available" ? escape(m.impact_explanation.winners.map((w) => `${w.factor_key}: ${w.score}`).join(" · ")) : "이 점수의 산정 설명이 아직 없어요."}</p></details>${isAvailable(m) ? button(m.is_target ? "챌린지 보기" : "이 마을 살펴보기", `data-live-village="${m.code}" ${!m.is_target && !m.target_change_allowed ? "disabled" : ""}`) : ""}</article>`).join("")}</div>`;
+  const factors = await topFactorsHtml();
+  if (ticket !== navigation || !factors) return;
+  area.querySelector(".live-book").insertAdjacentHTML("beforebegin", factors);
 }
 function renderEvolution() {
   const area = $(`.scene[data-page="${active}"] .panel-pad`);

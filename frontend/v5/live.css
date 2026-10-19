@@ -455,3 +455,49 @@ button:focus-visible {
   font-size: 13px;
   text-decoration: underline;
 }
+
+.live-top-factors {
+  margin: 14px 0 20px;
+}
+.live-top-factors h3 {
+  margin: 14px 0 8px;
+  font-size: 15px;
+}
+.live-top-factors .factor-list {
+  display: grid;
+  gap: 8px;
+}
+.live-top-factors .factor-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e6e3f3;
+  border-radius: 12px;
+  background: #fff;
+}
+.live-top-factors .factor-card strong {
+  flex: 1;
+  font-size: 14px;
+}
+.live-top-factors .factor-contrib {
+  color: #c7354a;
+  font-weight: 700;
+  font-size: 13px;
+}
+.live-top-factors .factor-monster,
+.live-top-factors .factor-fixed {
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.live-top-factors .factor-monster {
+  border: 1px solid #f0c65a;
+  background: #fff8e1;
+  color: #8a5a00;
+}
+.live-top-factors .factor-fixed {
+  background: #eef0f5;
+  color: #5f6780;
+}

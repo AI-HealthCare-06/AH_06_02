@@ -57,6 +57,7 @@ async function mock(page, state = {}) {
     else if (p === "/dashboard/summary")
       data = {
         prediction_available: true,
+        prediction_id: 5,
         risks: [
           { disease: "diabetes", probability: 0.075 },
           { disease: "hypertension", probability: 0.12 },
@@ -68,6 +69,7 @@ async function mock(page, state = {}) {
           {
             code: "viscera",
             name: "비세라",
+            title: "체격·활동 관련 요인",
             user_monster_id: 11,
             is_target: true,
             state: "caution",
@@ -86,7 +88,10 @@ async function mock(page, state = {}) {
           },
         ],
       };
-    else if (p === "/user-challenges")
+    else if (p === "/user-challenges" && req.method() === "POST") {
+      state.mission = true;
+      data = { items: [] };
+    } else if (p === "/user-challenges")
       data = {
         items: state.mission
           ? [
@@ -150,7 +155,21 @@ async function mock(page, state = {}) {
         weekly_progress: 10,
         reward_draw_id: 8,
       };
-    } else if (p === "/challenge-recommendations")
+    } else if (p === "/predictions/5/contributions")
+      data = {
+        diseases: [
+          {
+            disease: "diabetes",
+            items: [
+              { factor_key: "age", contribution: -0.012, direction: "decrease", modifiable: false },
+              { factor_key: "family_history_dm", contribution: 0.0117, direction: "increase", modifiable: false },
+              { factor_key: "bmi_high", contribution: 0.0106, direction: "increase", modifiable: true },
+              { factor_key: "smoking_current", contribution: 0.0004, direction: "increase", modifiable: true },
+            ],
+          },
+        ],
+      };
+    else if (p === "/challenge-recommendations")
       data = { items: state.cards || [] };
     else if (p === "/health-records") data = { items: [] };
     else if (p === "/adventure/progress")
@@ -400,4 +419,96 @@ test("받을 보상이 있으면 가방 아이콘에 표시하고 가방을 카�
     await bag.click();
     await page.getByText("5장 중 3장을 골라주세요", { exact: true }).waitFor({ timeout: 3000 });
     assert.equal(await page.getByText("아직 획득한 보상이 없어요", { exact: false }).count(), 0);
+  }));
+
+const card = (overrides) => ({
+  recommendation_id: 31,
+  challenge_id: 9,
+  title: "계단으로 올라가기",
+  description: null,
+  factor_key: "physical_activity_low",
+  difficulty: "challenge",
+  verification_type: "manual",
+  context_type: "daily",
+  context_label: "이동 시",
+  daily_target_count: 1,
+  target_value: null,
+  unit: null,
+  daily_xp: 36,
+  safety_check_required: true,
+  target_monster: { code: "viscera" },
+  action: null,
+  ...overrides,
+});
+
+test("전투 카드 이름은 시안의 요인별 공격 이름을 쓴다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, {
+      cards: [
+        card({ recommendation_id: 41, challenge_id: 4, title: "맨몸 근력 10분", factor_key: "strength_activity_low" }),
+        card({ recommendation_id: 42, challenge_id: 5, title: "업무 중 움직임 휴식", factor_key: "sedentary_time_high" }),
+        card({ recommendation_id: 43, challenge_id: 6, title: "계단으로 올라가기" }),
+      ],
+    });
+    await page.goto(new URL(path + "#reco", base).href);
+    await page.locator(".reco-card").first().waitFor();
+    assert.deepEqual(await page.locator(".reco-card .quest-card-label").allTextContents(), [
+      "근력 공격",
+      "휴식 공격",
+      "걷기 공격",
+    ]);
+  }));
+
+test("챌린지 상세는 빈 값 없이 목표·XP·난이도와 안전 안내를 보여주고 시작하면 알려준다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { cards: [card({ challenge_id: 2 })] });
+    await page.goto(new URL(path + "#reco", base).href);
+    await page.locator(".reco-card").first().click();
+    const details = page.locator(".live-details");
+    await details.waitFor();
+    const text = (await details.textContent()).replace(/\s+/g, " ");
+    assert.doesNotMatch(text, /회 ·\s*(인증|$)/);
+    assert.match(text, /하루 목표 36 XP/);
+    assert.match(text, /도전/);
+    await page.getByText("통증이나 불편이 생기면 중단하세요", { exact: false }).waitFor();
+    await page.locator("#live-safety").check();
+    await page.getByRole("button", { name: "이 챌린지 시작하기" }).click();
+    await page.getByText("챌린지를 시작했어요", { exact: false }).waitFor();
+    assert.equal(await page.locator("[data-live-stop]").evaluate((el) => el.classList.contains("danger-link")), true);
+  }));
+
+test("가족력은 해당 없을 때 비워두라는 안내를 바로 아래에 둔다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#health2", base).href);
+    const block = page.locator(".health2 .medicine");
+    await block.waitFor();
+    assert.match(await block.textContent(), /가족력이 없으면 두 항목 모두 선택하지 않아요/);
+    assert.equal(await block.locator(".required-note").count(), 0);
+  }));
+
+test("v4 에서 맞춘 문구와 기여요인 Top3 를 v5 에도 보여준다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    assert.equal(
+      await page.locator('[data-village-key="viscera"] .village-plaque span').textContent(),
+      "체격·활동 관련 요인",
+    );
+    // 가입·검진 화면은 같은 문서 안에 숨겨져 있어 문구만 확인한다
+    assert.equal(
+      (await page.locator(".signup-form .consent").textContent()).replace(/\s+/g, " ").trim(),
+      "의료 고지를 확인했습니다.*필수",
+    );
+    assert.match(await page.locator(".health3").textContent(), /비워두면 간편 모드로 저장돼요/);
+    await page.goto(new URL(path + "#monsters", base).href);
+    await page.reload();
+    const top = page.locator(".live-top-factors");
+    await top.waitFor();
+    const rows = await top.locator(".factor-card").allTextContents();
+    assert.equal(rows.length, 3);
+    assert.match(rows[0], /당뇨 가족력.*\+1\.2%p.*바꿀 수 없는 요인/);
+    assert.match(rows[1], /높은 체질량지수.*\+1\.1%p.*비세라/);
+    assert.match(rows[2], /흡연.*\+0\.1%p 미만.*코티니/);
   }));
