@@ -340,8 +340,24 @@ button:focus-visible {
     max-width: 420px;
     margin: auto;
   }
+  /* 휴대폰에서도 두 마리씩 보여 네 마리를 한두 번 스크롤로 훑어보게 한다 */
   .live-book {
-    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .live-monster {
+    padding: 12px;
+    min-width: 0;
+  }
+  .live-monster .evolution-art {
+    width: 96px;
+    height: 108px;
+  }
+  .live-monster h2 {
+    font-size: 16px;
+  }
+  .live-monster p {
+    font-size: 12px;
+    line-height: 1.5;
   }
   .live-daily-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));

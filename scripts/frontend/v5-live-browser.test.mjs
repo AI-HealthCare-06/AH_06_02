@@ -76,6 +76,10 @@ async function mock(page, state = {}) {
             impact_score: 41,
             weekly_progress: state.completed ? 10 : 0,
             seal_progress: 0,
+            impact_explanation: {
+              status: "available",
+              winners: [{ disease: "hypertension", factor_key: "bmi_high", score: 41 }],
+            },
           },
           {
             code: "alde",
@@ -511,4 +515,23 @@ test("v4 에서 맞춘 문구와 기여요인 Top3 를 v5 에도 보여준다", 
     assert.match(rows[0], /당뇨 가족력.*\+1\.2%p.*바꿀 수 없는 요인/);
     assert.match(rows[1], /높은 체질량지수.*\+1\.1%p.*비세라/);
     assert.match(rows[2], /흡연.*\+0\.1%p 미만.*코티니/);
+  }));
+
+test("도감은 휴대폰 화면에서 두 마리씩 보여주고 산정 설명을 요인 이름으로 쓴다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(new URL(path + "#monsters", base).href);
+    const cards = page.locator(".live-monster");
+    await cards.first().waitFor();
+    const [first, second] = await Promise.all([cards.nth(0).boundingBox(), cards.nth(1).boundingBox()]);
+    assert.equal(Math.round(first.y), Math.round(second.y));
+    await cards.nth(0).locator("summary").click();
+    assert.match(await cards.nth(0).locator("details").textContent(), /높은 체질량지수 41/);
+    assert.doesNotMatch(await cards.nth(0).locator("details").textContent(), /bmi_high/);
+    await page.setViewportSize({ width: 320, height: 800 });
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      true,
+    );
   }));
