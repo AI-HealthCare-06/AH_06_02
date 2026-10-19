@@ -738,21 +738,23 @@ function validateHealth() {
 function serverFieldError(error) {
   const [first] = error.details?.fields || [];
   if (!first) return error;
-  const profileKey = { birth_year: "birth_year", height_cm: "height" }[
-    first.field
-  ];
+  // 형식 검사(Pydantic)는 "simple.weight_kg" 처럼 입력 모드 이름을 앞에 붙인다
+  const key = String(first.field).split(".").pop();
+  const profileKey = { birth_year: "birth_year", height_cm: "height" }[key];
   let input = profileKey
     ? $(`[data-page="health"] [data-profile-field="${profileKey}"]`)
     : null;
   for (const [page, fields] of Object.entries(HEALTH_FIELDS))
-    if (!input && fields[first.field])
-      input = $(`.${page} [aria-label="${fields[first.field]}"]`);
+    if (!input && fields[key])
+      input = $(`.${page} [aria-label="${fields[key]}"]`);
   if (!input) return error;
-  const text = first.reason
-    ? first.reason.replace(/^Value error, /, "")
+  // 형식 검사 사유는 영어로 오므로 한국어 사유만 그대로 쓴다
+  const reason = String(first.reason || "").replace(/^Value error, /, "");
+  const text = /[가-힣]/.test(reason)
+    ? reason
     : first.min !== undefined
       ? `${first.min}~${first.max} 사이로 입력해주세요.`
-      : error.message;
+      : "입력 형식을 확인해주세요.";
   return fieldError(input, text);
 }
 async function saveIntake() {

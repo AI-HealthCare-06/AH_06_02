@@ -272,6 +272,27 @@ async function mock(page, state = {}) {
         user: { id: 2, nickname: body.nickname, sex: body.sex },
       };
     else if (p === "/health-records" && req.method() === "POST") {
+      if (state.rejectHealth === "decimal") {
+        // 실제 서버(Pydantic)는 모드 이름을 붙인 필드와 영어 사유를 돌려준다
+        state.rejectHealth = false;
+        return route.fulfill({
+          status: 400,
+          json: {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "입력값을 다시 확인해주세요.",
+              fields: [
+                {
+                  field: "simple.weight_kg",
+                  reason:
+                    "Decimal input should have no more than 1 decimal place",
+                },
+              ],
+            },
+          },
+        });
+      }
       if (state.rejectHealth) {
         state.rejectHealth = false;
         return route.fulfill({
@@ -962,4 +983,25 @@ test("전투 화면에서 새로고침해도 슬롯이 찬 상태를 다시 확�
       await page.locator("#live-feedback").textContent(),
       /지금은 챌린지를 더 시작할 수 없어요/,
     );
+  }));
+
+test("서버가 모드 이름을 붙인 필드로 거절해도 그 입력칸이 있는 단계로 옮기고 한국어로 알린다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { signedOut: true, rejectHealth: "decimal" });
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator(".field-error").waitFor();
+    assert.equal(
+      await page.evaluate(() => document.body.dataset.page),
+      "health",
+    );
+    assert.equal(
+      await page
+        .getByRole("spinbutton", { name: "체중" })
+        .getAttribute("aria-invalid"),
+      "true",
+    );
+    const text = await page.locator(".field-error").textContent();
+    assert.doesNotMatch(text, /[A-Za-z]/, "영어 사유를 그대로 보여주지 않는다");
   }));
