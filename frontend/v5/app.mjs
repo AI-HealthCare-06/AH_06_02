@@ -294,6 +294,8 @@ function stage(m) {
 }
 async function go(id, push = true) {
   if (!names[id]) id = "risk";
+  // 기다릴 저장·예측이 없으면 대기 화면에 머물 이유가 없다 (뒤로가기 등)
+  if (id === "waiting" && !healthRecordId && !predictionId) id = "risk";
   if (
     !auth.signedIn &&
     !["login", "signup", "health", "health2", "health3", "waiting"].includes(id)
@@ -1502,6 +1504,12 @@ auth.subscribe((session) => {
 });
 // 실제 연결 모드는 예측이 끝나면 지도로 자동 이동한다. 시안용 예시 결과 버튼은 가짜 결과로 오해하게 한다
 $('[data-page="waiting"] [data-route="risk"]')?.remove();
+// 브라우저 뒤로가기·앞으로가기로 주소가 바뀌면 화면도 그 주소로 옮긴다
+window.addEventListener("hashchange", () => {
+  const id = location.hash.slice(1);
+  if (id && id !== active)
+    go(id, false).catch((error) => message(error.message, true));
+});
 const initial = location.hash.slice(1);
 await run(async () => {
   if (!(await auth.restore())) return go("login", false);

@@ -829,3 +829,33 @@ test("예측 대기 중 새로고침해도 결과 확인을 이어가고 다시 
       "새로고침 뒤에도 같은 예측 결과를 조회한다",
     );
   }));
+
+test("브라우저 뒤로가기·앞으로가기를 하면 주소와 함께 화면도 바뀐다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    await page.locator('#adventure-nav [data-main-target="bag"]').click();
+    await page.locator('.scene[data-page="rewards"]:not([hidden])').waitFor();
+    await page.goBack();
+    await page.locator('.scene[data-page="risk"]:not([hidden])').waitFor();
+    assert.equal(await page.evaluate(() => document.body.dataset.page), "risk");
+    await page.goForward();
+    await page.locator('.scene[data-page="rewards"]:not([hidden])').waitFor();
+    assert.equal(new URL(page.url()).hash, "#rewards");
+  }));
+
+test("예측이 끝난 뒤 뒤로가기로 대기 화면에 갇히지 않는다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { signedOut: true });
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    await page.goBack();
+    await page.waitForFunction(() => location.hash !== "#waiting");
+    assert.notEqual(
+      await page.evaluate(() => document.body.dataset.page),
+      "waiting",
+    );
+  }));
