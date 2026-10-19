@@ -399,8 +399,16 @@ async function enterVillage(key) {
   }
   village = key;
   selected = null;
-  await api("/challenge-recommendations/generate", { method: "POST" });
+  // 새 추천을 못 만들어도(슬롯이 다 참 등) 진행 중인 챌린지에는 들어가야 한다
+  let notice = "";
+  try {
+    await api("/challenge-recommendations/generate", { method: "POST" });
+  } catch (error) {
+    if (error.code !== "CHLG_RECOMMENDATION_UNAVAILABLE") throw error;
+    notice = error.message;
+  }
   await go("reco");
+  if (notice && active === "reco") message(notice);
 }
 async function renderBattle(ticket) {
   const m = currentMonster();

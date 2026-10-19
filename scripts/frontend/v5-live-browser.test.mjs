@@ -203,7 +203,22 @@ async function mock(page, state = {}) {
           },
         ],
       };
-    else if (p === "/challenge-recommendations")
+    else if (p === "/challenge-recommendations/generate") {
+      if (state.full)
+        return route.fulfill({
+          status: 409,
+          json: {
+            success: false,
+            error: {
+              code: "CHLG_RECOMMENDATION_UNAVAILABLE",
+              message:
+                "현재 주기에 추가로 시작할 수 있는 챌린지가 없어요. 진행 중인 챌린지를 이어가세요.",
+              reason: "slots_unavailable",
+            },
+          },
+        });
+      data = { items: state.cards || [] };
+    } else if (p === "/challenge-recommendations")
       data = { items: state.cards || [] };
     else if (p === "/health-records") data = { items: [] };
     else if (p === "/adventure/progress")
@@ -661,5 +676,22 @@ test("로그인된 상태에서는 회원가입 화면 대신 지도로 보내 �
     assert.equal(
       calls.some((c) => c.path === "/users/me" && c.method === "PATCH"),
       false,
+    );
+  }));
+
+test("새 챌린지를 더 시작할 수 없어도 퀘스트에서 진행 중인 챌린지로 들어간다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { mission: true, full: true });
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    await page.locator('#adventure-nav [data-main-target="quests"]').click();
+    await page
+      .locator(".reco-card")
+      .filter({ hasText: "식후 걷기 · 진행 중" })
+      .waitFor();
+    assert.equal(await page.evaluate(() => document.body.dataset.page), "reco");
+    assert.match(
+      await page.locator("#live-feedback").textContent(),
+      /진행 중인 챌린지를 이어가세요/,
     );
   }));
