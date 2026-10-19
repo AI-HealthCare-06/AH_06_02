@@ -34,7 +34,10 @@ const mission = {
     },
   ],
 };
-async function fillSignup(page, { walkingDays = "3" } = {}) {
+async function fillSignup(
+  page,
+  { walkingDays = "3", weight = "70", untilHealth = false } = {},
+) {
   await page.locator(".login .text-link[data-route=signup]").click();
   await page.locator("#nickname").fill("새 모험가");
   await page.locator('.signup-form [type="email"]').fill("new@dangokiller.com");
@@ -47,9 +50,10 @@ async function fillSignup(page, { walkingDays = "3" } = {}) {
   await page.getByRole("button", { name: "♂ 남성" }).click();
   await page.getByRole("spinbutton", { name: "출생연도" }).fill("1975");
   await page.getByRole("spinbutton", { name: "키" }).fill("170");
-  await page.getByRole("spinbutton", { name: "체중" }).fill("70");
+  await page.getByRole("spinbutton", { name: "체중" }).fill(weight);
   await page.getByRole("spinbutton", { name: "허리둘레" }).fill("85");
   await page.locator('.health button[type="submit"]').click();
+  if (untilHealth) return;
   await page.getByRole("button", { name: "안 피워요" }).click();
   await page.locator("#alcohol-frequency").selectOption("1");
   await page
@@ -1004,4 +1008,30 @@ test("서버가 모드 이름을 붙인 필드로 거절해도 그 입력칸이 
     );
     const text = await page.locator(".field-error").textContent();
     assert.doesNotMatch(text, /[A-Za-z]/, "영어 사유를 그대로 보여주지 않는다");
+  }));
+
+test("소수 자릿수가 맞지 않는 값은 계정을 만들기 전에 그 칸에서 알려준다", async () =>
+  withPage(async (page, base) => {
+    const calls = await mock(page, { signedOut: true });
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page, { weight: "70.55", untilHealth: true });
+    await page.locator(".field-error").waitFor();
+    assert.equal(
+      await page.evaluate(() => document.body.dataset.page),
+      "health",
+    );
+    assert.equal(
+      await page
+        .getByRole("spinbutton", { name: "체중" })
+        .getAttribute("aria-invalid"),
+      "true",
+    );
+    assert.match(
+      await page.locator(".field-error").textContent(),
+      /소수점 아래 한 자리/,
+    );
+    assert.equal(
+      calls.some((c) => c.path === "/auth/signup"),
+      false,
+    );
   }));

@@ -78,6 +78,8 @@ const HEALTH_RANGES = {
   walking_minutes: [0, 1440],
   sitting_minutes: [0, 1440],
 };
+// 서버 저장 형식(app/dtos/health_records.py)의 소수 자릿수. 나머지 숫자 칸은 정수만 받는다
+const HEALTH_DECIMALS = { weight_kg: 1, waist_cm: 1, hba1c: 1 };
 const auth = new AuthSession();
 const api = auth.api;
 const upload = createEvidenceUploader(api);
@@ -612,12 +614,18 @@ function renderEvolution() {
 }
 function checkRanges(page) {
   for (const [key, value] of Object.entries(healthValues(page))) {
+    const input = $(`.${page} [aria-label="${HEALTH_FIELDS[page][key]}"]`);
+    const allowed = HEALTH_DECIMALS[key] ?? 0;
+    if ((String(value).split(".")[1] || "").length > allowed)
+      throw fieldError(
+        input,
+        allowed
+          ? "소수점 아래 한 자리까지 입력해주세요."
+          : "소수점 없이 입력해주세요.",
+      );
     const range = HEALTH_RANGES[key];
     if (range && (value < range[0] || value > range[1]))
-      throw fieldError(
-        $(`.${page} [aria-label="${HEALTH_FIELDS[page][key]}"]`),
-        `${range[0]}~${range[1]} 사이로 입력해주세요.`,
-      );
+      throw fieldError(input, `${range[0]}~${range[1]} 사이로 입력해주세요.`);
   }
 }
 function healthValues(page) {
