@@ -209,11 +209,27 @@ function syncMotion() {
     else v.play().catch(() => {});
   });
 }
+// 예측 대기 중 새로고침해도 결과 확인을 이어가도록 예측 번호를 탭 저장소에도 둔다
+const PREDICTION_KEY = "dangokiller.v5.prediction";
+function rememberPrediction(id) {
+  predictionId = id;
+  try {
+    if (id) sessionStorage.setItem(PREDICTION_KEY, String(id));
+    else sessionStorage.removeItem(PREDICTION_KEY);
+  } catch {}
+}
+function storedPrediction() {
+  try {
+    return Number(sessionStorage.getItem(PREDICTION_KEY)) || null;
+  } catch {
+    return null;
+  }
+}
 function reset() {
   user = null;
   signupDraft = null;
   healthRecordId = null;
-  predictionId = null;
+  rememberPrediction(null);
   sex = undefined;
   smoking = undefined;
   selected = null;
@@ -733,12 +749,14 @@ async function saveIntake() {
   await go("waiting");
   if (!predictionId) {
     try {
-      predictionId = (
-        await api("/predictions", {
-          method: "POST",
-          body: { health_record_id: healthRecordId },
-        })
-      ).prediction_id;
+      rememberPrediction(
+        (
+          await api("/predictions", {
+            method: "POST",
+            body: { health_record_id: healthRecordId },
+          })
+        ).prediction_id,
+      );
     } catch (error) {
       if (error.code === "PRED_ALL_DIAGNOSED") {
         healthRecordId = null;
@@ -761,7 +779,7 @@ async function pollPrediction() {
     const result = await api(`/predictions/${predictionId}`);
     if (result.status === "done") {
       healthRecordId = null;
-      predictionId = null;
+      rememberPrediction(null);
       await go("risk");
       return;
     }
@@ -1136,7 +1154,7 @@ async function click(button) {
   if (route) {
     if (route === "health") {
       healthRecordId = null;
-      predictionId = null;
+      rememberPrediction(null);
     }
     await go(route);
     return;
@@ -1448,7 +1466,7 @@ document.head.append(css);
 $$(
   ".prototype-disclosure,.prototype-banner,.prototype-notice,.prototype-status,.prototype-proposal,.rewards>.hint,.rewards .hint,.preview-note",
 ).forEach((el) => el.remove());
-$(".waiting .panel-pad")?.insertAdjacentHTML(
+$(".waiting .waiting-bottom")?.insertAdjacentHTML(
   "beforeend",
   button("결과 다시 확인", "data-live-retry"),
 );
@@ -1486,6 +1504,12 @@ auth.subscribe((session) => {
 $('[data-page="waiting"] [data-route="risk"]')?.remove();
 const initial = location.hash.slice(1);
 await run(async () => {
-  if (await auth.restore()) await go(names[initial] ? initial : "risk", false);
-  else await go("login", false);
+  if (!(await auth.restore())) return go("login", false);
+  const waiting = storedPrediction();
+  if (initial === "waiting" && waiting) {
+    predictionId = waiting;
+    await go("waiting", false);
+    await pollPrediction();
+  } else
+    await go(names[initial] && initial !== "waiting" ? initial : "risk", false);
 });

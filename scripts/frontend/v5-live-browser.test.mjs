@@ -520,8 +520,10 @@ test("검진정보 제목은 선택 단계임을 밝힌다", async () =>
 
 test("실제 연결 모드의 예측 대기 화면에는 시안용 예시 결과 버튼이 없다", async () =>
   withPage(async (page, base) => {
-    await mock(page);
-    await page.goto(new URL(path + "#waiting", base).href);
+    await mock(page, { signedOut: true, predicting: true });
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
     await page.locator('.scene[data-page="waiting"]:not([hidden])').waitFor();
     assert.equal(await page.getByText("예시 결과 보기").count(), 0);
   }));
@@ -798,5 +800,32 @@ test("허용 범위를 벗어난 값은 계정을 만들기 전에 그 단계에
     assert.equal(
       calls.some((c) => c.path === "/auth/signup"),
       false,
+    );
+  }));
+
+test("예측 대기 중 새로고침해도 결과 확인을 이어가고 다시 확인 버튼을 보여준다", async () =>
+  withPage(async (page, origin) => {
+    const state = { signedOut: true, predicting: true };
+    const calls = await mock(page, state);
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator('.scene[data-page="waiting"]:not([hidden])').waitFor();
+    await page
+      .locator(".waiting [data-live-retry]")
+      .filter({ hasText: "결과 다시 확인" })
+      .waitFor();
+    // 새로고침해도 로그인 쿠키는 남아 있다
+    state.signedOut = false;
+    state.predicting = false;
+    const before = calls.length;
+    await page.reload();
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    assert.equal(
+      calls
+        .slice(before)
+        .some((c) => c.path === "/predictions/5" && c.method === "GET"),
+      true,
+      "새로고침 뒤에도 같은 예측 결과를 조회한다",
     );
   }));
