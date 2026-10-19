@@ -359,3 +359,13 @@ test("회원가입은 비밀번호 규칙을 미리 보여주고 틀린 칸에 �
     assert.equal(await password.getAttribute("aria-invalid"), "true");
     assert.equal(await password.evaluate((el) => el === document.activeElement), true);
   }));
+
+test("검진정보 제목은 선택 단계임을 밝힌다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#health3", base).href);
+    await page
+      .locator(".health3 h1")
+      .filter({ hasText: "검진 수치가 있으면 알려주세요(선택)" })
+      .waitFor({ timeout: 3000 });
+  }));
