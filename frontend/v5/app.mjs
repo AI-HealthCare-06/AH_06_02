@@ -466,19 +466,21 @@ async function enterVillage(key) {
   }
   village = key;
   selected = null;
-  // 새 추천을 못 만들어도(슬롯이 다 참 등) 진행 중인 챌린지에는 들어가야 한다
-  let notice = "";
+  await go("reco");
+}
+// 추천 생성(CHLG-01). 남은 슬롯은 이 응답으로만 알 수 있어 전투 화면을 그릴 때마다(새로고침 포함) 확인한다.
+// 새 추천을 못 만들어도(슬롯이 다 참 등) 진행 중인 챌린지에는 들어가야 하므로 안내 문구만 돌려준다
+async function refreshRecommendations() {
   try {
     await api("/challenge-recommendations/generate", { method: "POST" });
     slotsFull = false;
+    return "";
   } catch (error) {
     if (error.code !== "CHLG_RECOMMENDATION_UNAVAILABLE") throw error;
     slotsFull = error.details?.reason === "slots_unavailable";
     // 같은 주기 2주차부터 1개를 더 시작할 수 있어 "현재 주기에" 안 된다고 하면 주기 끝까지 막힌 것처럼 읽힌다
-    notice = slotsFull ? SLOTS_FULL_NOTICE : error.message;
+    return slotsFull ? SLOTS_FULL_NOTICE : error.message;
   }
-  await go("reco");
-  if (notice && active === "reco") message(notice);
 }
 async function renderBattle(ticket) {
   const m = currentMonster();
@@ -487,6 +489,8 @@ async function renderBattle(ticket) {
     return;
   }
   village = m.code;
+  const notice = await refreshRecommendations();
+  if (ticket !== navigation) return;
   const cards = (await api("/challenge-recommendations?size=100")).items;
   if (ticket !== navigation) return;
   $("#battle-title").textContent = labels[m.code] + "와의 전투";
@@ -530,6 +534,7 @@ async function renderBattle(ticket) {
         .join("")
     : '<p class="live-empty">지금 시작할 수 있는 챌린지가 없어요. 건강정보를 다시 확인해 주세요.</p>';
   $(".reco-list")._cards = entries;
+  if (notice) message(notice);
 }
 // 카드 이름은 v5 시안(presentQuestCards)에 정한 공격 이름을 그대로 쓴다. 새 이름을 만들지 않는다
 function attackName(card) {

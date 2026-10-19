@@ -948,3 +948,18 @@ test("슬롯이 남아 있으면 추천 카드를 그대로 시작할 수 있다
     assert.equal(await fresh.isDisabled(), false);
     assert.doesNotMatch(await fresh.textContent(), /다음 주기/);
   }));
+
+test("전투 화면에서 새로고침해도 슬롯이 찬 상태를 다시 확인해 카드를 막는다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { mission: true, full: true, cards: [card()] });
+    await page.goto(new URL(path + "#reco", base).href);
+    const locked = page
+      .locator(".reco-card")
+      .filter({ hasText: "계단으로 올라가기" });
+    await locked.waitFor();
+    assert.equal(await locked.isDisabled(), true);
+    assert.match(
+      await page.locator("#live-feedback").textContent(),
+      /지금은 챌린지를 더 시작할 수 없어요/,
+    );
+  }));
