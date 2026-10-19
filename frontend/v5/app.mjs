@@ -1142,6 +1142,15 @@ function chooseButton(button) {
   });
 }
 async function click(button) {
+  // 메뉴에서 갈 곳을 고르면 메뉴를 닫는다. 모션 끄기 같은 메뉴 안 설정은 그대로 둔다
+  const menu = button.closest("#app-menu");
+  if (
+    menu?.open &&
+    (button.dataset.route ||
+      button.dataset.mainTarget ||
+      button.hasAttribute("data-live-logout"))
+  )
+    menu.close();
   if (button.dataset.profileSex) {
     sex = button.dataset.profileSex === "male" ? "M" : "F";
     chooseButton(button);

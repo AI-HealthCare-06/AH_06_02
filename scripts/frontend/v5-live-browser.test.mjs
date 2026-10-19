@@ -859,3 +859,16 @@ test("예측이 끝난 뒤 뒤로가기로 대기 화면에 갇히지 않는다"
       "waiting",
     );
   }));
+
+test("메뉴에서 화면을 고르면 메뉴 창이 닫힌다", async () =>
+  withPage(async (page, base) => {
+    await mock(page);
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    await page.locator("#menu-toggle").click();
+    const menu = page.locator("#app-menu");
+    assert.equal(await menu.evaluate((el) => el.open), true);
+    await menu.getByRole("button", { name: /가방 · 아이템과 보상/ }).click();
+    await page.locator('.scene[data-page="rewards"]:not([hidden])').waitFor();
+    assert.equal(await menu.evaluate((el) => el.open), false);
+  }));
