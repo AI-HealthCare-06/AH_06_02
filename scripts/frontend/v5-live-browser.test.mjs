@@ -1035,3 +1035,15 @@ test("소수 자릿수가 맞지 않는 값은 계정을 만들기 전에 그 �
       false,
     );
   }));
+
+test("로그인하지 않은 채 회원가입 주소로 들어오면 바로 회원가입 화면을 연다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { signedOut: true });
+    await page.goto(new URL(path + "#signup", base).href);
+    await page.locator('.scene[data-page="signup"]:not([hidden])').waitFor();
+    assert.equal(
+      await page.evaluate(() => document.body.dataset.page),
+      "signup",
+    );
+    assert.equal(new URL(page.url()).hash, "#signup");
+  }));

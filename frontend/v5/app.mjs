@@ -1559,7 +1559,9 @@ window.addEventListener("hashchange", () => {
 });
 const initial = location.hash.slice(1);
 await run(async () => {
-  if (!(await auth.restore())) return go("login", false);
+  // 로그인 전에 열 수 있는 첫 화면은 로그인과 회원가입뿐이다. 건강정보 단계는 가입 정보가 있어야 한다
+  if (!(await auth.restore()))
+    return go(initial === "signup" ? "signup" : "login", false);
   const waiting = storedPrediction();
   if (initial === "waiting" && waiting) {
     predictionId = waiting;
