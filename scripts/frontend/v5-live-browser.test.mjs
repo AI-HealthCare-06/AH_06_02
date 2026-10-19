@@ -150,7 +150,9 @@ async function mock(page, state = {}) {
         weekly_progress: 10,
         reward_draw_id: 8,
       };
-    } else if (p === "/health-records") data = { items: [] };
+    } else if (p === "/challenge-recommendations")
+      data = { items: state.cards || [] };
+    else if (p === "/health-records") data = { items: [] };
     else if (p === "/adventure/progress")
       data = { days: [], missions: [], cycles: [] };
     else throw new Error("예상하지 않은 API: " + p);
@@ -376,4 +378,14 @@ test("실제 연결 모드의 예측 대기 화면에는 시안용 예시 결과
     await page.goto(new URL(path + "#waiting", base).href);
     await page.locator('.scene[data-page="waiting"]:not([hidden])').waitFor();
     assert.equal(await page.getByText("예시 결과 보기").count(), 0);
+  }));
+
+test("전투 화면은 수행해도 위협도가 바로 줄지 않는 이유를 위협도 옆에 알려준다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { mission: true, completed: true });
+    await page.goto(new URL(path + "#reco", base).href);
+    await page.locator("#battle-score").filter({ hasText: "10 / 100" }).waitFor();
+    const note = page.locator(".fighter-panel.opponent").getByText("재측정 때 바뀌어요", { exact: false });
+    assert.equal(await note.isVisible(), true);
+    assert.equal(await page.locator("#battle-threat").textContent(), "41");
   }));
