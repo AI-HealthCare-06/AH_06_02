@@ -763,10 +763,10 @@ test("새 챌린지를 더 시작할 수 없어도 퀘스트에서 진행 중인
       .filter({ hasText: "식후 걷기 · 진행 중" })
       .waitFor();
     assert.equal(await page.evaluate(() => document.body.dataset.page), "reco");
-    assert.match(
-      await page.locator("#live-feedback").textContent(),
-      /진행 중인 챌린지를 이어가세요/,
-    );
+    const notice = await page.locator("#live-feedback").textContent();
+    assert.match(notice, /진행 중인 챌린지를 이어가세요/);
+    // 같은 주기 2주차부터 1개를 더 시작할 수 있어 주기 전체를 막는 것처럼 말하지 않는다
+    assert.doesNotMatch(notice, /현재 주기에|다음 주기/);
   }));
 
 test("가입 중 서버가 건강정보를 거절하면 입력을 지키고 틀린 칸이 있는 단계로 옮긴다", async () =>
@@ -914,7 +914,7 @@ test("받을 보상이 오래돼 다음 페이지에 있어도 가방에 표시�
     );
   }));
 
-test("슬롯이 다 차면 시작 안 한 추천 카드는 흐리게 막고 다음 주기에 시작할 수 있다고 알린다", async () =>
+test("슬롯이 다 차면 시작 안 한 추천 카드는 흐리게 막고 지금은 추가로 시작할 수 없다고 알린다", async () =>
   withPage(async (page, base) => {
     await mock(page, { mission: true, full: true, cards: [card()] });
     await page.goto(new URL(path + "#risk", base).href);
@@ -925,7 +925,8 @@ test("슬롯이 다 차면 시작 안 한 추천 카드는 흐리게 막고 다�
       .filter({ hasText: "계단으로 올라가기" });
     await locked.waitFor();
     assert.equal(await locked.isDisabled(), true);
-    assert.match(await locked.textContent(), /다음 주기에 시작할 수 있어요/);
+    assert.match(await locked.textContent(), /지금은 추가로 시작할 수 없어요/);
+    assert.doesNotMatch(await locked.textContent(), /다음 주기/);
     assert.ok(
       Number(await locked.evaluate((el) => getComputedStyle(el).opacity)) < 1,
       "흐리게 보인다",
