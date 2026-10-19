@@ -277,7 +277,7 @@ async function mock(page, state = {}) {
       };
     else if (p === "/health-records" && req.method() === "POST") {
       if (state.rejectHealth === "decimal") {
-        // 실제 서버(Pydantic)는 모드 이름을 붙인 필드와 영어 사유를 돌려준다
+        // 실제 서버(Pydantic)는 입력 모델 이름을 붙인 필드와 영어 사유를 돌려준다
         state.rejectHealth = false;
         return route.fulfill({
           status: 400,
@@ -288,7 +288,7 @@ async function mock(page, state = {}) {
               message: "입력값을 다시 확인해주세요.",
               fields: [
                 {
-                  field: "simple.weight_kg",
+                  field: "SimpleHealthRecordInput.weight_kg",
                   reason:
                     "Decimal input should have no more than 1 decimal place",
                 },
@@ -989,7 +989,7 @@ test("전투 화면에서 새로고침해도 슬롯이 찬 상태를 다시 확�
     );
   }));
 
-test("서버가 모드 이름을 붙인 필드로 거절해도 그 입력칸이 있는 단계로 옮기고 한국어로 알린다", async () =>
+test("서버가 입력 모델 이름을 붙인 필드로 거절해도 그 입력칸이 있는 단계로 옮기고 한국어로 알린다", async () =>
   withPage(async (page, base) => {
     await mock(page, { signedOut: true, rejectHealth: "decimal" });
     await page.goto(new URL(path + "#login", base).href);

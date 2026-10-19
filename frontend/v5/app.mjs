@@ -746,7 +746,7 @@ function validateHealth() {
 function serverFieldError(error) {
   const [first] = error.details?.fields || [];
   if (!first) return error;
-  // 형식 검사(Pydantic)는 "simple.weight_kg" 처럼 입력 모드 이름을 앞에 붙인다
+  // 형식 검사(Pydantic)는 "SimpleHealthRecordInput.weight_kg" 처럼 입력 모델 이름을 앞에 붙인다
   const key = String(first.field).split(".").pop();
   const profileKey = { birth_year: "birth_year", height_cm: "height" }[key];
   let input = profileKey
