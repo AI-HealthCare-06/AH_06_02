@@ -104,6 +104,8 @@ let user,
   previewItems = [],
   active = "login",
   navigation = 0;
+// 추천 생성(CHLG-01)이 슬롯 없음으로 거절됐는지. 카드 조회 API 에는 남은 슬롯이 없어 생성 결과로 안다
+let slotsFull = false;
 let busy = false,
   timerPoll = null,
   pendingPositions = new Set(),
@@ -229,6 +231,7 @@ function reset() {
   user = null;
   signupDraft = null;
   healthRecordId = null;
+  slotsFull = false;
   rememberPrediction(null);
   sex = undefined;
   smoking = undefined;
@@ -465,8 +468,10 @@ async function enterVillage(key) {
   let notice = "";
   try {
     await api("/challenge-recommendations/generate", { method: "POST" });
+    slotsFull = false;
   } catch (error) {
     if (error.code !== "CHLG_RECOMMENDATION_UNAVAILABLE") throw error;
+    slotsFull = error.details?.reason === "slots_unavailable";
     notice = error.message;
   }
   await go("reco");
@@ -514,10 +519,11 @@ async function renderBattle(ticket) {
   ];
   $(".reco-list").innerHTML = entries.length
     ? entries
-        .map(
-          (card, index) =>
-            `<button type="button" class="reco-card" data-live-card="${index}"><span class="quest-card-heading"><span class="quest-card-label">${escape(attackName(card))}</span></span><span class="quest-card-subtitle">${escape(card.title)}${card.live ? " · 진행 중" : ""}</span></button>`,
-        )
+        .map((card, index) => {
+          // 슬롯이 다 차면 아직 시작 안 한 추천은 눌러도 시작할 수 없다
+          const locked = slotsFull && !card.live;
+          return `<button type="button" class="reco-card${locked ? " is-locked" : ""}" data-live-card="${index}"${locked ? " disabled" : ""}><span class="quest-card-heading"><span class="quest-card-label">${escape(attackName(card))}</span></span><span class="quest-card-subtitle">${escape(card.title)}${card.live ? " · 진행 중" : ""}</span>${locked ? '<span class="quest-card-lock">다음 주기에 시작할 수 있어요</span>' : ""}</button>`;
+        })
         .join("")
     : '<p class="live-empty">지금 시작할 수 있는 챌린지가 없어요. 건강정보를 다시 확인해 주세요.</p>';
   $(".reco-list")._cards = entries;

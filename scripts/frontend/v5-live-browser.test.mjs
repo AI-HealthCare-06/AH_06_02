@@ -913,3 +913,37 @@ test("받을 보상이 오래돼 다음 페이지에 있어도 가방에 표시�
       "가방, 받을 보상 1개",
     );
   }));
+
+test("슬롯이 다 차면 시작 안 한 추천 카드는 흐리게 막고 다음 주기에 시작할 수 있다고 알린다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { mission: true, full: true, cards: [card()] });
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    await page.locator('#adventure-nav [data-main-target="quests"]').click();
+    const locked = page
+      .locator(".reco-card")
+      .filter({ hasText: "계단으로 올라가기" });
+    await locked.waitFor();
+    assert.equal(await locked.isDisabled(), true);
+    assert.match(await locked.textContent(), /다음 주기에 시작할 수 있어요/);
+    assert.ok(
+      Number(await locked.evaluate((el) => getComputedStyle(el).opacity)) < 1,
+      "흐리게 보인다",
+    );
+    const live = page.locator(".reco-card").filter({ hasText: "진행 중" });
+    assert.equal(await live.isDisabled(), false, "진행 중 카드는 그대로 연다");
+  }));
+
+test("슬롯이 남아 있으면 추천 카드를 그대로 시작할 수 있다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { mission: true, cards: [card()] });
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    await page.locator('#adventure-nav [data-main-target="quests"]').click();
+    const fresh = page
+      .locator(".reco-card")
+      .filter({ hasText: "계단으로 올라가기" });
+    await fresh.waitFor();
+    assert.equal(await fresh.isDisabled(), false);
+    assert.doesNotMatch(await fresh.textContent(), /다음 주기/);
+  }));
