@@ -176,8 +176,12 @@ async function run(action, control) {
   try {
     await action();
   } catch (error) {
-    if (error.field) showFieldError(error.field, error.message);
-    else if (
+    if (error.field) {
+      // 지금 화면에 없는 칸이면 그 칸이 있는 단계로 먼저 옮긴다
+      const scene = error.field.closest(".scene[data-page]");
+      if (scene?.hidden) await go(scene.dataset.page);
+      showFieldError(error.field, error.message);
+    } else if (
       owner === auth.user?.id ||
       !owner ||
       control?.closest(".login-form")
@@ -652,6 +656,27 @@ function validateHealth() {
     : "simple";
   return body;
 }
+// 서버가 알려준 틀린 필드를 그 입력칸 오류로 바꾼다
+function serverFieldError(error) {
+  const [first] = error.details?.fields || [];
+  if (!first) return error;
+  const profileKey = { birth_year: "birth_year", height_cm: "height" }[
+    first.field
+  ];
+  let input = profileKey
+    ? $(`[data-page="health"] [data-profile-field="${profileKey}"]`)
+    : null;
+  for (const [page, fields] of Object.entries(HEALTH_FIELDS))
+    if (!input && fields[first.field])
+      input = $(`.${page} [aria-label="${fields[first.field]}"]`);
+  if (!input) return error;
+  const text = first.reason
+    ? first.reason.replace(/^Value error, /, "")
+    : first.min !== undefined
+      ? `${first.min}~${first.max} 사이로 입력해주세요.`
+      : error.message;
+  return fieldError(input, text);
+}
 async function saveIntake() {
   const values = profile(),
     body = validateHealth();
@@ -661,13 +686,18 @@ async function saveIntake() {
       method: "POST",
       auth: false,
       body: { ...signupDraft, ...values },
+    }).catch((error) => {
+      throw serverFieldError(error);
     });
     signupDraft = null;
     await auth.acceptLogin(result);
   } else await api("/users/me", { method: "PATCH", body: values });
   if (!healthRecordId)
-    healthRecordId = (await api("/health-records", { method: "POST", body }))
-      .health_record_id;
+    healthRecordId = (
+      await api("/health-records", { method: "POST", body }).catch((error) => {
+        throw serverFieldError(error);
+      })
+    ).health_record_id;
   await go("waiting");
   if (!predictionId) {
     try {
@@ -1406,6 +1436,9 @@ auth.subscribe((session) => {
   if (nextOwner === accountOwner) return;
   const previous = accountOwner;
   accountOwner = nextOwner;
+  user = session.user;
+  // 처음 로그인될 때(가입 직후 포함)는 입력 중인 건강정보를 지우지 않는다
+  if (previous === null) return;
   reset();
   user = session.user;
   $$("form").forEach((form) => form.reset());

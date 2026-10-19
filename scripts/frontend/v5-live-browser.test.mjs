@@ -34,6 +34,35 @@ const mission = {
     },
   ],
 };
+async function fillSignup(page, { walkingDays = "3" } = {}) {
+  await page.locator(".login .text-link[data-route=signup]").click();
+  await page.locator("#nickname").fill("새 모험가");
+  await page.locator('.signup-form [type="email"]').fill("new@dangokiller.com");
+  for (const field of await page
+    .locator('.signup-form [type="password"]')
+    .all())
+    await field.fill("test1234a");
+  await page.locator(".signup-form .consent input").check();
+  await page.locator('.signup-form [type="submit"]').click();
+  await page.getByRole("button", { name: "♂ 남성" }).click();
+  await page.getByRole("spinbutton", { name: "출생연도" }).fill("1975");
+  await page.getByRole("spinbutton", { name: "키" }).fill("170");
+  await page.getByRole("spinbutton", { name: "체중" }).fill("70");
+  await page.getByRole("spinbutton", { name: "허리둘레" }).fill("85");
+  await page.locator('.health button[type="submit"]').click();
+  await page.getByRole("button", { name: "안 피워요" }).click();
+  await page.locator("#alcohol-frequency").selectOption("1");
+  await page
+    .getByRole("spinbutton", { name: "주당 걷기 일수" })
+    .fill(walkingDays);
+  await page.getByRole("spinbutton", { name: "1회 걷기 시간" }).fill("30");
+  await page.getByRole("spinbutton", { name: "주당 근력운동 일수" }).fill("1");
+  await page
+    .getByRole("spinbutton", { name: "하루 앉아 있는 시간" })
+    .fill("480");
+  await page.locator("#dining-out-freq").selectOption("5");
+  await page.locator('.health2 button[type="submit"]').click();
+}
 async function mock(page, state = {}) {
   const calls = [];
   await page.route("**/api/v1/**", async (route) => {
@@ -220,6 +249,31 @@ async function mock(page, state = {}) {
       data = { items: state.cards || [] };
     } else if (p === "/challenge-recommendations")
       data = { items: state.cards || [] };
+    else if (p === "/auth/signup")
+      data = {
+        access_token: "v5-signup-token",
+        user: { id: 2, nickname: body.nickname, sex: body.sex },
+      };
+    else if (p === "/health-records" && req.method() === "POST") {
+      if (state.rejectHealth) {
+        state.rejectHealth = false;
+        return route.fulfill({
+          status: 400,
+          json: {
+            success: false,
+            error: {
+              code: "HLTH_VALUE_OUT_OF_RANGE",
+              message: "입력하신 값이 허용 범위를 벗어났습니다.",
+              fields: [{ field: "walking_days", min: 0, max: 7 }],
+            },
+          },
+        });
+      }
+      data = { health_record_id: 9 };
+    } else if (p === "/predictions" && req.method() === "POST")
+      data = { prediction_id: 5 };
+    else if (p === "/predictions/5")
+      data = { status: state.predicting ? "pending" : "done" };
     else if (p === "/health-records") data = { items: [] };
     else if (p === "/adventure/progress")
       data = { days: [], missions: [], cycles: [] };
@@ -694,4 +748,32 @@ test("새 챌린지를 더 시작할 수 없어도 퀘스트에서 진행 중인
       await page.locator("#live-feedback").textContent(),
       /진행 중인 챌린지를 이어가세요/,
     );
+  }));
+
+test("가입 중 서버가 건강정보를 거절하면 입력을 지키고 틀린 칸이 있는 단계로 옮긴다", async () =>
+  withPage(async (page, origin) => {
+    const calls = await mock(page, { signedOut: true, rejectHealth: true });
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    const walking = page.getByRole("spinbutton", { name: "주당 걷기 일수" });
+    await page.locator(".field-error").waitFor();
+    assert.equal(
+      await page.evaluate(() => document.body.dataset.page),
+      "health2",
+    );
+    assert.equal(await walking.getAttribute("aria-invalid"), "true");
+    assert.match(await page.locator(".field-error").textContent(), /0~7/);
+    assert.equal(
+      await page.locator('[aria-label="출생연도"]').inputValue(),
+      "1975",
+      "앞 단계 입력도 그대로 남는다",
+    );
+    await page.locator('.health2 button[type="submit"]').click();
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    const posts = (p) =>
+      calls.filter((c) => c.path === p && c.method === "POST").length;
+    assert.equal(posts("/auth/signup"), 1, "계정은 한 번만 만든다");
+    assert.equal(posts("/health-records"), 2);
   }));
