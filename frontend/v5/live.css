@@ -431,3 +431,17 @@ button:focus-visible {
   outline: 2px solid #e5484d;
   outline-offset: 1px;
 }
+
+#adventure-nav [data-main-target="bag"].has-reward {
+  position: relative;
+}
+#adventure-nav [data-main-target="bag"].has-reward::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: calc(50% - 18px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #e5484d;
+}

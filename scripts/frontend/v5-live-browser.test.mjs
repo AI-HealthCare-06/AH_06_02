@@ -389,3 +389,15 @@ test("전투 화면은 수행해도 위협도가 바로 줄지 않는 이유를 
     assert.equal(await note.isVisible(), true);
     assert.equal(await page.locator("#battle-threat").textContent(), "41");
   }));
+
+test("받을 보상이 있으면 가방 아이콘에 표시하고 가방을 카드 뽑기로 연다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { draw: true });
+    await page.goto(new URL(path + "#risk", base).href);
+    const bag = page.locator('#adventure-nav [data-main-target="bag"]');
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    assert.equal(await bag.getAttribute("aria-label"), "가방, 받을 보상 1개");
+    await bag.click();
+    await page.getByText("5장 중 3장을 골라주세요", { exact: true }).waitFor({ timeout: 3000 });
+    assert.equal(await page.getByText("아직 획득한 보상이 없어요", { exact: false }).count(), 0);
+  }));

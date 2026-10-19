@@ -53,7 +53,7 @@ let user,
   selected,
   village,
   growth = "character",
-  bagTab = "inventory",
+  bagTab = null,
   month = dateKey().slice(0, 7),
   catalog = [],
   adventurer = {},
@@ -202,7 +202,17 @@ async function load() {
   catalog = values[5].items;
   adventurer = values[6];
   draws = values[7].items;
+  syncBagBadge();
   return true;
+}
+// 받을 보상 카드가 있으면 하단 가방 아이콘에 표시한다
+function syncBagBadge() {
+  const pending = draws.filter((d) => !d.claimed_at).length;
+  $$('#adventure-nav [data-main-target="bag"]').forEach((b) => {
+    b.classList.toggle("has-reward", pending > 0);
+    if (pending) b.setAttribute("aria-label", `가방, 받을 보상 ${pending}개`);
+    else b.removeAttribute("aria-label");
+  });
 }
 function currentMonster() {
   return (
@@ -715,6 +725,8 @@ async function complete(occurrenceId) {
   );
 }
 async function renderBag() {
+  // 가방을 새로 열 때 받을 보상이 있으면 카드 뽑기부터 보여준다. 보상함이 비어 보여 헷갈렸다
+  if (!bagTab) bagTab = draws.some((d) => !d.claimed_at) ? "draw" : "inventory";
   const content = $("#reward-content");
   $("#reward-page-title").textContent = "나의 보상";
   $("#reward-page-copy").textContent =
@@ -768,7 +780,7 @@ async function renderBag() {
         ? ["hat", "bag", "hand", "shoes"].includes(i.slot)
         : i.owned && !i.starter,
   );
-  const cards = `<div class="reward-grid">${items.map((i) => `<article class="reward-tile ${i.owned ? "" : "locked"}">${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt="${escape(i.name)}" loading="lazy"></div>` : '<span class="live-token" aria-hidden="true">✦</span>'}<h3>${escape(i.name)}</h3><p>${i.starter ? "기본 제공" : i.rarity}</p>${bagTab !== "inventory" ? `<button type="button" class="reward-apply" data-live-equip="${i.code}" ${i.owned ? "" : "disabled"}>${!i.owned ? "🔒 미획득" : (adventurer.equipment?.[i.slot] || adventurer.room?.[i.slot]) === i.code ? "해제하기" : "적용하기"}</button>` : ""}</article>`).join("") || "<p>아직 획득한 보상이 없어요. 챌린지를 완료하면 카드를 고를 수 있어요.</p>"}</div>`;
+  const cards = `<div class="reward-grid">${items.map((i) => `<article class="reward-tile ${i.owned ? "" : "locked"}">${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt="${escape(i.name)}" loading="lazy"></div>` : '<span class="live-token" aria-hidden="true">✦</span>'}<h3>${escape(i.name)}</h3><p>${i.starter ? "기본 제공" : i.rarity}</p>${bagTab !== "inventory" ? `<button type="button" class="reward-apply" data-live-equip="${i.code}" ${i.owned ? "" : "disabled"}>${!i.owned ? "🔒 미획득" : (adventurer.equipment?.[i.slot] || adventurer.room?.[i.slot]) === i.code ? "해제하기" : "적용하기"}</button>` : ""}</article>`).join("") || (draws.some((d) => !d.claimed_at) ? `<p>받을 보상 카드가 있어요. 카드를 고르면 여기에 담겨요.</p>${button("카드 고르러 가기", 'data-live-bag="draw"')}` : "<p>아직 획득한 보상이 없어요. 챌린지를 완료하면 카드를 고를 수 있어요.</p>")}</div>`;
   panel.innerHTML =
     bagTab === "room"
       ? `<div class="live-room-layout">${roomArt()}<section>${cards}</section></div>`
@@ -939,7 +951,10 @@ async function click(button) {
   if (main) {
     if (main === "home") await go("risk");
     if (main === "book") await go("monsters");
-    if (main === "bag") await go("rewards");
+    if (main === "bag") {
+      bagTab = null;
+      await go("rewards");
+    }
     if (main === "records") await go("progress");
     if (main === "quests") {
       selected = null;
