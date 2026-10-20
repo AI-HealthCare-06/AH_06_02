@@ -1,6 +1,6 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-19 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-20 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -602,13 +602,13 @@
 - **사용 테이블**: reward_draws 읽기
 - **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
 
-### RWRD-04 · 보상 카드 3장 수령
+### RWRD-04 · 보상 카드 1장 수령
 
 `POST /api/v1/reward-draws/{draw_id}/claim`
 
 - **인증**: 필요
 - **요청 파라미터**: path: draw_id
-- **요청 본문**: { positions: [0,2,4] } (0~4 중 서로 다른 3개)
+- **요청 본문**: { positions: [2] } (0~4 중 1개)
 - **응답 (성공)**: { draw_id, selected_positions, results: [{ code, name, slot, rarity, asset, duplicate, materials }], claimed_at }. 동일 선택 재요청은 동일 영수증 반환, 선택 변경은 거절
 - **주요 에러**: UNAUTHORIZED, CHLG_NOT_FOUND, VALIDATION_ERROR
 - **관련 요구사항**: REQ-RECO-010
@@ -648,7 +648,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { equipment, room, materials, item_stage }. 재료 5개 차감, 최대 3단계
+- **응답 (성공)**: { equipment, room, materials, item_stage }. 재료 20개 (2단계)·40개(3단계) 차감, 최대 3단계
 - **주요 에러**: UNAUTHORIZED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-RECO-012
 - **사용 테이블**: adventurer_states 쓰기
