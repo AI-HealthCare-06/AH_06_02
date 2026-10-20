@@ -93,7 +93,8 @@ class ChallengeTimerService:
                 defaults={
                     "user_id": user_id,
                     "user_challenge_id": mission.id,
-                    "started_at": current,
+                    # DATETIME 칸은 초 단위라 반올림된다. 일시정지 시각과 같은 기준이 되도록 잘라 저장한다
+                    "started_at": current.replace(microsecond=0),
                     "target_seconds": math.ceil(mission.target_value_snapshot * 60),
                     "expires_at": datetime.combine(current.date() + timedelta(days=1), time.min, config.TIMEZONE),
                 },
@@ -124,7 +125,8 @@ class ChallengeTimerService:
             await lock_user(user_id)
             timer = await self._changeable(user_id, mission_id, timer_id, current)
             if timer.paused_at is None:
-                timer.paused_at = current
+                # DATETIME 칸은 초 단위라 소수 초를 반올림한다. 저장 전에 잘라 두어야 다시 읽어도 같은 시간이 보인다
+                timer.paused_at = current.replace(microsecond=0)
                 await timer.save(update_fields=["paused_at"])
             return timer_body(timer, current)
 

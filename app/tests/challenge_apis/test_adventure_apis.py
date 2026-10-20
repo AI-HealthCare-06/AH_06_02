@@ -94,6 +94,18 @@ class TestAdventureAPI(TestCase):
         assert ready["ready"] is True
         assert (await service.resume(user_id, mission_id, timer_id, t0 + timedelta(seconds=1001)))["paused"] is False
 
+    async def test_paused_time_is_whole_seconds_so_reload_shows_the_same_time(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            token, mission_id, timer_id = await self._started_timer(client, "v5-pause-second@example.com")
+            user_id = (await client.get("/api/v1/users/me", headers=_auth(token))).json()["data"]["id"]
+        service = ChallengeTimerService()
+        t0 = kst((await ChallengeTimerSession.get(id=timer_id)).started_at)
+        paused = await service.pause(user_id, mission_id, timer_id, t0 + timedelta(seconds=3, milliseconds=700))
+        stored = await ChallengeTimerSession.get(id=timer_id)
+        # 운영 DB 의 DATETIME 은 초 단위라 소수 초를 반올림한다. 멈춘 시각은 초 단위로 잘라 저장한다
+        assert stored.paused_at is not None and stored.paused_at.microsecond == 0
+        assert timer_body(stored, t0 + timedelta(seconds=60))["elapsed_seconds"] == paused["elapsed_seconds"] == 3
+
     async def test_pause_and_resume_endpoints_check_owner_and_expiry(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             token, mission_id, timer_id = await self._started_timer(client, "v5-pause-api@example.com")
