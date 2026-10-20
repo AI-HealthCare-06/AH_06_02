@@ -105,8 +105,12 @@ async function mock(page, state = {}) {
         prediction_available: true,
         prediction_id: 5,
         risks: [
-          { disease: "diabetes", probability: 0.075 },
-          { disease: "hypertension", probability: 0.12 },
+          {
+            disease: "diabetes",
+            probability: 0.075,
+            delta: state.dmDelta ?? null,
+          },
+          { disease: "hypertension", probability: 0.12, delta: null },
         ],
       };
     else if (p === "/monsters/me")
@@ -1234,5 +1238,20 @@ test("'해당 없어요'로 제외한 챌린지는 목록에 모아 두고 다�
         ["/challenge-recommendations/31", { action: "not_applicable" }],
         ["/challenge-recommendations/31/unsuppress", null],
       ],
+    );
+  }));
+
+test("재측정하면 위험도 칸에 직전 대비 변화량을 보여준다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { dmDelta: -1.26 });
+    await page.goto(new URL(path + "#risk", base).href);
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    const delta = page.locator("#dm-risk .live-risk-delta");
+    assert.equal((await delta.textContent()).trim(), "직전 대비 -1.3%p");
+    assert.equal(await delta.isVisible(), true);
+    assert.equal(
+      await page.locator("#htn-risk .live-risk-delta").count(),
+      0,
+      "비교할 직전 예측이 없으면 표시하지 않는다",
     );
   }));

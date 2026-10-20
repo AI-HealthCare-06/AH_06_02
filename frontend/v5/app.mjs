@@ -387,15 +387,33 @@ function riskValue(key) {
     (r) => r.disease === (key === "dm" ? "diabetes" : "hypertension"),
   );
   return risk
-    ? [`${(risk.probability * 100).toFixed(1)}<small>%</small>`, "현재 위험도"]
+    ? [
+        `${(risk.probability * 100).toFixed(1)}<small>%</small>`,
+        "현재 위험도",
+        riskDelta(risk.delta),
+      ]
     : ["—", "건강정보 입력 후 확인"];
+}
+// delta 는 같은 모델로 낸 직전 완료 예측 대비 percentage points 다. 없으면(첫 예측·모델 변경) 표시하지 않는다
+function riskDelta(delta) {
+  if (typeof delta !== "number") return "";
+  const rounded = Math.round(delta * 10) / 10;
+  return `직전 대비 ${rounded > 0 ? "+" : ""}${rounded}%p`;
 }
 function renderHome() {
   for (const key of ["dm", "htn"]) {
     const tile = $("#" + key + "-risk"),
-      [value, copy] = riskValue(key);
+      [value, copy, delta] = riskValue(key);
     tile.querySelector("strong").innerHTML = value;
     tile.querySelector("p").textContent = copy;
+    tile.querySelector(".live-risk-delta")?.remove();
+    if (delta)
+      tile
+        .querySelector("strong")
+        .insertAdjacentHTML(
+          "afterend",
+          `<span class="live-risk-delta">${escape(delta)}</span>`,
+        );
   }
   $("#map-level").textContent = "Lv. " + level.level;
   $("#map-xp-text").textContent =

@@ -593,3 +593,12 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
   font: inherit;
   font-weight: 700;
 }
+
+/* 지도 위험도 칸의 직전 대비 변화량. 설명 줄은 숨겨져 있어 따로 보여준다 */
+.home-risk-summary .risk-tile .live-risk-delta {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
