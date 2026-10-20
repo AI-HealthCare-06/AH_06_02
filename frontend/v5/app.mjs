@@ -895,6 +895,10 @@ async function saveIntake() {
         throw serverFieldError(error);
       })
     ).health_record_id;
+  await submitPrediction();
+}
+// PRED-01 접수 후 결과를 기다린다. 이미 접수한 예측이 있으면 다시 접수하지 않는다
+async function submitPrediction() {
   await go("waiting");
   if (!predictionId) {
     try {
