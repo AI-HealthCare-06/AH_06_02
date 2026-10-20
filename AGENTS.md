@@ -17,16 +17,18 @@ Do not translate them into new English names.
 
 ## Read this first
 
-**If you are building a screen, read the v4 prototype and
+**If you are building a screen, read the v5 HTML and
 [`docs/02_team/design.md`](docs/02_team/design.md) before anything else.** Skip
 them and the four of us ship four different-looking screens.
 
-The visual source of truth is the HTML prototype v4,
-[`frontend/docs/prototype/당고킬러-모험시안_v4.html`](frontend/docs/prototype/당고킬러-모험시안_v4.html).
+The visual source of truth is the v5 HTML,
+[`frontend/docs/prototype/당고킬러-모험시안_v5.html`](frontend/docs/prototype/당고킬러-모험시안_v5.html),
+which is also the service screen (the team switched from v4 on 2026-10-20).
 Take colors, spacing, typography and copy from it. `docs/02_team/design.md`
-adds the meaning, state representation and implementation rules the prototype
-does not show. When the two disagree, v4 wins. Do not hand-edit design.md; ask
-the team instead.
+adds the meaning, state representation and implementation rules the HTML does
+not show; parts of it still describe v4 until the team updates it. When the two
+disagree, v5 wins. Do not hand-edit design.md; ask the team instead. How the
+frontend is laid out and run is in [`frontend/README.md`](frontend/README.md).
 
 ---
 

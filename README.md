@@ -94,7 +94,8 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 | 예측 API 상세 계약 | `docs/01_planning/api-predictions.md` |
 | 모델 입력·SHAP·서비스 계약 | `docs/03_ai_data/model.md` |
 | 색·간격·버튼을 어떻게 쓰는가 | `docs/02_team/design.md` |
-| 팀 의견을 받을 v5 모험 시안 | `docs/02_team/prototype-v5-proposal.md` — 실제 API 연결·별도 체험 모드, 기존 v4 진입점 유지 |
+| 서비스 화면(v5)의 연결 범위와 보상 규칙 | `docs/02_team/prototype-v5-proposal.md` |
+| 프론트 파일 구성과 실행 | `frontend/README.md` |
 
 요구사항 정의서와 테이블 명세서, API 명세서는 구글 시트가 원본입니다. 레포의 세 파일은 `uv run scripts/sync_specs.py`로 뽑은 사본이라 손으로 고치지 않습니다. 시트를 먼저 고치고 다시 뽑습니다.
 

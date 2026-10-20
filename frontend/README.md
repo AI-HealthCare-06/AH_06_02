@@ -1,28 +1,17 @@
-# 당고킬러 공통 HTML 프론트
+# 당고킬러 v5 프론트
 
-2026-10-12 통합된 `frontend/`를 기준으로 HTML v4의 디자인을 사용한다.
-React·Vite·TypeScript의 미사용 초기 템플릿을 제거했다. Node 20 이상이 필요하며 화면 실행에 번들러는 사용하지 않는다.
-화면·API·DB가 같은 저장소에 있다. `docs/prototype/당고킬러-모험시안_v4.html`은 11화면의 참고 시안으로 유지한다.
-
-## v5 모험 화면
-
-`docs/prototype/당고킬러-모험시안_v5.html`은 기본 주소에서 실제 API를 사용한다. 공통 인증과 건강정보·모델 예측·챌린지·서버 타이머·PHOTO 업로드·보상·꾸미기 저장을 연결했다. 기존 공통 진입점과 v4 화면은 유지한다.
-
-API 또는 아래 개발 서버로 `/frontend/docs/prototype/당고킬러-모험시안_v5.html#login`을 연다. 일반 정적 서버만으로는 실제 API를 호출할 수 없다. 입력 없는 시안 검토는 `?demo=1#login` 주소를 사용한다. 이 모드는 새로고침하면 기록이 초기화된다.
-
-새 테이블 세 개의 마이그레이션과 기존 마스터 시드가 필요하다. 로컬 사진 저장소는 `EVIDENCE_STORAGE_DIR=./media/evidence`처럼 쓰기 가능한 비공개 경로로 지정한다. [v5 연결 범위·보상 규칙·검증](../docs/02_team/prototype-v5-proposal.md)에 실행 조건과 호환성 범위를 정리했다. 후보 70종은 잠긴 미리보기다.
-
-`npm run test:v5`로 실제 연결 모드의 브라우저 회귀를, `npm run test:prototype`으로 별도 체험 모드를 검사한다. 기존 서비스 검사는 아래 명령을 그대로 사용한다.
+서비스 화면은 v5다(2026-10-20 팀 합의). Node 20 이상이 필요하며 화면 실행에 번들러는 사용하지 않는다.
+화면·API·DB가 같은 저장소에 있다. v4 앱 코드는 #65에서 지웠고, 지우기 전 코드는 커밋 `218dd51`에서 볼 수 있다. v4 시안 HTML(`docs/prototype/당고킬러-모험시안_v4.html`)은 참고용으로만 남긴다.
 
 ## 실행
 
-백엔드는 기존 안내대로 저장소 루트에서 실행한다.
+백엔드는 저장소 루트에서 실행한다.
 
 ```bash
 docker compose up -d
 ```
 
-환경을 직접 구성한 경우에는 기존 DB·환경변수·마이그레이션·시드를 준비하고 `uv run uvicorn app.main:app --reload`로 실행할 수 있다.
+환경을 직접 구성한 경우에는 DB·환경변수·마이그레이션·시드를 준비하고 `uv run uvicorn app.main:app --reload`로 실행한다. 예측까지 확인하려면 예측 워커도 띄운다(루트 README 참고).
 
 프론트 개발 서버:
 
@@ -32,147 +21,68 @@ npm ci
 npm run dev
 ```
 
-화면은 `http://127.0.0.1:5173/`, API는 개발 서버가 `http://127.0.0.1:8000/api/v1`로 전달한다.
-브라우저는 같은 출처로 요청하므로 토큰·쿠키를 위해 별도 CORS 설정을 바꾸지 않는다.
+`http://127.0.0.1:5173/frontend/`를 연다. API는 개발 서버가 `http://127.0.0.1:8000/api/v1`로 전달한다.
+브라우저는 같은 출처로 요청하므로 토큰·쿠키를 위해 CORS 설정을 바꾸지 않는다.
 포트나 백엔드 주소를 바꾸려면 실행 환경변수 `DANGO_FRONTEND_PORT`, `DANGO_API_ORIGIN`을 지정한다.
-개발 서버는 기본적으로 127.0.0.1에만 열린다. 운영에서는 이 개발 서버 대신 FastAPI·Nginx의 `/frontend/` 경로를 사용한다.
-FastAPI의 `http://localhost:8000/frontend/`로 직접 열어도 같은 진입점이 동작한다.
+개발 서버는 127.0.0.1에만 열린다. 운영에서는 FastAPI·Nginx의 `/frontend/` 경로를 사용한다. 일반 정적 서버만으로는 실제 API를 호출할 수 없다.
 
-## 공통 기반이 맡는 것
+입력 없이 화면만 검토하려면 주소에 `?demo=1`을 붙인다(`/frontend/?demo=1#login`). 이 모드는 API를 부르지 않고, 새로고침하면 기록이 초기화된다.
 
-| 구성 | 파일 | 역할 |
-| --- | --- | --- |
-| 화면 틀 | index.html, app.mjs | 헤더·하단 메뉴·내용 영역·공통 사용자 표시 |
-| 라우팅 | shared/router.mjs | 11개 화면 이름, 로그인 보호, 원래 화면 복귀, 주소창·뒤로가기 |
-| 인증 | shared/auth.mjs | 로그인·서버 로그아웃·쿠키 복원·메모리 세션·계정 경합 방지 |
-| API | shared/api.mjs | /api/v1, Bearer, 성공 봉투 해제, 실패·인증 갱신, 파일 본문 |
-| UI | shared/components.mjs, components.css | 버튼·입력·카드·로딩·없음·오류·중복 클릭 방지 |
+## 파일 구성
 
-공통 화면 내용은 `data-page-host` 안에만 렌더링한다. 각 페이지가 헤더나 하단 메뉴를 새로 만들지 않는다.
-D 네 화면은 `embedded` 모드로 공통 틀 안에 연결되어 있다. D 사이 이동에서는 기존 타이머 상태를 유지한다.
-다른 담당 화면으로 이동하거나 로그인 사용자가 바뀌면 이전 D 영역과 수행 중 상태를 정리한다.
-새로고침·영역 제거로 미인증 타이머가 사라진 경우에는 새 타이머로 시작한다. 임의로 완료를 인정하지 않는다.
+| 파일 | 역할 |
+| --- | --- |
+| `index.html` | 서비스 입구. v5 HTML로 넘기며 주소의 화면 이름(`#login` 등)과 `?demo=1`을 이어받는다 |
+| `docs/prototype/당고킬러-모험시안_v5.html` | 화면 마크업·스타일과 `?demo=1` 체험 모드. 기본 모드에서는 `v5/app.mjs`를 불러온다 |
+| `v5/app.mjs` | 실제 연결 모드. 화면 이동(주소의 `#화면이름`), 인증, API 호출, 화면 그리기 |
+| `v5/live.css` | 실제 연결 모드에서만 쓰는 스타일 |
+| `v5/item-preview.json` | 꾸미기 후보 70종의 이름과 그림 경로(잠긴 미리보기) |
+| `shared/auth.mjs` | 로그인·서버 로그아웃·쿠키 복원·메모리 세션·계정 경합 방지 |
+| `shared/api.mjs` | `/api/v1`, Bearer, 성공 봉투 해제, 실패·인증 갱신, 파일 본문 |
+| `shared/evidence.mjs` | HLTH-03 사진 업로드 |
+| `shared/factors.mjs` | 기여요인 이름표와 Top3 표시 |
+| `docs/prototype/assets/` | 화면 그림·영상·폰트와 라이선스 |
 
-## 담당별 시작 파일
+화면 이름은 `login`·`signup`·`health`·`health2`·`health3`·`waiting`·`risk`·`monsters`·`reco`·`today`·`progress`·`evolution`·`evolution-complete`·`rewards`다. 로그인 전에는 `login`·`signup`과 가입 중의 건강정보·예측 대기 단계만 열린다.
 
-| 담당 | 화면 | 수정 시작점 |
-| --- | --- | --- |
-| 수빈 / A | login·signup | pages/login.mjs, pages/signup.mjs |
-| 병주 / C | health·health2·health3·waiting·risk | pages/각_화면명.mjs |
-| 이경 / D | reco·today·progress·monsters | d/screens.mjs, d/model.mjs |
+## 구현 규칙
 
-`login`에는 공통 인증을 검증할 최소 로그인 폼을 제공한다. A의 최종 시안·회원가입 흐름 구현 완료를 뜻하지 않는다.
-C 세 입력 화면(health·health2·health3)은 `pages/health-flow.mjs`의 메모리 초안에 값을 모아 HLTH-01을 한 번만 보낸다. waiting은 PRED-01을 한 번 접수하고 PRED-02를 폴링해 `pending` → `done`을 확인하면 추천으로 넘긴다. risk는 DASH-01과 USER-01로 현재 위험도를 보여준다. 가상 건강 수치·결과는 넣지 않는다.
-회원가입·건강기록·예측 접수·폴링·결과 표시·사진 업로드의 화면별 처리는 해당 담당자가 이어서 구현한다.
-
-## 페이지 구현 규약
-
-각 파일에서 `mount(context)`를 내보낸다. 아래 예시는 호출 방법을 보여준다. 자신의 화면 진입점에서 작성한다.
-
-```javascript
-export function mount({ root, ui, api, auth, router, route, signal }) {
-  const title = ui.element('h1', { text: '화면 제목' });
-  const field = ui.field('입력 항목', { name: 'input_value', required: true });
-  const status = ui.element('div', { attributes: { 'aria-live': 'polite' } });
-  const load = ui.button('내 정보 확인', {
-    variant: 'secondary',
-    onClick: () => ui.runPending(load, async () => {
-      try {
-        const data = await api('/users/me');
-        if (signal.aborted) return;
-        status.replaceChildren(ui.notice(data.nickname));
-      } catch (error) {
-        if (!signal.aborted) status.replaceChildren(ui.notice(error.message, { kind: 'error' }));
-      }
-    }),
-  });
-  root.replaceChildren(title, field.wrapper, status, load);
-  return () => { /* 타이머·구독·이벤트를 정리한다. */ };
-}
-```
-
-- `api('/path', {method?, body?})`는 성공 봉투의 `data`를 반환한다. 사용자 ID를 요청에 넣지 않는다.
-- 공개 인증 API는 `{auth:false}`로 호출한다. 로그인 자체는 `auth.login({email,password})`로 처리한다.
-- 회원가입 성공 결과를 `await auth.acceptLogin(data)`에 전달하면 토큰·내 정보를 공통 세션에 연결한다. `refresh_token`을 별도 저장하지 않는다.
-- 이동은 `router.navigate('health2')` 또는 `router.navigate('waiting?prediction_id=501')`로 한다. 다른 담당 페이지로 넘어갈 때 파일 경로나 `location`을 직접 바꾸지 않는다.
-- 인증을 마친 로그인 페이지에서는 `router.resume()`로 원래 목적지에 복귀한다.
-- `route.params`는 URLSearchParams다. ID 형식·양수 여부는 사용하는 페이지에서도 확인한다. 토큰과 건강정보를 URL에 넣지 않는다.
-- 조회는 화면 이탈 시 취소 신호를 받는다. 늦은 응답을 표시하기 전에 `signal.aborted`를 확인한다.
-- 쓰기는 자동 재전송·자동 취소하지 않는다. 연결이 끊기면 서버 목록을 확인한 뒤 사용자가 재시도한다.
-- `ui.runPending(button, work)`는 처리 중 표시와 중복 실행 방지를 맡는다.
-- `ui.element`와 `ui.notice`는 텍스트를 안전하게 넣는다. 서버 문자열을 직접 innerHTML에 넣지 않는다.
+- 실제 연결 모드에는 가상 데이터를 넣지 않는다. API 오류를 예시 결과로 대신 보여주지 않는다.
+- 입력 오류는 해당 칸에 표시하고 그 칸으로 옮긴다. 허용 범위와 소수 자릿수는 서버 검증과 같게 계정 생성 전에 확인한다.
+- 서버 문자열은 이스케이프한 뒤 넣는다. 사용자 ID를 요청에 넣지 않는다.
+- 쓰기(가입·저장·시작·중단·수령)는 자동으로 다시 보내지 않는다. 응답 전에 연결이 끊긴 예측 접수는 다시 보내지 않고 지도에서 결과를 확인하게 한다.
+- 이미 진단·복약 중인 질환에는 예측 확률 대신 `진단 관리 중`을 표시한다.
+- `위험도`·`위협도`·`공략 점수`·봉인은 루트 [AGENTS.md](../AGENTS.md)를 따른다. 수행해도 `위험도`·`위협도`는 바뀌지 않는다.
+- 320px 화면에서 가로로 넘치지 않는다. `prefers-reduced-motion`을 따르고 영상은 멈춘다.
 
 ## 인증·오류·날짜 규칙
 
 공통 액세스 토큰은 메모리에만 둔다. 토큰과 개인정보는 localStorage·sessionStorage에 저장하지 않는다. 새로고침 복원에 필요한 식별자(예: 예측 번호)만 sessionStorage에 둘 수 있다.
 새로고침은 AUTH-04의 서버 HttpOnly 쿠키로 복원한 뒤 USER-01로 본인을 확인한다.
 로그아웃 뒤 늦게 도착한 갱신 응답이 이전 토큰을 다시 넣지 못하도록 세션 버전을 확인한다.
-조회는 401일 때 한 번 갱신 후 다시 읽는다. 시작·저장·중단 등의 쓰기는 자동 재전송하지 않는다.
-로그아웃 API 실패를 성공처럼 표시하지 않는다. 토큰·비밀번호를 로그로 남기지 않는다.
-
-예측 완료 직후에만 제한적으로 재시도한다. 폴링이 done 으로 바뀐 뒤 첫 호출에서
-404 PRED_NOT_FOUND 또는 409 CHLG_RECOMMENDATION_UNAVAILABLE 이 나면 1초 간격으로
-2회까지 다시 호출한다. 그 밖에는 재시도하지 않는다.
-409 CHLG_RECOMMENDATION_UNAVAILABLE 은 갱신 대기뿐 아니라 아티팩트 부재·후보 없음·
-슬롯 부족도 함께 덮는 코드다. 두 번 더 시도해도 실패하면 error.message 를 그대로
-보여준다. 409 를 코드별로 나누는 것은 2단계 후보다.
-
-공통 컨텍스트의 `predictionReady`가 완료 직후 추천 호출을 관리한다. C의 폴링 화면은
-실제 `pending` → `done` 전환을 확인한 뒤 아래처럼 연결한다.
-
-```javascript
-predictionReady.markDone(result); // result.status === 'done', 양의 정수 prediction_id 확인
-router.navigate('reco');
-```
-
-D 화면은 이 표시가 있던 첫 추천 호출만 재시도한다. 완료 표시는 메모리에만 보관하며
-5초가 지나거나 첫 요청이 사용하거나 로그인 상태가 바뀌면 만료된다.
-화면 이탈·계정 변경 이후에는 예약된 재시도를 보내지 않는다.
-일반 추천 오류나 시작·대상 변경·인증 쓰기에는 자동 재시도를 적용하지 않는다.
-C 폴링 화면 자체는 C 담당자가 구현해야 하며, 서버의 `done` 확인 없이 완료 표시를 만들지 않는다.
+조회는 401일 때 한 번 갱신 후 다시 읽는다. 로그아웃 API 실패를 성공처럼 표시하지 않는다. 토큰·비밀번호를 로그로 남기지 않는다.
 
 API 타임스탬프는 오프셋을 포함해 해석한다. UTC로 고정해서 9시간을 중복 추가하지 않는다.
-KST 달력 날짜 `YYYY-MM-DD`는 날짜 자체를 유지한다. `위험도`·`위협도`·`공략 점수`·봉인은 루트 지침을 따른다.
+KST 달력 날짜 `YYYY-MM-DD`는 날짜 자체를 유지한다.
 PRED 상태는 실제 API의 `pending`·`done`·`failed`를 사용한다. HTTP 200만으로 추론 완료를 판단하지 않는다.
-의료 고지와 이미 진단/복약해 제외된 질환을 확률 0으로 채우지 않는 처리는 C 결과 화면에서 지킨다. 그 자리에 대신 넣을 표시 문구는 AGENTS.md 의 "Never do this" 를 따른다.
 
-## 사진 업로드 연결
+## 사진 업로드
 
-이 변경은 HLTH-03 서버·참조값 검증과 프론트를 함께 포함한다. 기본값은 활성이다.
-서버가 없는 이전 환경에서는 `window.dangoConfig.evidencePhotosEnabled = false`로 비활성화한다.
-프론트만 분리 배포하지 않는다.
-
-서버가 `POST /api/v1/evidence/photos`를 제공하면 앱 시작 전에
-`window.dangoConfig = { ...window.dangoConfig, evidencePhotosEnabled: true }`로 설정하거나,
-직접 `startApplication(root, { evidencePhotosEnabled: true })`로 시작한다.
-공통 세션의 API 클라이언트가 `photo`와 `user_challenge_id`를 FormData로 전송한다.
-클라이언트에서 JPEG/PNG·빈 파일·최대 10 MiB를 검사하며 서버에서도 검증해야 한다.
-
-C의 별도 업로드 함수를 주입하는 방법도 유지한다.
-`uploadPhoto(file, { userChallengeId, occurrenceId, signal }) -> { evidence_url }` 계약을 따른다.
-`window.dangoEvidence.uploadPhoto`도 같은 인자를 받는다. occurrenceId는 화면 문맥이며
-HLTH-03 multipart 필드에는 포함하지 않는다. multipart Content-Type은 브라우저가 정한다.
-
-비공개 증빙 참조값을 받은 뒤에만 해당 미션의 CHLG-07로 수행 기록을 전송한다.
-업로드 실패·응답 이상·계정 변경·화면 이탈 시에는 새 수행 로그를 만들지 않는다.
-업로드 쓰기 요청을 인증 갱신 후 자동 재전송하지 않는다.
-업로드 파일의 소유권·활성 미션·내용·보관 기간은 C 서버에서 검증해야 한다.
+`shared/evidence.mjs`가 공통 세션의 API 클라이언트로 `photo`와 `user_challenge_id`를 FormData로 보낸다. 클라이언트에서 JPEG/PNG·빈 파일·최대 10 MiB를 검사하며 서버에서도 검증한다.
+비공개 증빙 참조값을 받은 뒤에만 해당 미션의 CHLG-07로 수행 기록을 보낸다. 업로드가 실패하면 수행 기록을 만들지 않는다.
 
 ## 검증
 
 ```bash
-npm run test:unit
+npm run test:unit        # API·인증·사진 업로드·개발 서버 프록시
 npx playwright install chromium
-npm run test:browser
+npm run test:prototype   # ?demo=1 체험 모드
+npm run test:v5          # 실제 연결 모드 브라우저 회귀
 ```
 
-단위 검사는 API·인증·라우트·점수·타이머·개발 서버 프록시를 확인한다.
-브라우저 검사는 공통 로그인·쿠키 복원·원래 화면 복귀·뒤로가기·늦은 응답·320px 화면과 D의 시작·인증·보상·도감을 확인한다.
-브라우저 테스트의 API 응답은 테스트 파일에만 있다. 실제 서비스 화면에 가상 데이터 모드는 없다.
-앱·DB 검사는 저장소 루트의 기존 `scripts/ci` 명령을 사용한다. 운영 배포와 실제 워커 포함 통합 검증은 별도다.
+브라우저 테스트의 API 응답은 테스트 파일에만 있다. 앱·DB 검사는 저장소 루트의 `scripts/ci` 명령을 사용한다.
 
-## 기존 자료
+## 참고 자료
 
 API·요구사항·DB·설계는 저장소 루트 `docs/`를 참조한다. 원본 시트의 사본을 여기 만들지 않는다.
-기존 v4 폰트·이미지와 라이선스는 `d/assets/`에 있으며 모든 공통 화면에서 같은 CSS를 사용한다.
-모델 PR과 D 추천 최신성/복약 보완은 별도 작업이다. 이 공통 기반 패치에 그 후속 코드를 중복으로 넣지 않는다.
+v5 연결 범위·추가 계약·보상 규칙·검증 기록은 [docs/02_team/prototype-v5-proposal.md](../docs/02_team/prototype-v5-proposal.md)에 있다.

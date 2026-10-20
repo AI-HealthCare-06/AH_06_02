@@ -16,14 +16,16 @@ single-sourced. Do not translate them into new English names.
 
 ## Building a screen
 
-`docs/prototype/당고킬러-모험시안_v4.html` is the reference. Take colors,
-spacing, copy and button shapes from it. Do not invent new ones.
+The service screen is v5. `docs/prototype/당고킬러-모험시안_v5.html` holds the
+markup and styles, and `v5/app.mjs` connects it to the real API. Take colors,
+spacing, copy and button shapes from that HTML. Do not invent new ones. The v4
+prototype HTML stays only as a historical reference.
 
-The prototype leaves three dropdowns empty with a dashed border: 음주 빈도,
-음주량, 외식 빈도. `pages/health2.mjs` fills them from the KNHANES code meanings
-in [`docs/03_ai_data/input-code-map.md`](../docs/03_ai_data/input-code-map.md)
-and sends the code itself as the value. Keep these lists and that file in step;
-do not invent new options.
+Three dropdowns carry KNHANES codes: 음주 빈도, 음주량, 외식 빈도. Their options
+in the v5 HTML follow the code meanings in
+[`docs/03_ai_data/input-code-map.md`](../docs/03_ai_data/input-code-map.md),
+and the app sends the code itself as the value. Keep these lists and that file
+in step; do not invent new options.
 
 - 음주 빈도 `alcohol_frequency` 1~6: 최근 4주 동안 마시지 않음 · 월 1회 미만 ·
   월 1회 정도 · 월 2~4회 · 주 2~3회 · 주 4회 이상
@@ -56,9 +58,10 @@ localStorage·sessionStorage에 저장하지 않는다. 새로고침 복원에 �
 
 ## 공통 구현 연결
 
-실행·담당 페이지·공통 인증·라우팅·API·UI 사용법은 [README.md](README.md)를 따른다.
-페이지는 내용 영역만 렌더링하며 공통 헤더와 하단 메뉴를 중복 생성하지 않는다.
-개별 페이지에서 별도 토큰 저장소나 API 클라이언트를 만들지 않는다.
+실행·파일 구성·인증·API 사용법은 [README.md](README.md)를 따른다.
+화면 코드는 `v5/app.mjs`에 두고 `shared/auth.mjs`의 세션과 `shared/api.mjs`의 API
+클라이언트를 쓴다. 별도 토큰 저장소나 API 클라이언트를 만들지 않는다.
+실제 연결 모드에 가상 데이터를 넣지 않는다. 화면만 보는 체험은 `?demo=1`에서 한다.
 날짜·API 활성 상태·봉인 의미는 상위 지침과 실제 서버 응답을 따른다.
 API 타임스탬프를 UTC로 가정하지 않는다. KST 달력 날짜는 날짜 그대로 표시한다.
 등록되지 않은 화면과 사진 업로드를 완료된 것처럼 표시하지 않는다.

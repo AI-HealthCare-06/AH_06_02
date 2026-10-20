@@ -7,8 +7,8 @@
 | 요구사항 | 구글 시트 `당고킬러_요구사항정의서` | `01_planning/requirements.md` |
 | 테이블 | 구글 시트 `당고킬러_테이블명세서` | `01_planning/table-spec.md` |
 | API | 구글 시트 `당고킬러_API 명세서` | `01_planning/api-spec.md` |
-| 현재 화면 기준 | HTML v4 · 보완 설계 | `../frontend/docs/prototype/당고킬러-모험시안_v4.html` · `02_team/design.md` |
-| v5 모험 화면 | 실제 API 연결·체험 모드·자산 | `02_team/prototype-v5-proposal.md` · `../frontend/docs/prototype/당고킬러-모험시안_v5.html` |
+| 화면 기준 | HTML v5 · 보완 설계 | `../frontend/docs/prototype/당고킬러-모험시안_v5.html` · `02_team/design.md` |
+| v5 연결 범위·보상 규칙 | 이 저장소 | `02_team/prototype-v5-proposal.md` |
 | 구현 규칙 | 이 저장소 | `../AGENTS.md` |
 
 **구글 시트가 원본입니다.** 이 폴더의 마크다운은 사본이고, 코드를 쓸 때 읽기 위한 것입니다.
