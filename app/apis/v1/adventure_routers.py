@@ -35,6 +35,20 @@ async def get_timer(
     return ok(await ChallengeTimerService().get(user.id, user_challenge_id, timer_session_id))
 
 
+@adventure_router.post("/user-challenges/{user_challenge_id}/timers/{timer_session_id}/pause")
+async def pause_timer(
+    user_challenge_id: int, timer_session_id: int, user: Annotated[User, Depends(get_request_user)]
+) -> dict[str, Any]:
+    return ok(await ChallengeTimerService().pause(user.id, user_challenge_id, timer_session_id))
+
+
+@adventure_router.post("/user-challenges/{user_challenge_id}/timers/{timer_session_id}/resume")
+async def resume_timer(
+    user_challenge_id: int, timer_session_id: int, user: Annotated[User, Depends(get_request_user)]
+) -> dict[str, Any]:
+    return ok(await ChallengeTimerService().resume(user.id, user_challenge_id, timer_session_id))
+
+
 @adventure_router.get("/rewards/catalog")
 async def catalog(user: Annotated[User, Depends(get_request_user)]) -> dict[str, Any]:
     return ok(await AdventureRewardService().catalog(user.id))

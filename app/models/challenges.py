@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -413,6 +414,9 @@ class ChallengeTimerSession(models.Model):
     expires_at = fields.DatetimeField()
     completed_log_id = fields.BigIntField(null=True, unique=True)
     created_at = fields.DatetimeField(auto_now_add=True)
+    # 일시정지 (CHLG-13·14). 멈춘 시각과 지금까지 멈춘 시간의 합(초)
+    paused_at: datetime | None = fields.DatetimeField(null=True)
+    paused_seconds = fields.IntField(default=0)
 
     class Meta:
         table = "challenge_timer_sessions"

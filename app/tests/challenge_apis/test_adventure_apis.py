@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from httpx import ASGITransport, AsyncClient
@@ -6,7 +6,8 @@ from tortoise.contrib.test import TestCase
 
 from app.core import config
 from app.main import app
-from app.models.challenges import VerificationType
+from app.models.challenges import ChallengeTimerSession, VerificationType
+from app.services.challenge_timers import ChallengeTimerService, kst, timer_body
 from app.tests.challenge_apis.test_challenge_core_apis import _auth, _challenge, _login, _recommendation
 from app.tests.d_fixtures import make_cycle
 
@@ -57,6 +58,61 @@ class TestAdventureAPI(TestCase):
                 headers=headers,
             )
             assert rejected.status_code == 422
+
+    async def _started_timer(self, client: AsyncClient, email: str) -> tuple[str, int, int]:
+        user_id, token = await _login(client, email)
+        challenge = await _challenge(email.split("@")[0].upper())
+        challenge.target_value = Decimal("10")
+        await challenge.save()
+        card = await _recommendation(user_id=user_id, challenge_id=challenge.id)
+        started = await client.post(
+            "/api/v1/user-challenges", json={"recommendation_ids": [card.id]}, headers=_auth(token)
+        )
+        mission_id = started.json()["data"]["items"][0]["user_challenge_id"]
+        timer = await client.post(f"/api/v1/user-challenges/{mission_id}/timers", json={}, headers=_auth(token))
+        return token, mission_id, timer.json()["data"]["timer_session_id"]
+
+    async def test_paused_timer_does_not_count_paused_time(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            token, mission_id, timer_id = await self._started_timer(client, "v5-pause@example.com")
+            user_id = (await client.get("/api/v1/users/me", headers=_auth(token))).json()["data"]["id"]
+        service = ChallengeTimerService()
+        session = await ChallengeTimerSession.get(id=timer_id)
+        t0 = kst(session.started_at)
+        paused = await service.pause(user_id, mission_id, timer_id, t0 + timedelta(seconds=100))
+        assert paused["paused"] is True
+        # 멈춘 동안에는 경과 시간이 늘지 않는다
+        frozen = timer_body(await ChallengeTimerSession.get(id=timer_id), t0 + timedelta(seconds=500))
+        assert (frozen["elapsed_seconds"], frozen["ready"]) == (100, False)
+        assert (await service.pause(user_id, mission_id, timer_id, t0 + timedelta(seconds=550)))["paused"] is True
+        resumed = await service.resume(user_id, mission_id, timer_id, t0 + timedelta(seconds=500))
+        assert (resumed["paused"], resumed["elapsed_seconds"]) == (False, 100)
+        assert (await ChallengeTimerSession.get(id=timer_id)).paused_seconds == 400
+        later = timer_body(await ChallengeTimerSession.get(id=timer_id), t0 + timedelta(seconds=999))
+        assert (later["elapsed_seconds"], later["ready"]) == (599, False)
+        ready = timer_body(await ChallengeTimerSession.get(id=timer_id), t0 + timedelta(seconds=1000))
+        assert ready["ready"] is True
+        assert (await service.resume(user_id, mission_id, timer_id, t0 + timedelta(seconds=1001)))["paused"] is False
+
+    async def test_pause_and_resume_endpoints_check_owner_and_expiry(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            token, mission_id, timer_id = await self._started_timer(client, "v5-pause-api@example.com")
+            base = f"/api/v1/user-challenges/{mission_id}/timers/{timer_id}"
+            paused = await client.post(f"{base}/pause", headers=_auth(token))
+            assert paused.status_code == 200
+            assert paused.json()["data"]["paused"] is True
+            looked = await client.get(base, headers=_auth(token))
+            assert looked.json()["data"]["paused"] is True
+            resumed = await client.post(f"{base}/resume", headers=_auth(token))
+            assert resumed.json()["data"]["paused"] is False
+            _, stranger = await _login(client, "v5-pause-other@example.com")
+            assert (await client.post(f"{base}/pause", headers=_auth(stranger))).status_code == 404
+            # 만료된 세션은 멈추거나 이어할 수 없다
+            await ChallengeTimerSession.filter(id=timer_id).update(
+                expires_at=datetime.now(config.TIMEZONE) - timedelta(seconds=1)
+            )
+            expired = await client.post(f"{base}/pause", headers=_auth(token))
+            assert expired.json()["error"]["code"] == "CHLG_VERIFICATION_FAILED"
 
     async def test_recognized_completion_creates_one_hidden_draw(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
