@@ -30,11 +30,11 @@ def kst(value: datetime) -> datetime:
 
 def timer_body(timer: ChallengeTimerSession, now: datetime | None = None) -> dict[str, Any]:
     current = now or datetime.now(config.TIMEZONE)
-    # 멈춘 시간은 경과 시간에 넣지 않는다. 멈춰 있는 동안은 멈춘 시각에서 시간이 그친다
-    paused_for = timer.paused_seconds + (
-        (kst(current) - kst(timer.paused_at)).total_seconds() if timer.paused_at is not None else 0
-    )
-    elapsed = max(0, math.floor((kst(current) - kst(timer.started_at)).total_seconds() - paused_for))
+    # 멈춘 시간은 경과 시간에 넣지 않는다. 멈춰 있는 동안은 멈춘 시각에서 시간이 그친다.
+    # 시각끼리 먼저 빼서 계산한다. 초를 소수로 바꾼 뒤 빼면 부동소수점 오차로 1초 모자랄 수 있다
+    until = kst(timer.paused_at) if timer.paused_at is not None else kst(current)
+    running = until - kst(timer.started_at) - timedelta(seconds=timer.paused_seconds)
+    elapsed = max(0, math.floor(running.total_seconds()))
     return {
         "timer_session_id": timer.id,
         "occurrence_id": timer.occurrence_id,

@@ -105,6 +105,10 @@ class TestAdventureAPI(TestCase):
         # 운영 DB 의 DATETIME 은 초 단위라 소수 초를 반올림한다. 멈춘 시각은 초 단위로 잘라 저장한다
         assert stored.paused_at is not None and stored.paused_at.microsecond == 0
         assert timer_body(stored, t0 + timedelta(seconds=60))["elapsed_seconds"] == paused["elapsed_seconds"] == 3
+        # 다시 읽는 시각에 소수 초가 있어도 부동소수점 오차로 1초 줄지 않는다
+        for micro in range(0, 1_000_000, 997):
+            later = t0 + timedelta(seconds=10, microseconds=micro)
+            assert timer_body(stored, later)["elapsed_seconds"] == 3, micro
 
     async def test_pause_and_resume_endpoints_check_owner_and_expiry(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
