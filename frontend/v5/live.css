@@ -674,3 +674,18 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
     animation: none;
   }
 }
+/* 5장 중 1장이라 결과는 한 장이다. 가운데에 크게 보여준다 */
+.reward-results:has(> .draw-result:only-child) {
+  grid-template-columns: minmax(0, 200px);
+  justify-content: center;
+}
+.reward-results > .draw-result:only-child .equipment-thumbnail {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto;
+}
+.reward-results > .draw-result:only-child .equipment-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
