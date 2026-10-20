@@ -6,6 +6,7 @@
 
 import argparse
 import re
+from datetime import date
 from pathlib import Path
 
 from openpyxl import load_workbook
@@ -24,13 +25,15 @@ def read_groups(source: Path) -> dict[str, list[tuple]]:
             current = str(row[0])
         if current in TABLES and row[4]:
             groups.setdefault(current, []).append(tuple(row[4:10]))
-    if set(groups) != TABLES or sum(map(len, groups.values())) != 26:
-        raise ValueError("명세서의 v5 테이블 3개·컬럼 26개를 확인해주세요.")
+    if set(groups) != TABLES:
+        raise ValueError("명세서의 v5 테이블 3개를 확인해주세요.")
     return groups
 
 
-def generate(source: Path) -> None:
+def generate(source: Path, write_migration: bool = False) -> None:
+    """ERD·DDL 사본을 다시 쓴다. 마이그레이션 8 은 이미 적용됐으므로 --migration 을 줄 때만 다시 쓴다."""
     groups = read_groups(source)
+    column_count = sum(map(len, groups.values()))
     sql, diagram = [], []
     for table, fields in groups.items():
         columns, constraints, mermaid = [], [], []
@@ -66,9 +69,11 @@ def generate(source: Path) -> None:
     target = ROOT / "docs/01_planning/erd.md"
     base = target.read_text().split("\n## v5 API 추가 테이블")[0].rstrip()
     target.write_text(
-        base + "\n\n## v5 API 추가 테이블\n\n2026-10-18 명세 사본에서 생성. 기존 테이블 유지, "
-        "3테이블·26컬럼·FK 7개 추가.\n\n```mermaid\nerDiagram\n" + "\n".join(diagram) + "\n```\n"
+        base + f"\n\n## v5 API 추가 테이블\n\n{date.today().isoformat()} 명세 사본에서 생성. 기존 테이블 유지, "
+        f"{len(groups)}테이블·{column_count}컬럼 추가.\n\n```mermaid\nerDiagram\n" + "\n".join(diagram) + "\n```\n"
     )
+    if not write_migration:
+        return
     migration = ROOT / "app/core/db/migrations/models/8_20261018093000_v5_adventure.py"
     state = (
         migration.read_text().split("MODELS_STATE =", 1)[1]
@@ -91,4 +96,6 @@ def generate(source: Path) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
-    generate(parser.parse_args().source)
+    parser.add_argument("--migration", action="store_true", help="마이그레이션 8 파일도 다시 쓴다 (처음 만들 때만)")
+    args = parser.parse_args()
+    generate(args.source, args.migration)
