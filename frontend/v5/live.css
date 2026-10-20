@@ -108,8 +108,7 @@
   display: block;
   margin: 20px 0;
 }
-.live-avatar-layout,
-.live-room-layout {
+.live-avatar-layout {
   display: grid;
   grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
   gap: 28px;
@@ -141,17 +140,37 @@
 .live-avatar-layout p {
   line-height: 2;
 }
-.live-room-layout .room-preview {
-  position: sticky;
-  top: 20px;
+.live-decorate-stage .room-preview {
+  position: relative;
   width: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: 1.25;
   border-radius: 22px;
   background: #e9e0ce;
+  overflow: hidden;
 }
-.live-room-layout .room-stage {
+.live-decorate-stage .room-stage {
   position: absolute;
-  inset: 8%;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.live-decorate-stage .room-stage .room-base {
+  object-fit: cover;
+}
+/* 방 그림 위 왼쪽에 이름표로 올린다. 틀 모서리에 걸려 잘리지 않게 한다 */
+.live-decorate-stage .room-preview-label {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(31 43 58 / 0.78);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
 }
 .room-stage .room-base {
   width: 100%;
@@ -162,35 +181,42 @@
   position: absolute;
   object-fit: contain;
 }
+/* 가구 자리는 방 그림(5:4) 기준 퍼센트다. 바닥 꼭짓점: 뒤 50%·32%, 왼쪽 11%·56%, 오른쪽 91%·60%, 앞 50%·88%.
+   책상·침대 그림은 등이 오른쪽 위를 향하므로 벽돌 벽에 등을 대고, 방에 비해 작게 둔다 */
 .room-stage .room-bed {
-  width: 45%;
-  height: 45%;
-  left: 49%;
-  top: 43%;
+  width: 34%;
+  height: 42.5%;
+  left: 54%;
+  top: 36%;
+  z-index: 3;
 }
 .room-stage .room-desk {
-  width: 43%;
-  height: 43%;
-  left: 12%;
-  top: 18%;
+  width: 24%;
+  height: 30%;
+  left: 40%;
+  top: 22%;
+  z-index: 1;
 }
 .room-stage .room-chair {
-  width: 25%;
-  height: 30%;
-  left: 23%;
-  top: 39%;
+  width: 15%;
+  height: 18.75%;
+  left: 38%;
+  top: 36%;
+  z-index: 4;
 }
 .room-stage .room-light {
-  width: 20%;
-  height: 33%;
-  left: 76%;
-  top: 27%;
+  width: 15%;
+  height: 18.75%;
+  left: 81%;
+  top: 36%;
+  z-index: 2;
 }
 .room-stage .room-ornament {
-  width: 20%;
-  height: 25%;
-  left: 7%;
-  top: 49%;
+  width: 9%;
+  height: 11.25%;
+  left: 25.5%;
+  top: 38.75%;
+  z-index: 5;
 }
 .live-token {
   display: grid;
@@ -331,14 +357,8 @@ button:focus-visible {
   height: 200px;
 }
 @media (max-width: 760px) {
-  .live-avatar-layout,
-  .live-room-layout {
+  .live-avatar-layout {
     grid-template-columns: 1fr;
-  }
-  .live-room-layout .room-preview {
-    position: relative;
-    max-width: 420px;
-    margin: auto;
   }
   /* 휴대폰에서도 두 마리씩 보여 네 마리를 한두 번 스크롤로 훑어보게 한다 */
   .live-book {
@@ -688,4 +708,132 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+/* 꾸미기: 방·모험가를 가장 크게, 아이템은 옆(넓은 화면)이나 아래(휴대폰) 띠에 */
+.live-decorate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  gap: 16px;
+  align-items: start;
+  margin: 20px 0;
+}
+.live-decorate-stage {
+  min-width: 0;
+}
+.live-avatar-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 560px;
+  padding: 24px;
+  border-radius: 24px;
+  background: radial-gradient(ellipse, #fff, #e8e3f5);
+}
+.live-avatar-stage .avatar-rig {
+  width: 320px;
+  height: 480px;
+}
+.live-item-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 640px;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: 18px;
+  background: #1f2b3a;
+}
+.live-item-tile {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  min-height: 72px;
+  padding: 8px;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  background: #2b3a55;
+  color: #fff;
+  text-align: left;
+  font: inherit;
+}
+.live-item-thumb {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #f4efe6;
+  color: #705ee0;
+  font-size: 24px;
+}
+.live-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.live-item-tile b {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-item-tile small {
+  font-size: 11px;
+  color: #c9d1e3;
+}
+.live-item-tile.rare {
+  border-color: #d3b462;
+}
+.live-item-tile.applied {
+  border-color: #8b7af0;
+  background: #3d3478;
+}
+.live-item-tile:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.live-rail-empty {
+  margin: 8px;
+  color: #c9d1e3;
+  font-size: 13px;
+}
+@media (max-width: 760px) {
+  .live-decorate {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .live-item-rail {
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .live-item-tile {
+    flex: 0 0 108px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+    justify-items: center;
+    row-gap: 4px;
+    text-align: center;
+  }
+  .live-item-thumb {
+    grid-row: auto;
+    width: 64px;
+    height: 64px;
+  }
+  .live-item-tile b {
+    max-width: 100%;
+  }
+  .live-avatar-stage {
+    min-height: 400px;
+  }
+  .live-avatar-stage .avatar-rig {
+    width: 230px;
+    height: 345px;
+  }
 }

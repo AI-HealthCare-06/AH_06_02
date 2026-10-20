@@ -1183,14 +1183,23 @@ async function renderBag() {
         ? ["hat", "bag", "hand", "shoes"].includes(i.slot)
         : i.owned && !i.starter,
   );
-  const cards = `<div class="reward-grid">${items.map((i) => `<article class="reward-tile ${i.owned ? "" : "locked"}">${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt="${escape(i.name)}" loading="lazy"></div>` : '<span class="live-token" aria-hidden="true">✦</span>'}<h3>${escape(i.name)}</h3><p>${i.starter ? "기본 제공" : i.rarity}</p>${bagTab !== "inventory" ? `<button type="button" class="reward-apply" data-live-equip="${i.code}" ${i.owned ? "" : "disabled"}>${!i.owned ? "🔒 미획득" : (adventurer.equipment?.[i.slot] || adventurer.room?.[i.slot]) === i.code ? "해제하기" : "적용하기"}</button>` : ""}</article>`).join("") || (draws.some((d) => !d.claimed_at) ? `<p>받을 보상 카드가 있어요. 카드를 고르면 여기에 담겨요.</p>${button("카드 고르러 가기", 'data-live-bag="draw"')}` : "<p>아직 획득한 보상이 없어요. 챌린지를 완료하면 카드를 고를 수 있어요.</p>")}</div>`;
+  const cards = `<div class="reward-grid">${items.map((i) => `<article class="reward-tile ${i.owned ? "" : "locked"}">${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt="${escape(i.name)}" loading="lazy"></div>` : '<span class="live-token" aria-hidden="true">✦</span>'}<h3>${escape(i.name)}</h3><p>${i.starter ? "기본 제공" : i.rarity}</p></article>`).join("") || (draws.some((d) => !d.claimed_at) ? `<p>받을 보상 카드가 있어요. 카드를 고르면 여기에 담겨요.</p>${button("카드 고르러 가기", 'data-live-bag="draw"')}` : "<p>아직 획득한 보상이 없어요. 챌린지를 완료하면 카드를 고를 수 있어요.</p>")}</div>`;
+  // 꾸미기는 방·모험가를 가장 크게 두고 아이템은 옆(넓은 화면)이나 아래(휴대폰) 띠에 둔다
+  const rail = `<section class="live-item-rail" aria-label="${bagTab === "room" ? "방 아이템" : "모험가 아이템"}">${items.map(itemTile).join("") || '<p class="live-rail-empty">아직 놓을 수 있는 아이템이 없어요.</p>'}</section>`;
   panel.innerHTML =
     bagTab === "room"
-      ? `<div class="live-room-layout">${roomArt()}<section>${cards}</section></div>`
+      ? `<div class="live-decorate"><div class="live-decorate-stage">${roomArt()}</div>${rail}</div>`
       : bagTab === "adventurer"
-        ? `<div class="live-avatar-layout"><div class="growth-avatar">${avatar()}<h2>${escape(user.nickname)}</h2></div><section>${cards}</section></div>`
+        ? `<div class="live-decorate"><div class="live-decorate-stage live-avatar-stage">${avatar()}<h2>${escape(user.nickname)}</h2></div>${rail}</div>`
         : cards;
   panel.insertAdjacentHTML("beforeend", growthDisplay());
+}
+// 꾸미기 아이템 칸. 칸 전체가 적용·해제 버튼이다
+function itemTile(i) {
+  const applied =
+    (adventurer.equipment?.[i.slot] || adventurer.room?.[i.slot]) === i.code;
+  const action = !i.owned ? "미획득" : applied ? "해제하기" : "적용하기";
+  return `<button type="button" class="live-item-tile${i.rarity === "RARE" ? " rare" : ""}${applied ? " applied" : ""}" data-live-equip="${i.code}" aria-pressed="${applied}" ${i.owned ? "" : "disabled"}><span class="live-item-thumb">${i.asset ? `<img src="${asset(i.asset)}" alt="" loading="lazy">` : '<span aria-hidden="true">✦</span>'}</span><b>${escape(i.name)}</b><small>${!i.owned ? "🔒 " : ""}${action}</small></button>`;
 }
 // 아이템 단계와 다음 단계까지 모은 조각. 단계마다 필요한 조각이 늘어난다 (2단계 20개, 3단계 40개)
 function growthDisplay() {
