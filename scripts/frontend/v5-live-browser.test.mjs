@@ -164,7 +164,29 @@ async function mock(page, state = {}) {
           : [],
       };
     else if (p === "/rewards/catalog")
-      data = { items: [{ ...hat, owned: !!state.claimed }] };
+      data = {
+        items: [
+          { ...hat, owned: !!state.claimed },
+          {
+            code: "room-basic-bed",
+            name: "기본 원목 침대",
+            slot: "bed",
+            rarity: "COMMON",
+            asset: "room-decor-v1/basic-bed.webp",
+            starter: true,
+            owned: true,
+          },
+          {
+            code: "room-cloud-chair",
+            name: "구름 라운지 의자",
+            slot: "chair",
+            rarity: "RARE",
+            asset: "room-decor-v1/cloud-chair.webp",
+            starter: false,
+            owned: false,
+          },
+        ],
+      };
     else if (p === "/adventurer/me") {
       if (req.method() === "PATCH") state.equipment = body.equipment;
       data = {
@@ -530,16 +552,84 @@ test("카드 5장 중 1장을 골라 서버 수령 후 장착하며 새로고침
     await page
       .getByRole("button", { name: "바로 꾸미기", exact: true })
       .click();
-    await page.getByRole("button", { name: "적용하기", exact: true }).click();
+    await page.getByRole("button", { name: /모험가의 모자 적용하기/ }).click();
     await page
       .getByText("꾸미기 설정을 저장했어요.", { exact: true })
       .waitFor();
     assert.deepEqual(state.equipment, { hat: "explorer-hat" });
     await page.reload();
     await page.getByRole("button", { name: "모험가", exact: true }).click();
-    await page.getByRole("button", { name: "해제하기", exact: true }).waitFor();
+    await page
+      .getByRole("button", { name: /모험가의 모자 해제하기/ })
+      .waitFor();
     assert.equal(await page.locator(".avatar-rig .gear-hat").count(), 1);
   }));
+
+// 꾸미기 화면은 방·모험가가 가장 크고 아이템은 옆(넓은 화면)이나 아래(휴대폰) 띠에 둔다
+async function decorateLayout(page) {
+  return page.evaluate(() => {
+    const stage = document
+      .querySelector(".live-decorate-stage")
+      .getBoundingClientRect();
+    const rail = document
+      .querySelector(".live-item-rail")
+      .getBoundingClientRect();
+    return {
+      stage: {
+        left: stage.left,
+        right: stage.right,
+        top: stage.top,
+        bottom: stage.bottom,
+        width: stage.width,
+      },
+      rail: { left: rail.left, top: rail.top, width: rail.width },
+      overflow: document.documentElement.scrollWidth > innerWidth,
+    };
+  });
+}
+
+for (const [tab, label, subject] of [
+  ["room", "방 꾸미기", "방을"],
+  ["adventurer", "모험가", "모험가를"],
+])
+  test(`${label} 화면은 ${subject} 크게 두고 아이템은 옆이나 아래 띠에 둔다`, async () =>
+    withPage(async (page, base) => {
+      await mock(page, { claimed: true });
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await page.goto(new URL(path + "#rewards", base).href);
+      await page.getByRole("button", { name: label, exact: true }).click();
+      await page.locator(".live-item-rail").waitFor();
+      const wide = await decorateLayout(page);
+      assert.ok(
+        wide.rail.left >= wide.stage.right - 1,
+        "넓은 화면: 아이템 띠는 오른쪽에 있다",
+      );
+      assert.ok(
+        wide.stage.width >= wide.rail.width * 2.5,
+        "넓은 화면: 방·모험가가 아이템 띠보다 훨씬 크다",
+      );
+      const tile = page.locator(".live-item-rail button", {
+        hasText: tab === "room" ? "기본 원목 침대" : "모험가의 모자",
+      });
+      assert.equal(await tile.count(), 1, "아이템 칸이 버튼이다");
+      for (const width of [390, 320]) {
+        await page.setViewportSize({ width, height: 844 });
+        const narrow = await decorateLayout(page);
+        assert.ok(
+          narrow.rail.top >= narrow.stage.bottom - 1,
+          `${width}px: 아이템 띠는 아래에 있다`,
+        );
+        assert.ok(
+          narrow.stage.width >= width * 0.85,
+          `${width}px: 방·모험가가 화면 폭을 거의 채운다`,
+        );
+        assert.equal(
+          narrow.overflow,
+          false,
+          `${width}px: 가로로 넘치지 않는다`,
+        );
+      }
+    }));
 
 test("320px에서도 가방·후보 도감·성장 달력이 가로로 넘치지 않는다", async () =>
   withPage(async (page, base) => {
