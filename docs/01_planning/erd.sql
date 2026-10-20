@@ -384,6 +384,8 @@ CREATE TABLE `challenge_timer_sessions` (
   `expires_at` DATETIME NOT NULL,
   `completed_log_id` BIGINT NULL UNIQUE,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `paused_at` DATETIME NULL,
+  `paused_seconds` INT NOT NULL DEFAULT 0,
   FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
   FOREIGN KEY (`user_challenge_id`) REFERENCES `user_challenges` (`id`),
   FOREIGN KEY (`occurrence_id`) REFERENCES `user_challenge_occurrences` (`id`),

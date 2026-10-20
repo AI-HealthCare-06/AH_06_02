@@ -30,7 +30,11 @@ def kst(value: datetime) -> datetime:
 
 def timer_body(timer: ChallengeTimerSession, now: datetime | None = None) -> dict[str, Any]:
     current = now or datetime.now(config.TIMEZONE)
-    elapsed = max(0, math.floor((kst(current) - kst(timer.started_at)).total_seconds()))
+    # 멈춘 시간은 경과 시간에 넣지 않는다. 멈춰 있는 동안은 멈춘 시각에서 시간이 그친다.
+    # 시각끼리 먼저 빼서 계산한다. 초를 소수로 바꾼 뒤 빼면 부동소수점 오차로 1초 모자랄 수 있다
+    until = kst(timer.paused_at) if timer.paused_at is not None else kst(current)
+    running = until - kst(timer.started_at) - timedelta(seconds=timer.paused_seconds)
+    elapsed = max(0, math.floor(running.total_seconds()))
     return {
         "timer_session_id": timer.id,
         "occurrence_id": timer.occurrence_id,
@@ -42,6 +46,7 @@ def timer_body(timer: ChallengeTimerSession, now: datetime | None = None) -> dic
         and timer.completed_log_id is None,
         "expires_at": timer.expires_at,
         "completed": timer.completed_log_id is not None,
+        "paused": timer.paused_at is not None,
     }
 
 
@@ -88,7 +93,8 @@ class ChallengeTimerService:
                 defaults={
                     "user_id": user_id,
                     "user_challenge_id": mission.id,
-                    "started_at": current,
+                    # DATETIME 칸은 초 단위라 반올림된다. 일시정지 시각과 같은 기준이 되도록 잘라 저장한다
+                    "started_at": current.replace(microsecond=0),
                     "target_seconds": math.ceil(mission.target_value_snapshot * 60),
                     "expires_at": datetime.combine(current.date() + timedelta(days=1), time.min, config.TIMEZONE),
                 },
@@ -100,6 +106,41 @@ class ChallengeTimerService:
         if timer is None:
             raise AppError(ErrorCode.CHLG_NOT_FOUND)
         return timer_body(timer)
+
+    async def _changeable(self, user_id: int, mission_id: int, timer_id: int, now: datetime) -> ChallengeTimerSession:
+        """사용자 잠금을 얻은 트랜잭션 안에서 호출한다. 완료·만료 세션은 멈추거나 이어할 수 없다."""
+        timer = await ChallengeTimerSession.select_for_update().get_or_none(
+            id=timer_id, user_id=user_id, user_challenge_id=mission_id
+        )
+        if timer is None:
+            raise AppError(ErrorCode.CHLG_NOT_FOUND)
+        if timer.completed_log_id is not None or kst(now) >= kst(timer.expires_at):
+            raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
+        return timer
+
+    async def pause(self, user_id: int, mission_id: int, timer_id: int, now: datetime | None = None) -> dict[str, Any]:
+        """CHLG-13. 이미 멈춘 세션은 그대로 돌려준다."""
+        current = now or datetime.now(config.TIMEZONE)
+        async with in_transaction():
+            await lock_user(user_id)
+            timer = await self._changeable(user_id, mission_id, timer_id, current)
+            if timer.paused_at is None:
+                # DATETIME 칸은 초 단위라 소수 초를 반올림한다. 저장 전에 잘라 두어야 다시 읽어도 같은 시간이 보인다
+                timer.paused_at = current.replace(microsecond=0)
+                await timer.save(update_fields=["paused_at"])
+            return timer_body(timer, current)
+
+    async def resume(self, user_id: int, mission_id: int, timer_id: int, now: datetime | None = None) -> dict[str, Any]:
+        """CHLG-14. 멈춘 시간을 paused_seconds 에 더한다. 진행 중 세션은 그대로 돌려준다."""
+        current = now or datetime.now(config.TIMEZONE)
+        async with in_transaction():
+            await lock_user(user_id)
+            timer = await self._changeable(user_id, mission_id, timer_id, current)
+            if timer.paused_at is not None:
+                timer.paused_seconds += max(0, math.floor((kst(current) - kst(timer.paused_at)).total_seconds()))
+                timer.paused_at = None
+                await timer.save(update_fields=["paused_at", "paused_seconds"])
+            return timer_body(timer, current)
 
     async def validate(
         self, user_id: int, mission_id: int, timer_id: int, slot: str | None, occurred: datetime, now: datetime

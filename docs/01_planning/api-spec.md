@@ -557,7 +557,7 @@
 - **인증**: 필요
 - **요청 파라미터**: path: user_challenge_id
 - **요청 본문**: { context_slot? }
-- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed }
+- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed, paused}
 - **주요 에러**: VALIDATION_ERROR, UNAUTHORIZED, CHLG_NOT_FOUND, CHLG_NOT_ACTIVE, CHLG_LOG_DUPLICATED, CHLG_VERIFICATION_FAILED
 - **관련 요구사항**: REQ-CHLG-013
 - **사용 테이블**: challenge_timer_sessions 쓰기 / user_challenges·user_challenge_occurrences 읽기
@@ -570,7 +570,7 @@
 - **인증**: 필요
 - **요청 파라미터**: path: user_challenge_id, timer_session_id
 - **요청 본문**: —
-- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed }
+- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed, paused }
 - **주요 에러**: UNAUTHORIZED, CHLG_NOT_FOUND
 - **관련 요구사항**: REQ-CHLG-013
 - **사용 테이블**: challenge_timer_sessions·user_challenges 읽기
@@ -666,3 +666,29 @@
 - **관련 요구사항**: REQ-CHLG-003·004
 - **사용 테이블**: user_challenges·challenge_logs·user_attack_cycles 읽기
 - **상태**: v5 API 연결 — 2026.10.18 사용자 요청. 기존 API 유지·추가
+
+### CHLG-13 · 서버 타이머 일시정지
+
+`POST /api/v1/user-challenges/{user_challenge_id}/timers/{timer_session_id}/pause`
+
+- **인증**: 필요
+- **요청 파라미터**: path: user_challenge_id, timer_session_id
+- **요청 본문**: -
+- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed, paused }. 멈춘 세션 재요청은 그대로 반환
+- **주요 에러**: UNAUTHORIZED, CHLG_NOT_FOUND, CHLG_VERIFICATION_FAILED
+- **관련 요구사항**: REQ-CHLG-013
+- **사용 테이블**: challenge_timer_sessions 쓰기
+- **상태**: 2026.10.20 타이머 일시정지 추가
+
+### CHLG-14 · 서버 타이머 이어하기
+
+`POST /api/v1/user-challenges/{user_challenge_id}/timers/{timer_session_id}/resume`
+
+- **인증**: 필요
+- **요청 파라미터**: path: user_challenge_id, timer_session_id
+- **요청 본문**: -
+- **응답 (성공)**: { timer_session_id, occurrence_id, started_at, target_seconds, elapsed_seconds, ready, expires_at, completed, paused }. 멈춘 시간은 경과 시간에서 뺀다. 진행 중 세션 재요청은 그대로 반환
+- **주요 에러**: UNAUTHORIZED, CHLG_NOT_FOUND, CHLG_VERIFICATION_FAILED
+- **관련 요구사항**: REQ-CHLG-013
+- **사용 테이블**: challenge_timer_sessions 쓰기
+- **상태**: 2026.10.20 타이머 일시정지 추가

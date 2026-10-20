@@ -215,6 +215,16 @@ async function mock(page, state = {}) {
           ? [state.drawResult]
           : [{ ...hat, duplicate: false, materials: 0 }],
       };
+    } else if (/^\/user-challenges\/21\/timers\/77\/(pause|resume)$/.test(p)) {
+      state.paused = p.endsWith("/pause");
+      data = {
+        timer_session_id: 77,
+        occurrence_id: 101,
+        target_seconds: 600,
+        elapsed_seconds: 12,
+        ready: false,
+        paused: state.paused,
+      };
     } else if (p === "/user-challenges/21/timers/77")
       data = {
         timer_session_id: 77,
@@ -222,6 +232,7 @@ async function mock(page, state = {}) {
         target_seconds: 600,
         elapsed_seconds: state.ready ? 600 : 12,
         ready: !!state.ready,
+        paused: !!state.paused,
       };
     else if (p === "/user-challenges/21/logs") {
       state.completed = true;
@@ -1450,4 +1461,27 @@ test("아이템 단계는 2단계에 조각 20개, 3단계에 40개가 필요하
     const upgrade = growth.locator("[data-live-upgrade]");
     assert.equal(await upgrade.isDisabled(), false);
     assert.match(await upgrade.textContent(), /조각 40개로 3단계/);
+  }));
+
+test("진행 중인 타이머는 일시정지하고 이어할 수 있다", async () =>
+  withPage(async (page, base) => {
+    const state = { mission: true };
+    const calls = await mock(page, state);
+    await page.goto(new URL(path + "#today", base).href);
+    await page.getByRole("button", { name: "식후 걷기", exact: false }).click();
+    await page.getByText("00:12 / 10분", { exact: false }).waitFor();
+    await page.getByRole("button", { name: "일시정지", exact: true }).click();
+    await page.getByRole("button", { name: "이어하기", exact: true }).waitFor();
+    assert.match(
+      await page.locator('[data-timer-display="101"]').textContent(),
+      /일시정지/,
+    );
+    await page.getByRole("button", { name: "이어하기", exact: true }).click();
+    await page.getByRole("button", { name: "일시정지", exact: true }).waitFor();
+    assert.deepEqual(
+      calls
+        .filter((c) => /\/timers\/77\/(pause|resume)$/.test(c.path))
+        .map((c) => c.path.split("/").pop()),
+      ["pause", "resume"],
+    );
   }));

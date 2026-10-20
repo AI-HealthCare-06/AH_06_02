@@ -329,7 +329,7 @@ erDiagram
 
 ## v5 API 추가 테이블
 
-2026-10-18 명세 사본에서 생성. 기존 테이블 유지, 3테이블·26컬럼·FK 7개 추가.
+2026-10-20 명세 사본에서 생성. 기존 테이블 유지, 3테이블·28컬럼 추가.
 
 ```mermaid
 erDiagram
@@ -347,6 +347,8 @@ erDiagram
         datetime expires_at
         bigint completed_log_id FK, UK
         datetime created_at
+        datetime paused_at
+        int paused_seconds
     }
     users ||--o{ reward_draws : "user_id"
     challenge_logs ||--o| reward_draws : "challenge_log_id"

@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-18 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-20 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -23,7 +23,7 @@
 | 13 | user_attack_cycles | 사용자 공략 주기 | 김이경 (D) | /challenges | 10 | 집중 공략 수용 구조안. 사용자당 active1개·대상1개·공통D28. 팀 확정 전·DB 미반영. |
 | 14 | user_challenge_occurrences | 예정 기회 | 김이경 (D) | /challenges | 10 | 신규 — 10/3 A 결정. 예정 기회를 행으로 분리해 수행률 분모로 사용. 같은 기회 중복 완료는 유니크 제약으로 방지 |
 |  | 수용 구조안: 14테이블·222컬럼·FK23 (예정 기회 테이블 10개 컬럼, 종료 집계 컬럼 5개 반영, completion_summary_snapshot JSON 제거). active 주기 유니크용 생성 컬럼과 소유권 복합 FK는 ERD·DDL 단계에서 반영. DB 미반영 |  |  |  |  |  |
-| 15 | challenge_timer_sessions | 챌린지 타이머 세션 | 김이경 (D) | /user-challenges/*/timers | 9 | v5 API 연결. 기존 테이블 유지·추가 전용 |
+| 15 | challenge_timer_sessions | 챌린지 타이머 세션 | 김이경 (D) | /user-challenges/*/timers | 11 | v5 API 연결. 기존 테이블 유지·추가 전용 |
 | 16 | reward_draws | 완료 보상 뽑기 | 김이경 (D) | /reward-draws | 9 | v5 API 연결. 기존 테이블 유지·추가 전용 |
 | 17 | adventurer_states | 모험가 꾸미기 상태 | 김이경 (D) | /adventurer/me | 8 | v5 API 연결. 기존 테이블 유지·추가 전용 |
 
@@ -341,7 +341,7 @@
 | 10 | updated_at | DATETIME | NN |  | ON UPDATE |  | 신규 — 10/3 A 결정 |
 
 ### challenge_timer_sessions — 챌린지 타이머 세션
-담당 김이경 (D) · 9컬럼
+담당 김이경 (D) · 11컬럼
 
 | No | 컬럼명 | 타입 | NULL | 키 | 기본값 | 설명 | 상태 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -354,6 +354,8 @@
 | 7 | expires_at | DATETIME | NN |  |  | 해당 예정일 다음날 00:00 KST. 주기 종료 이후 불가 | v5 API 연결 — 2026.10.18 사용자 요청 |
 | 8 | completed_log_id | BIGINT | Y | FK, UNIQUE |  | → challenge_logs.id. 완료 전 NULL | v5 API 연결 — 2026.10.18 사용자 요청 |
 | 9 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 생성 시각 | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 10 | paused_at | DATETIME | Y |  |  | 일시정지한 서버 KST 시간. 진행 중이면 NULL | 2026.10.20 - 타이머 일시정지 추가 |
+| 11 | paused_seconds | INT | NN |  | 0 | 지금까지 멈춘 시간의 합(초). 경과 시간에서 뺀다 | 2026.10.20 - 타이머 일시정지 추가 |
 
 ### reward_draws — 완료 보상 뽑기
 담당 김이경 (D) · 9컬럼
