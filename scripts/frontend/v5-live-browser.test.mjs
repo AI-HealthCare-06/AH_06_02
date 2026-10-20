@@ -1283,6 +1283,38 @@ test("재측정하면 위험도 칸에 직전 대비 변화량을 보여준다",
       0,
       "비교할 직전 예측이 없으면 표시하지 않는다",
     );
+    // 휴대폰 너비에서 변화량 때문에 위험도 칸이 화면 밖으로 밀리지 않는다
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      const box = await page.evaluate(() => {
+        const dm = document.querySelector("#dm-risk").getBoundingClientRect();
+        const htn = document.querySelector("#htn-risk").getBoundingClientRect();
+        const delta = document
+          .querySelector("#dm-risk .live-risk-delta")
+          .getBoundingClientRect();
+        const value = document
+          .querySelector("#dm-risk strong")
+          .getBoundingClientRect();
+        return {
+          right: htn.right,
+          width: innerWidth,
+          below: delta.top >= value.bottom - 1,
+          inside: delta.right <= dm.right + 0.5,
+        };
+      });
+      assert.ok(
+        box.right <= box.width,
+        `${width}px: 고혈압 칸이 화면 안에 있다`,
+      );
+      assert.ok(box.below, `${width}px: 변화량은 숫자 아래 줄에 있다`);
+      assert.ok(box.inside, `${width}px: 변화량이 칸 안에 있다`);
+      // 휴대폰에서 라벨 뒤에 붙는 ' 위험' 글자가 변화량 뒤에도 붙지 않는다
+      assert.equal(
+        await delta.evaluate((el) => getComputedStyle(el, "::after").content),
+        "none",
+        `${width}px: 변화량 뒤에 다른 글자가 붙지 않는다`,
+      );
+    }
   }));
 
 const predictionPosts = (calls) =>

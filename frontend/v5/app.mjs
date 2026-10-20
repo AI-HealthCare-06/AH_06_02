@@ -417,7 +417,7 @@ function renderHome() {
         .querySelector("strong")
         .insertAdjacentHTML(
           "afterend",
-          `<span class="live-risk-delta">${escape(delta)}</span>`,
+          `<small class="live-risk-delta">${escape(delta)}</small>`,
         );
   }
   $("#map-level").textContent = "Lv. " + level.level;
