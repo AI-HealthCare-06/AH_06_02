@@ -38,7 +38,10 @@ def generate(source: Path, write_migration: bool = False) -> None:
     for table, fields in groups.items():
         columns, constraints, mermaid = [], [], []
         for name, kind, nullable, key, default, description in fields:
-            key, default = str(key or ""), str(default or "")
+            # 기본값 0 도 값이다. None 일 때만 비우고, 시트가 숫자를 0.0 으로 주면 0 으로 적는다
+            if isinstance(default, float) and default.is_integer():
+                default = int(default)
+            key, default = str(key or ""), "" if default is None else str(default)
             definition = f"  `{name}` {kind} " + ("NOT NULL" if nullable == "NN" else "NULL")
             if "PK" in key:
                 definition += " AUTO_INCREMENT PRIMARY KEY"
