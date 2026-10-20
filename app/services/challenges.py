@@ -15,6 +15,7 @@ from app.models.challenges import (
     Challenge,
     ChallengeLog,
     ChallengeRecommendation,
+    ChallengeTimerSession,
     ContextType,
     Monster,
     OccurrenceStatus,
@@ -31,6 +32,7 @@ from app.models.challenges import (
     VerificationType,
 )
 from app.repositories.user_repository import UserRepository
+from app.services.adventure_rewards import AdventureRewardService
 from app.services.attack_cycles import (
     EXTRA_FROM_DAY,
     MAX_ACTIVE_CHALLENGES,
@@ -41,6 +43,7 @@ from app.services.attack_cycles import (
     lock_user,
     today_kst,
 )
+from app.services.challenge_timers import ChallengeTimerService
 from app.services.evidence import EvidenceService
 from app.services.recommendations import target_monster_body
 
@@ -127,6 +130,7 @@ class LogResult:
     new_level: int | None
     #: 이번 기록으로 새로 지급한 보상. 이미 가진 보상이나 성향이 달라 주지 않은 경우는 None
     reward: Reward | None = None
+    reward_draw_id: int | None = None
 
 
 class ChallengeCoreService:
@@ -331,6 +335,7 @@ class ChallengeCoreService:
         value: Decimal | None,
         verification_method: VerificationMethod,
         evidence_url: str | None,
+        timer_session_id: int | None = None,
         now: datetime | None = None,
     ) -> LogResult:
         """CHLG-07. 공략 점수만 즉시 올리고 위협도는 건드리지 않는다 (REQ-CHLG-007).
@@ -347,6 +352,9 @@ class ChallengeCoreService:
             occurred = self._occurred_in_period(mission, occurred_at, current)
             log_date = occurred.date()
             challenge = await Challenge.get(id=mission.challenge_id)
+            timer, value = await ChallengeTimerService().prepare_log(
+                user_id, mission.id, timer_session_id, verification_method, context_slot, occurred, current, value
+            )
             if verification_method == VerificationMethod.PHOTO and not await EvidenceService().verify_reference(
                 user_id, mission.id, evidence_url
             ):
@@ -408,6 +416,8 @@ class ChallengeCoreService:
                     await log.save(update_fields=["reward_eligible"])
                 return LogResult(log=log, weekly_progress=None, level_up=False, new_level=None)
 
+            await ChallengeTimerService.consume(timer, occurrence.id, log.id)
+
             # 이전 인스턴스의 인정 완료까지 합친 그날 N 번째인지로 XP 를 나눈다
             completed_today = await UserChallengeOccurrence.filter(
                 user_challenge_id__in=siblings, scheduled_date=log_date, status=OccurrenceStatus.COMPLETED
@@ -421,6 +431,7 @@ class ChallengeCoreService:
                 log.xp_granted = xp
                 await log.save(update_fields=["xp_granted"])
             reward = await self._grant_first_completion_rewards(user_id, challenge, current)
+            draw = await AdventureRewardService().create_draw(user_id, log.id)
 
             updated = await self.add_weekly_progress(
                 user_id=user_id,
@@ -432,7 +443,14 @@ class ChallengeCoreService:
         progress = next((item.weekly_progress for item in updated if item.id == target_id), None)
         if progress is None and updated:
             progress = updated[0].weekly_progress
-        return LogResult(log=log, weekly_progress=progress, level_up=level_up, new_level=new_level, reward=reward)
+        return LogResult(
+            log=log,
+            weekly_progress=progress,
+            level_up=level_up,
+            new_level=new_level,
+            reward=reward,
+            reward_draw_id=draw.id,
+        )
 
     @staticmethod
     async def _complete(occurrence: UserChallengeOccurrence, log: ChallengeLog, now: datetime) -> bool:
@@ -591,6 +609,10 @@ class ChallengeCoreService:
             completed = await occurrences.filter(status=OccurrenceStatus.COMPLETED).count()
             snapshot = mission.goal_config_snapshot or {}
             today_occurrences = await occurrences.filter(scheduled_date=today).order_by("sequence_no", "id")
+            timers = {
+                timer.occurrence_id: timer.id
+                for timer in await ChallengeTimerSession.filter(occurrence_id__in=[o.id for o in today_occurrences])
+            }
             items.append(
                 {
                     "user_challenge_id": mission.id,
@@ -617,6 +639,7 @@ class ChallengeCoreService:
                             "slot_code": item.slot_code,
                             "sequence_no": item.sequence_no,
                             "status": str(item.status),
+                            **({"timer_session_id": timers[item.id]} if item.id in timers else {}),
                         }
                         for item in today_occurrences
                     ],

@@ -1,0 +1,492 @@
+[
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 1,
+    "name": "기본 갈색 헝클머리",
+    "filename": "hair/01.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 2,
+    "name": "검정 짧은 스포츠 머리",
+    "filename": "hair/02.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 3,
+    "name": "꿀빛 곱슬머리",
+    "filename": "hair/03.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 4,
+    "name": "밤색 단정 단발",
+    "filename": "hair/04.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 5,
+    "name": "은빛 물결 머리",
+    "filename": "hair/05.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 6,
+    "name": "빨강 삐죽 머리",
+    "filename": "hair/06.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 7,
+    "name": "파랑 비대칭 머리",
+    "filename": "hair/07.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 8,
+    "name": "보라 묶음 머리",
+    "filename": "hair/08.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 9,
+    "name": "초록 땋은 머리",
+    "filename": "hair/09.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 10,
+    "name": "분홍 둥근 바가지 머리",
+    "filename": "hair/10.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 1,
+    "name": "황동 고글 탐험모",
+    "filename": "hats/01.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 2,
+    "name": "달빛 마법사 모자",
+    "filename": "hats/02.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 3,
+    "name": "초록 숲 레인저 모자",
+    "filename": "hats/03.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 4,
+    "name": "선장 삼각모",
+    "filename": "hats/04.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 5,
+    "name": "구름 방울 니트모",
+    "filename": "hats/05.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 6,
+    "name": "고양이 귀 후드모",
+    "filename": "hats/06.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 7,
+    "name": "별빛 왕관",
+    "filename": "hats/07.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 8,
+    "name": "도토리 베레모",
+    "filename": "hats/08.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 9,
+    "name": "붉은 비행사 모자",
+    "filename": "hats/09.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 10,
+    "name": "노란 우비 모자",
+    "filename": "hats/10.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 1,
+    "name": "새싹 기본 티셔츠",
+    "filename": "tops/01.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 2,
+    "name": "숲길 탐험 조끼",
+    "filename": "tops/02.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 3,
+    "name": "달빛 마법사 로브",
+    "filename": "tops/03.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 4,
+    "name": "바람의 레인저 상의",
+    "filename": "tops/04.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 5,
+    "name": "포근한 구름 스웨터",
+    "filename": "tops/05.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 6,
+    "name": "선장 줄무늬 셔츠",
+    "filename": "tops/06.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 7,
+    "name": "빛나는 기사 흉갑",
+    "filename": "tops/07.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 8,
+    "name": "노을 후드티",
+    "filename": "tops/08.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 9,
+    "name": "밤하늘 우주 재킷",
+    "filename": "tops/09.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 10,
+    "name": "연두 개구리 판초",
+    "filename": "tops/10.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 1,
+    "name": "모험가 반바지",
+    "filename": "bottoms/01.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 2,
+    "name": "초록 카고 바지",
+    "filename": "bottoms/02.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 3,
+    "name": "별빛 마법사 바지",
+    "filename": "bottoms/03.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 4,
+    "name": "하늘 데님 멜빵 반바지",
+    "filename": "bottoms/04.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 5,
+    "name": "구름 조거 팬츠",
+    "filename": "bottoms/05.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 6,
+    "name": "선장 세일러 반바지",
+    "filename": "bottoms/06.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 7,
+    "name": "기사의 보호 바지",
+    "filename": "bottoms/07.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 8,
+    "name": "붉은 체크 바지",
+    "filename": "bottoms/08.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 9,
+    "name": "우주 탐사 바지",
+    "filename": "bottoms/09.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 10,
+    "name": "나뭇잎 배기 바지",
+    "filename": "bottoms/10.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 1,
+    "name": "침낭 여행 배낭",
+    "filename": "bags/01.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 2,
+    "name": "달빛 마법 책가방",
+    "filename": "bags/02.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 3,
+    "name": "초록 잎사귀 배낭",
+    "filename": "bags/03.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 4,
+    "name": "선장의 보물 가방",
+    "filename": "bags/04.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 5,
+    "name": "구름 양털 가방",
+    "filename": "bags/05.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 6,
+    "name": "고양이 친구 가방",
+    "filename": "bags/06.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 7,
+    "name": "기사의 방패 배낭",
+    "filename": "bags/07.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 8,
+    "name": "우주 로켓 배낭",
+    "filename": "bags/08.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 9,
+    "name": "개구리 연못 가방",
+    "filename": "bags/09.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 10,
+    "name": "피크닉 버섯 가방",
+    "filename": "bags/10.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 1,
+    "name": "별빛 마법 주사기",
+    "filename": "hands/01.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 2,
+    "name": "은하 수정검",
+    "filename": "hands/02.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 3,
+    "name": "새싹 나무 지팡이",
+    "filename": "hands/03.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 4,
+    "name": "달빛 마법서",
+    "filename": "hands/04.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 5,
+    "name": "태양빛 작은 방패",
+    "filename": "hands/05.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 6,
+    "name": "구름빛 해머",
+    "filename": "hands/06.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 7,
+    "name": "숲의 활",
+    "filename": "hands/07.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 8,
+    "name": "모험가의 랜턴",
+    "filename": "hands/08.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 9,
+    "name": "우주 탐사 광선봉",
+    "filename": "hands/09.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 10,
+    "name": "연금술 물약병",
+    "filename": "hands/10.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 1,
+    "name": "갈색 탐험 부츠",
+    "filename": "shoes/01.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 2,
+    "name": "초록 숲 레인저 신발",
+    "filename": "shoes/02.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 3,
+    "name": "달빛 마법사 부츠",
+    "filename": "shoes/03.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 4,
+    "name": "구름 운동화",
+    "filename": "shoes/04.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 5,
+    "name": "선장 가죽 장화",
+    "filename": "shoes/05.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 6,
+    "name": "황금 기사 부츠",
+    "filename": "shoes/06.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 7,
+    "name": "포근한 니트 신발",
+    "filename": "shoes/07.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 8,
+    "name": "개구리 비 장화",
+    "filename": "shoes/08.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 9,
+    "name": "은하 우주 부츠",
+    "filename": "shoes/09.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 10,
+    "name": "도토리 나무 샌들",
+    "filename": "shoes/10.webp"
+  }
+]

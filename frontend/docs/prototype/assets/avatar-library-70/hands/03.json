@@ -1,0 +1,10 @@
+{
+  "category": "hands",
+  "category_label": "손 아이템",
+  "index": 3,
+  "name": "새싹 나무 지팡이",
+  "description": "upright curved wooden staff topped with a green crystal sprout and two leaves",
+  "filename": "hands/03.webp",
+  "prompt": "Create a BRAND NEW, distinctly designed game equipment asset: upright curved wooden staff topped with a green crystal sprout and two leaves. ONE ITEM ONLY, no hand, body or person, complete object. Art direction: polished cute 3D storybook RPG illustration, rounded cartoon proportions suitable for a big-eyed child adventurer, soft warm lighting, detailed tactile leather/fabric/metal as appropriate, rich but tasteful color. The requested unique SHAPE, MATERIAL, and COLOR are essential. Center entire object with 8% clear margin; do not crop. Genuinely transparent alpha background. No backdrop, no ground, no exterior shadow, no glow haze, no text, no labels, no watermark, no unrelated objects. Exactly one isolated equipment sprite (two shoes for footwear).",
+  "status": "complete"
+}

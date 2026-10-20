@@ -207,6 +207,7 @@ async def record_challenge_log(
         value=request.value,
         verification_method=request.verification_method,
         evidence_url=request.evidence_url,
+        timer_session_id=request.timer_session_id,
     )
     return ok(
         {
@@ -220,6 +221,7 @@ async def record_challenge_log(
             "new_level": result.new_level,
             # 이번 기록으로 새로 받은 보상만 싣는다. 이미 가졌거나 지급하지 않았으면 null
             "reward": _reward_body(result.reward) if result.reward else None,
+            "reward_draw_id": result.reward_draw_id,
         }
     )
 

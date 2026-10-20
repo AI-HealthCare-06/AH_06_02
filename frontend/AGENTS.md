@@ -50,8 +50,9 @@ Do not show a predicted probability for a disease the user has already been
 diagnosed with. A user diagnosed with diabetes must never see "당뇨 확률 24%" —
 show `진단 관리 중` instead.
 
-토큰은 공통 메모리 세션만 사용한다. localStorage·sessionStorage에 새로 저장하거나
-비밀번호·토큰을 콘솔에 출력하지 않는다.
+토큰은 공통 메모리 세션만 사용한다. 토큰과 개인정보(비밀번호·건강 수치 등)는
+localStorage·sessionStorage에 저장하지 않는다. 새로고침 복원에 필요한 식별자(예: 예측
+번호)만 sessionStorage에 둘 수 있다. 비밀번호·토큰을 콘솔에 출력하지 않는다.
 
 ## 공통 구현 연결
 

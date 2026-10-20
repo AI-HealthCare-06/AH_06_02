@@ -27,7 +27,7 @@ ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
 # 비공개 저장 경로
-MEDIA_EVIDENCE_DIR = Path("/app/media/evidence")
+MEDIA_EVIDENCE_DIR = Path(config.EVIDENCE_STORAGE_DIR)
 
 
 class EvidenceService:

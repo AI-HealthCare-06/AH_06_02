@@ -1,0 +1,562 @@
+[
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 1,
+    "name": "기본 갈색 헝클머리",
+    "description": "short tousled chestnut-brown hair with a small upward forelock",
+    "filename": "hair/01.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 2,
+    "name": "검정 짧은 스포츠 머리",
+    "description": "short neat jet-black cropped sporty hair with softly textured fringe",
+    "filename": "hair/02.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 3,
+    "name": "꿀빛 곱슬머리",
+    "description": "rounded honey-blond curly hair with soft tight curls",
+    "filename": "hair/03.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 4,
+    "name": "밤색 단정 단발",
+    "description": "ear-length smooth dark-brown bob haircut with side-swept bangs",
+    "filename": "hair/04.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 5,
+    "name": "은빛 물결 머리",
+    "description": "silver wavy medium-short hair with airy layered side-parted fringe",
+    "filename": "hair/05.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 6,
+    "name": "빨강 삐죽 머리",
+    "description": "short copper-red spiky hair with five playful soft upward points",
+    "filename": "hair/06.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 7,
+    "name": "파랑 비대칭 머리",
+    "description": "inky-blue asymmetrical side-swept hair, shorter left side and longer right fringe",
+    "filename": "hair/07.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 8,
+    "name": "보라 묶음 머리",
+    "description": "soft lavender hair swept back into one small high ponytail with loose side fringe",
+    "filename": "hair/08.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 9,
+    "name": "초록 땋은 머리",
+    "description": "sage-green medium hair with one narrow side braid and wavy fringe",
+    "filename": "hair/09.webp"
+  },
+  {
+    "category": "hair",
+    "category_label": "머리",
+    "index": 10,
+    "name": "분홍 둥근 바가지 머리",
+    "description": "dusty-rose rounded bowl haircut with softly separated curved fringe",
+    "filename": "hair/10.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 1,
+    "name": "황동 고글 탐험모",
+    "description": "broad-brim brown leather explorer hat with bronze goggles",
+    "filename": "hats/01.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 2,
+    "name": "달빛 마법사 모자",
+    "description": "tall crooked midnight-blue wizard hat with crescent moon pin and silver band",
+    "filename": "hats/02.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 3,
+    "name": "초록 숲 레인저 모자",
+    "description": "deep green pointed felt ranger cap with a single ivory feather",
+    "filename": "hats/03.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 4,
+    "name": "선장 삼각모",
+    "description": "navy leather tricorn captain hat with brass edging and small compass medallion",
+    "filename": "hats/04.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 5,
+    "name": "구름 방울 니트모",
+    "description": "cream cable-knit beanie with large sky-blue pompom",
+    "filename": "hats/05.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 6,
+    "name": "고양이 귀 후드모",
+    "description": "soft lavender hood-cap with two triangular cat ears, no face",
+    "filename": "hats/06.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 7,
+    "name": "별빛 왕관",
+    "description": "small golden crown with five star-shaped points and purple crystal center",
+    "filename": "hats/07.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 8,
+    "name": "도토리 베레모",
+    "description": "round chestnut felt beret with small acorn stem and leaf",
+    "filename": "hats/08.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 9,
+    "name": "붉은 비행사 모자",
+    "description": "red-brown leather aviator cap with folded earflaps and round turquoise goggles",
+    "filename": "hats/09.webp"
+  },
+  {
+    "category": "hats",
+    "category_label": "모자",
+    "index": 10,
+    "name": "노란 우비 모자",
+    "description": "bright yellow waterproof bucket hat with curved brim and small green frog badge",
+    "filename": "hats/10.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 1,
+    "name": "새싹 기본 티셔츠",
+    "description": "plain ivory short-sleeved T-shirt with a tiny embroidered green sprout",
+    "filename": "tops/01.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 2,
+    "name": "숲길 탐험 조끼",
+    "description": "short tan safari shirt with open dark-brown leather vest and tiny brass fastenings",
+    "filename": "tops/02.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 3,
+    "name": "달빛 마법사 로브",
+    "description": "midnight blue short wizard tunic with silver star embroidery and purple cuffs, no hat or trousers",
+    "filename": "tops/03.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 4,
+    "name": "바람의 레인저 상의",
+    "description": "moss-green hoodless ranger tunic with asymmetric leather shoulder panel",
+    "filename": "tops/04.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 5,
+    "name": "포근한 구름 스웨터",
+    "description": "chunky sky-blue cable-knit sweater with cream ribbed collar and cuffs",
+    "filename": "tops/05.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 6,
+    "name": "선장 줄무늬 셔츠",
+    "description": "navy and cream striped sailor shirt with square sailor collar",
+    "filename": "tops/06.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 7,
+    "name": "빛나는 기사 흉갑",
+    "description": "rounded gold-and-cream light fantasy chest armor over short white sleeves, child friendly",
+    "filename": "tops/07.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 8,
+    "name": "노을 후드티",
+    "description": "warm coral hoodie with a cream drawstring, hood lying flat behind neck",
+    "filename": "tops/08.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 9,
+    "name": "밤하늘 우주 재킷",
+    "description": "short silver-and-purple padded space jacket with rounded collar and blue glowing trim",
+    "filename": "tops/09.webp"
+  },
+  {
+    "category": "tops",
+    "category_label": "상의",
+    "index": 10,
+    "name": "연두 개구리 판초",
+    "description": "short light-green waterproof poncho with leaf-shaped collar, hood down",
+    "filename": "tops/10.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 1,
+    "name": "모험가 반바지",
+    "description": "simple knee-length cocoa brown shorts with clean hems",
+    "filename": "bottoms/01.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 2,
+    "name": "초록 카고 바지",
+    "description": "olive-green tapered cargo trousers with two rounded side pockets",
+    "filename": "bottoms/02.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 3,
+    "name": "별빛 마법사 바지",
+    "description": "dark-purple loose wizard trousers with tiny silver star embroidery near cuffs",
+    "filename": "bottoms/03.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 4,
+    "name": "하늘 데님 멜빵 반바지",
+    "description": "sky-blue denim bib overalls shorts with brass buttons and two shoulder straps, no shirt",
+    "filename": "bottoms/04.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 5,
+    "name": "구름 조거 팬츠",
+    "description": "cream soft jogger trousers with ribbed ankles and sky-blue side stripe",
+    "filename": "bottoms/05.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 6,
+    "name": "선장 세일러 반바지",
+    "description": "navy sailor shorts with two rows of gold buttons and ivory hem",
+    "filename": "bottoms/06.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 7,
+    "name": "기사의 보호 바지",
+    "description": "charcoal short trousers with rounded gold knee guards and soft leather panels",
+    "filename": "bottoms/07.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 8,
+    "name": "붉은 체크 바지",
+    "description": "red and brown plaid ankle-length trousers with folded cuffs",
+    "filename": "bottoms/08.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 9,
+    "name": "우주 탐사 바지",
+    "description": "silver padded space trousers with purple knee patches and blue trim",
+    "filename": "bottoms/09.webp"
+  },
+  {
+    "category": "bottoms",
+    "category_label": "하의",
+    "index": 10,
+    "name": "나뭇잎 배기 바지",
+    "description": "sage-green billowy cropped trousers with overlapping leaf-shaped cuffs",
+    "filename": "bottoms/10.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 1,
+    "name": "침낭 여행 배낭",
+    "description": "brown leather explorer backpack with rolled beige sleeping mat, brass buckles",
+    "filename": "bags/01.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 2,
+    "name": "달빛 마법 책가방",
+    "description": "midnight blue satchel shaped like a thick spell book with silver crescent clasp",
+    "filename": "bags/02.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 3,
+    "name": "초록 잎사귀 배낭",
+    "description": "green leaf-shaped backpack with vine straps and acorn clasp",
+    "filename": "bags/03.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 4,
+    "name": "선장의 보물 가방",
+    "description": "small burgundy treasure-chest backpack with gold corners and shoulder straps",
+    "filename": "bags/04.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 5,
+    "name": "구름 양털 가방",
+    "description": "fluffy cream cloud-shaped backpack with pale blue straps",
+    "filename": "bags/05.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 6,
+    "name": "고양이 친구 가방",
+    "description": "round lavender cat-face backpack with tiny ears and embroidered sleepy eyes",
+    "filename": "bags/06.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 7,
+    "name": "기사의 방패 배낭",
+    "description": "small polished gold-and-cream shield-shaped backpack with purple crystal emblem",
+    "filename": "bags/07.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 8,
+    "name": "우주 로켓 배낭",
+    "description": "silver and purple rounded rocket backpack with two small blue engine bells",
+    "filename": "bags/08.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 9,
+    "name": "개구리 연못 가방",
+    "description": "light-green frog-shaped backpack with bulging eyes and yellow zipper",
+    "filename": "bags/09.webp"
+  },
+  {
+    "category": "bags",
+    "category_label": "가방",
+    "index": 10,
+    "name": "피크닉 버섯 가방",
+    "description": "red mushroom-cap backpack with ivory spots and wicker basket base",
+    "filename": "bags/10.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 1,
+    "name": "별빛 마법 주사기",
+    "description": "upright ornate golden fantasy syringe with purple star-filled glass vial and crystal needle pointing down",
+    "filename": "hands/01.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 2,
+    "name": "은하 수정검",
+    "description": "upright luminous violet crystal short sword with golden star guard and leather grip, blade up",
+    "filename": "hands/02.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 3,
+    "name": "새싹 나무 지팡이",
+    "description": "upright curved wooden staff topped with a green crystal sprout and two leaves",
+    "filename": "hands/03.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 4,
+    "name": "달빛 마법서",
+    "description": "open floating dark blue spellbook with silver clasps and purple luminous pages, no letters",
+    "filename": "hands/04.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 5,
+    "name": "태양빛 작은 방패",
+    "description": "round polished golden shield with a raised sun face emblem and brown hand strap visible behind",
+    "filename": "hands/05.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 6,
+    "name": "구름빛 해머",
+    "description": "small fantasy hammer with a fluffy-looking ivory cloud-shaped metal head and sky-blue handle",
+    "filename": "hands/06.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 7,
+    "name": "숲의 활",
+    "description": "small elegant curved wooden bow with green vine wraps and pale gold string, no arrow",
+    "filename": "hands/07.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 8,
+    "name": "모험가의 랜턴",
+    "description": "handheld brass lantern with curved top handle and warm golden star light inside",
+    "filename": "hands/08.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 9,
+    "name": "우주 탐사 광선봉",
+    "description": "child-friendly silver and purple futuristic magic baton with blue crystal tip, no firearm",
+    "filename": "hands/09.webp"
+  },
+  {
+    "category": "hands",
+    "category_label": "손 아이템",
+    "index": 10,
+    "name": "연금술 물약병",
+    "description": "round teal glass potion bottle with a cork, golden leaf frame and swirling sparkling liquid",
+    "filename": "hands/10.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 1,
+    "name": "갈색 탐험 부츠",
+    "description": "matching pair of brown leather explorer ankle boots with golden lace hooks and thick soles",
+    "filename": "shoes/01.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 2,
+    "name": "초록 숲 레인저 신발",
+    "description": "matching pair of green suede pointed ranger shoes with leaf-shaped cuffs",
+    "filename": "shoes/02.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 3,
+    "name": "달빛 마법사 부츠",
+    "description": "matching pair of midnight-blue soft wizard boots with curled toes and silver stars",
+    "filename": "shoes/03.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 4,
+    "name": "구름 운동화",
+    "description": "matching pair of ivory chunky sneakers with sky-blue cloud-shaped soles",
+    "filename": "shoes/04.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 5,
+    "name": "선장 가죽 장화",
+    "description": "matching pair of burgundy knee-high pirate boots with folded cuffs and brass side buckles",
+    "filename": "shoes/05.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 6,
+    "name": "황금 기사 부츠",
+    "description": "matching pair of rounded gold-and-cream armored boots with purple jewel ankle plates",
+    "filename": "shoes/06.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 7,
+    "name": "포근한 니트 신발",
+    "description": "matching pair of warm beige wool ankle shoes with folded cable-knit cuffs",
+    "filename": "shoes/07.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 8,
+    "name": "개구리 비 장화",
+    "description": "matching pair of yellow rain boots with green frog-face decorations",
+    "filename": "shoes/08.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 9,
+    "name": "은하 우주 부츠",
+    "description": "matching pair of silver space boots with purple panels and luminous blue soles",
+    "filename": "shoes/09.webp"
+  },
+  {
+    "category": "shoes",
+    "category_label": "신발",
+    "index": 10,
+    "name": "도토리 나무 샌들",
+    "description": "matching pair of brown leather sandals with small acorn buckles and rounded cork soles",
+    "filename": "shoes/10.webp"
+  }
+]

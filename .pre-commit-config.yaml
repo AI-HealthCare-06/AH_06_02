@@ -12,7 +12,7 @@ repos:
       - id: check-toml
       - id: check-added-large-files
         # 시안 HTML 은 글꼴·이미지가 base64 로 박혀 있어 기본 한도(500KB)를 넘는다
-        exclude: '^frontend/(docs/prototype/|d/assets/(v4-1\.ttf|v4-2\.woff2|v4-[34]\.png)$)'
+        exclude: '^frontend/docs/prototype/'
       - id: check-merge-conflict
       - id: end-of-file-fixer
       - id: trailing-whitespace

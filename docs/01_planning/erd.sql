@@ -372,4 +372,45 @@ CREATE TABLE user_rewards (
   CONSTRAINT fk_ur_reward FOREIGN KEY (reward_id) REFERENCES rewards (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='보상 획득 이력';
 
+-- v5 API 추가 테이블 (구글 시트에서 생성)
+
+CREATE TABLE `challenge_timer_sessions` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_id` BIGINT NOT NULL,
+  `user_challenge_id` BIGINT NOT NULL,
+  `occurrence_id` BIGINT NOT NULL UNIQUE,
+  `started_at` DATETIME NOT NULL,
+  `target_seconds` INT NOT NULL,
+  `expires_at` DATETIME NOT NULL,
+  `completed_log_id` BIGINT NULL UNIQUE,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
+  FOREIGN KEY (`user_challenge_id`) REFERENCES `user_challenges` (`id`),
+  FOREIGN KEY (`occurrence_id`) REFERENCES `user_challenge_occurrences` (`id`),
+  FOREIGN KEY (`completed_log_id`) REFERENCES `challenge_logs` (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `reward_draws` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_id` BIGINT NOT NULL,
+  `challenge_log_id` BIGINT NOT NULL UNIQUE,
+  `cards` JSON NOT NULL,
+  `selected_positions` JSON NULL,
+  `results` JSON NULL,
+  `claimed_at` DATETIME NULL,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`),
+  FOREIGN KEY (`challenge_log_id`) REFERENCES `challenge_logs` (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE `adventurer_states` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `user_id` BIGINT NOT NULL UNIQUE,
+  `equipment` JSON NOT NULL,
+  `room` JSON NOT NULL,
+  `materials` INT NOT NULL DEFAULT 0,
+  `item_stage` SMALLINT NOT NULL DEFAULT 1,
+  `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET FOREIGN_KEY_CHECKS = 1;

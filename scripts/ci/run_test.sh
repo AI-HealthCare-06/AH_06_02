@@ -22,17 +22,21 @@ echo "Has tests: $HAS_TESTS"
 
 if [ "$HAS_TESTS" = true ]; then
   if docker ps --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER_NAME}$"; then
-    echo "${COLOR_BLUE}→ MySQL container found. Granting privileges...${COLOR_NC}"
+    echo "${COLOR_BLUE}→ MySQL 테스트 환경 확인${COLOR_NC}"
 
-    docker exec -i ${MYSQL_CONTAINER_NAME} \
-    mysql -u root -p${DB_ROOT_PASSWORD}<<EOF
+    # 이미 테스트 DB 권한이 있는 로컬 환경에서는 권한 변경 없이 검사한다.
+    if [ "${DANGO_TEST_SKIP_GRANT:-0}" != "1" ]; then
+      docker exec -i ${MYSQL_CONTAINER_NAME} \
+      mysql -u root -p${DB_ROOT_PASSWORD}<<EOF
       GRANT ALL PRIVILEGES ON *.* TO '${DB_USER}'@'%' WITH GRANT OPTION;
       FLUSH PRIVILEGES;
 EOF
+    fi
 
     echo "${COLOR_BLUE}Run Pytest with Coverage${COLOR_NC}"
 
-    if ! uv run coverage run -m pytest app; then
+    if [ "$#" -eq 0 ]; then set -- app; fi
+    if ! uv run coverage run -m pytest "$@"; then
       echo ""
       echo "${COLOR_RED}✖ Pytest failed.${COLOR_NC}"
       echo "${COLOR_RED}→ Fix the test failures above and re-run.${COLOR_NC}"

@@ -44,6 +44,9 @@ class Config(BaseSettings):
     # 서빙 artifact 가 가리키는 원본 질환 모델(<실행>/model.joblib·artifact.json)과 background-<질환>.npy 위치
     MODEL_DIR: str = "data/experiment-refit"
 
+    # PHOTO 증빙 비공개 저장소. 로컬 실행 시 쓰기 가능한 별도 경로로 지정한다.
+    EVIDENCE_STORAGE_DIR: str = "/app/media/evidence"
+
     # 예측 큐. PRED-01 이 {prediction_id, job_id} 를 LPUSH 하고 ai_worker 가 BRPOP 한다
     VALKEY_URL: str = "redis://localhost:6379/0"
     PREDICTION_QUEUE_KEY: str = "pred:queue"

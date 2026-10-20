@@ -4,6 +4,16 @@
 React·Vite·TypeScript의 미사용 초기 템플릿을 제거했다. Node 20 이상이 필요하며 화면 실행에 번들러는 사용하지 않는다.
 화면·API·DB가 같은 저장소에 있다. `docs/prototype/당고킬러-모험시안_v4.html`은 11화면의 참고 시안으로 유지한다.
 
+## v5 모험 화면
+
+`docs/prototype/당고킬러-모험시안_v5.html`은 기본 주소에서 실제 API를 사용한다. 공통 인증과 건강정보·모델 예측·챌린지·서버 타이머·PHOTO 업로드·보상·꾸미기 저장을 연결했다. 기존 공통 진입점과 v4 화면은 유지한다.
+
+API 또는 아래 개발 서버로 `/frontend/docs/prototype/당고킬러-모험시안_v5.html#login`을 연다. 일반 정적 서버만으로는 실제 API를 호출할 수 없다. 입력 없는 시안 검토는 `?demo=1#login` 주소를 사용한다. 이 모드는 새로고침하면 기록이 초기화된다.
+
+새 테이블 세 개의 마이그레이션과 기존 마스터 시드가 필요하다. 로컬 사진 저장소는 `EVIDENCE_STORAGE_DIR=./media/evidence`처럼 쓰기 가능한 비공개 경로로 지정한다. [v5 연결 범위·보상 규칙·검증](../docs/02_team/prototype-v5-proposal.md)에 실행 조건과 호환성 범위를 정리했다. 후보 70종은 잠긴 미리보기다.
+
+`npm run test:v5`로 실제 연결 모드의 브라우저 회귀를, `npm run test:prototype`으로 별도 체험 모드를 검사한다. 기존 서비스 검사는 아래 명령을 그대로 사용한다.
+
 ## 실행
 
 백엔드는 기존 안내대로 저장소 루트에서 실행한다.
@@ -94,7 +104,7 @@ export function mount({ root, ui, api, auth, router, route, signal }) {
 
 ## 인증·오류·날짜 규칙
 
-공통 액세스 토큰은 메모리에만 둔다. localStorage·sessionStorage에 새로 저장하지 않는다.
+공통 액세스 토큰은 메모리에만 둔다. 토큰과 개인정보는 localStorage·sessionStorage에 저장하지 않는다. 새로고침 복원에 필요한 식별자(예: 예측 번호)만 sessionStorage에 둘 수 있다.
 새로고침은 AUTH-04의 서버 HttpOnly 쿠키로 복원한 뒤 USER-01로 본인을 확인한다.
 로그아웃 뒤 늦게 도착한 갱신 응답이 이전 토큰을 다시 넣지 못하도록 세션 버전을 확인한다.
 조회는 401일 때 한 번 갱신 후 다시 읽는다. 시작·저장·중단 등의 쓰기는 자동 재전송하지 않는다.

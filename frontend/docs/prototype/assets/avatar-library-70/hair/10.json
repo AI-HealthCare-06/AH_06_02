@@ -1,0 +1,10 @@
+{
+  "category": "hair",
+  "category_label": "머리",
+  "index": 10,
+  "name": "분홍 둥근 바가지 머리",
+  "description": "dusty-rose rounded bowl haircut with softly separated curved fringe",
+  "filename": "hair/10.webp",
+  "prompt": "Create a BRAND NEW, distinctly designed game equipment asset: dusty-rose rounded bowl haircut with softly separated curved fringe. Hair/wig ONLY. The main defining silhouette MUST be dusty-rose rounded bowl haircut with softly separated curved fringe. Do not render default tousled hair unless specifically requested. Open underside for placement on a head; no face, eyes, ears, neck, head or mannequin. Three-quarter view pointing viewer-right. Art direction: polished cute 3D storybook RPG illustration, rounded cartoon proportions suitable for a big-eyed child adventurer, soft warm lighting, detailed tactile leather/fabric/metal as appropriate, rich but tasteful color. The requested unique SHAPE, MATERIAL, and COLOR are essential. Center entire object with 8% clear margin; do not crop. Genuinely transparent alpha background. No backdrop, no ground, no exterior shadow, no glow haze, no text, no labels, no watermark, no unrelated objects. Exactly one isolated equipment sprite (two shoes for footwear).",
+  "status": "complete"
+}
