@@ -181,40 +181,41 @@
   position: absolute;
   object-fit: contain;
 }
-/* 가구 자리는 방 그림(5:4) 기준 퍼센트다. 바닥 꼭짓점: 뒤 50%·32%, 왼쪽 11%·56%, 오른쪽 91%·60%, 앞 50%·88% */
+/* 가구 자리는 방 그림(5:4) 기준 퍼센트다. 바닥 꼭짓점: 뒤 50%·32%, 왼쪽 11%·56%, 오른쪽 91%·60%, 앞 50%·88%.
+   책상·침대 그림은 등이 오른쪽 위를 향하므로 벽돌 벽에 등을 대고, 방에 비해 작게 둔다 */
 .room-stage .room-bed {
-  width: 45%;
-  height: 45%;
-  left: 49%;
-  top: 43%;
+  width: 34%;
+  height: 42.5%;
+  left: 54%;
+  top: 36%;
   z-index: 3;
 }
 .room-stage .room-desk {
-  width: 30%;
-  height: 37.5%;
-  left: 27%;
-  top: 20%;
+  width: 24%;
+  height: 30%;
+  left: 40%;
+  top: 22%;
   z-index: 1;
 }
 .room-stage .room-chair {
-  width: 20%;
-  height: 25%;
-  left: 31%;
-  top: 41%;
+  width: 15%;
+  height: 18.75%;
+  left: 38%;
+  top: 36%;
   z-index: 4;
 }
 .room-stage .room-light {
-  width: 20%;
-  height: 33%;
-  left: 76%;
-  top: 27%;
+  width: 15%;
+  height: 18.75%;
+  left: 81%;
+  top: 36%;
   z-index: 2;
 }
 .room-stage .room-ornament {
-  width: 11%;
-  height: 13.75%;
-  left: 23%;
-  top: 55%;
+  width: 9%;
+  height: 11.25%;
+  left: 25.5%;
+  top: 38.75%;
   z-index: 5;
 }
 .live-token {

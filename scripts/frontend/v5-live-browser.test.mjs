@@ -679,6 +679,10 @@ test("방 가구는 방 그림의 바닥 위에 놓이고 책상이 문을 가�
         ratio: stage.width / stage.height,
         ornament: pct(document.querySelector(".room-ornament")),
         desk: pct(document.querySelector(".room-desk")),
+        bedWidth:
+          (document.querySelector(".room-bed").getBoundingClientRect().width /
+            stage.width) *
+          100,
       };
     });
     const floor = [
@@ -703,6 +707,10 @@ test("방 가구는 방 그림의 바닥 위에 놓이고 책상이 문을 가�
     assert.ok(
       boxes.desk.left >= 25,
       `책상이 문(19~28%)을 가리지 않는다 (${boxes.desk.left.toFixed(1)})`,
+    );
+    assert.ok(
+      boxes.bedWidth <= 36,
+      `가구가 방에 비해 너무 크지 않다 (침대 ${boxes.bedWidth.toFixed(1)}%)`,
     );
   }));
 
