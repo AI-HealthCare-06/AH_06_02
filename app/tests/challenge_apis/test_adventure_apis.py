@@ -82,6 +82,33 @@ class TestAdventureAPI(TestCase):
             assert draws["items"][0]["results"] is None
             assert "cards" not in draws["items"][0]
 
+    async def test_draw_is_claimed_by_choosing_one_of_five_cards(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            user_id, token = await _login(client, "v5-one-card@example.com")
+            headers = _auth(token)
+            challenge = await _challenge("V5-ONE-CARD")
+            challenge.verification_type = VerificationType.MANUAL
+            await challenge.save()
+            card = await _recommendation(user_id=user_id, challenge_id=challenge.id)
+            started = await client.post(
+                "/api/v1/user-challenges", json={"recommendation_ids": [card.id]}, headers=headers
+            )
+            mission_id = started.json()["data"]["items"][0]["user_challenge_id"]
+            logged = await client.post(
+                f"/api/v1/user-challenges/{mission_id}/logs",
+                json={"occurred_at": datetime.now(config.TIMEZONE).isoformat(), "verification_method": "manual"},
+                headers=headers,
+            )
+            draw_id = logged.json()["data"]["reward_draw_id"]
+            three = await client.post(
+                f"/api/v1/reward-draws/{draw_id}/claim", json={"positions": [0, 1, 2]}, headers=headers
+            )
+            assert three.status_code == 400
+            one = await client.post(f"/api/v1/reward-draws/{draw_id}/claim", json={"positions": [3]}, headers=headers)
+            assert one.status_code == 200
+            assert one.json()["data"]["selected_positions"] == [3]
+            assert len(one.json()["data"]["results"]) == 1
+
     async def test_new_account_has_basic_room_and_locked_rewards(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             _, token = await _login(client, "v5-room@example.com")

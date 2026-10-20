@@ -14,6 +14,13 @@ from app.services.adventure_catalog import BASIC_ROOM, BY_CODE, CATALOG, EQUIPME
 from app.services.attack_cycles import lock_user
 
 RANDOM = SystemRandom()
+#: 보상 규칙 v2 (REQ-RECO-010·012, 2026-10-20). 카드마다 RARE 15%, 5장 중 1장 수령
+RARE_RATE = 0.15
+PICK_COUNT = 1
+#: 재료 카드 한 장이 주는 조각 수
+MATERIAL_CARD_AMOUNT = 2
+#: 지금 단계 → 다음 단계로 올리는 데 드는 조각 수. 최대 3단계
+UPGRADE_COST = {1: 20, 2: 40}
 
 
 def state_body(state: AdventurerState) -> dict[str, Any]:
@@ -58,17 +65,13 @@ class AdventureRewardService:
         pool = [entry for entry in CATALOG if not entry["starter"]]
         cards = []
         for _ in range(5):
-            rarity = "RARE" if RANDOM.random() < 0.25 else "COMMON"
+            rarity = "RARE" if RANDOM.random() < RARE_RATE else "COMMON"
             cards.append(RANDOM.choice([entry["code"] for entry in pool if entry["rarity"] == rarity]))
         return await RewardDraw.create(user_id=user_id, challenge_log_id=log_id, cards=cards)
 
     async def claim(self, user_id: int, draw_id: int, positions: list[int]) -> dict[str, Any]:
-        if (
-            len(positions) != 3
-            or len(set(positions)) != 3
-            or any(type(p) is not int or not 0 <= p < 5 for p in positions)
-        ):
-            raise AppError(ErrorCode.VALIDATION_ERROR, message="카드 5장 중 서로 다른 3장을 골라주세요.")
+        if len(positions) != PICK_COUNT or any(type(p) is not int or not 0 <= p < 5 for p in positions):
+            raise AppError(ErrorCode.VALIDATION_ERROR, message="카드 5장 중 1장을 골라주세요.")
         positions = sorted(positions)
         async with in_transaction():
             await lock_user(user_id)
@@ -90,7 +93,7 @@ class AdventureRewardService:
     async def _grant(user_id: int, entry: dict[str, Any], state: AdventurerState) -> dict[str, Any]:
         duplicate, materials = False, 0
         if entry["code"] == "material":
-            materials = 1
+            materials = MATERIAL_CARD_AMOUNT
         else:
             reward, _ = await Reward.get_or_create(
                 code=entry["code"],
@@ -133,9 +136,12 @@ class AdventureRewardService:
         async with in_transaction():
             await lock_user(user_id)
             state = await self.state(user_id)
-            if state.materials < 5 or state.item_stage >= 3:
-                raise AppError(ErrorCode.VALIDATION_ERROR, message="성장의 조각 5개가 필요해요. 최대 단계는 3단계예요.")
-            state.materials -= 5
+            cost = UPGRADE_COST.get(state.item_stage)
+            if cost is None:
+                raise AppError(ErrorCode.VALIDATION_ERROR, message="이미 최대 단계(3단계)예요.")
+            if state.materials < cost:
+                raise AppError(ErrorCode.VALIDATION_ERROR, message=f"다음 단계에는 성장의 조각 {cost}개가 필요해요.")
+            state.materials -= cost
             state.item_stage += 1
             await state.save(update_fields=["materials", "item_stage", "updated_at"])
             return state_body(state)

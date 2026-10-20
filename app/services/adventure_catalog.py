@@ -19,7 +19,8 @@ CATALOG = [
     item("dawn", "새벽 정원", "background", rarity="RARE"),
     item("lantern", "모험가의 등불", "ornament", "room-decor-v1/lantern.webp"),
     item("flowers", "반짝 꽃 화분", "ornament", "room-decor-v1/plant.webp", "RARE"),
-    item("material", "성장의 조각", "material"),
+    # 재료 카드는 귀하게 보이도록 RARE 로 둔다 (2026-10-20 보상 규칙 v2)
+    item("material", "성장의 조각", "material", "growth-shard.webp", "RARE"),
     item("meadow", "초록 정원", "background", starter=True),
     item("room-basic-bed", "기본 원목 침대", "bed", "room-decor-v1/basic-bed.webp", starter=True),
     item("room-star-bed", "별빛 침대", "bed", "room-decor-v1/star-bed.webp"),
