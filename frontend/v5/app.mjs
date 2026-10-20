@@ -80,6 +80,8 @@ const HEALTH_RANGES = {
 };
 // 서버 저장 형식(app/dtos/health_records.py)의 소수 자릿수. 나머지 숫자 칸은 정수만 받는다
 const HEALTH_DECIMALS = { weight_kg: 1, waist_cm: 1, hba1c: 1 };
+// 보상 규칙 v2. 서버 app/services/adventure_rewards.py 의 UPGRADE_COST 와 같다 (지금 단계 → 다음 단계 조각 수)
+const UPGRADE_COST = { 1: 20, 2: 40 };
 const auth = new AuthSession();
 const api = auth.api;
 const upload = createEvidenceUploader(api);
@@ -1141,7 +1143,7 @@ async function renderBag() {
     )
     .join(
       "",
-    )}</div><p>성장의 조각 ${adventurer.materials}개 · 아이템 ${adventurer.item_stage}단계</p><div id="live-bag-panel"></div>`;
+    )}</div><div class="live-shard-chip"><img src="${asset("growth-shard.webp")}" alt=""><span>성장의 조각</span><b>${adventurer.materials}</b><small>아이템 ${adventurer.item_stage}단계</small></div><div id="live-bag-panel"></div>`;
   const panel = $("#live-bag-panel");
   if (bagTab === "draw") {
     renderDraw(panel);
@@ -1184,10 +1186,17 @@ async function renderBag() {
       : bagTab === "adventurer"
         ? `<div class="live-avatar-layout"><div class="growth-avatar">${avatar()}<h2>${escape(user.nickname)}</h2></div><section>${cards}</section></div>`
         : cards;
-  panel.insertAdjacentHTML(
-    "beforeend",
-    `<section class="growth-display"><h2>아이템 ${adventurer.item_stage}단계</h2><p>성장의 조각 5개로 다음 단계에 도전해요.</p><button type="button" class="reward-apply" data-live-upgrade ${adventurer.materials < 5 || adventurer.item_stage >= 3 ? "disabled" : ""}>${adventurer.item_stage >= 3 ? "최대 단계" : "단계 상승 · 조각 5개"}</button></section>`,
-  );
+  panel.insertAdjacentHTML("beforeend", growthDisplay());
+}
+// 아이템 단계와 다음 단계까지 모은 조각. 단계마다 필요한 조각이 늘어난다 (2단계 20개, 3단계 40개)
+function growthDisplay() {
+  const stage = adventurer.item_stage;
+  const have = adventurer.materials;
+  const cost = UPGRADE_COST[stage];
+  const progress = cost
+    ? `<div class="live-shard-progress" role="progressbar" aria-label="다음 단계까지 모은 조각" aria-valuemin="0" aria-valuemax="${cost}" aria-valuenow="${Math.min(have, cost)}"><i style="width:${Math.min(100, (have / cost) * 100)}%"></i></div><p>${have} / ${cost} · ${have >= cost ? "지금 단계를 올릴 수 있어요" : `다음 단계까지 조각 ${cost - have}개`}</p>`
+    : "<p>최대 단계에 도착했어요.</p>";
+  return `<section class="growth-display"><img class="growth-shard" src="${asset("growth-shard.webp")}" alt=""><h2>아이템 ${stage}단계</h2>${progress}<button type="button" class="reward-apply" data-live-upgrade ${!cost || have < cost ? "disabled" : ""}>${cost ? `조각 ${cost}개로 ${stage + 1}단계 올리기` : "최대 단계"}</button></section>`;
 }
 function roomArt() {
   const room = adventurer.room || {};
@@ -1210,14 +1219,14 @@ function renderDraw(panel) {
   currentDraw = draws.find((d) => !d.claimed_at) || draws[0] || null;
   if (!currentDraw) {
     panel.innerHTML =
-      '<div class="growth-empty"><h2>실천이 선물로 돌아와요.</h2><p>예정된 챌린지를 한 번 완료하면 카드 5장 중 3장을 고를 수 있어요.</p></div>';
+      '<div class="growth-empty"><h2>실천이 선물로 돌아와요.</h2><p>예정된 챌린지를 한 번 완료하면 카드 5장 중 1장을 고를 수 있어요.</p></div>';
     return;
   }
   if (currentDraw.claimed_at) {
-    panel.innerHTML = `<h2>보상 3개를 받았어요!</h2><div class="reward-results">${currentDraw.results.map((i) => `<article class="draw-result ${i.rarity.toLowerCase()}"><span class="rarity">${i.rarity}</span>${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt=""></div>` : "✦"}<h3>${escape(i.name)}</h3><p>${i.duplicate ? "중복 보상 → " : ""}${i.materials ? "성장의 조각 +" + i.materials : "새 보상 획득"}</p></article>`).join("")}</div>${button("바로 꾸미기", 'data-live-bag="adventurer"')}`;
+    panel.innerHTML = `<h2>보상을 받았어요!</h2><div class="reward-results">${currentDraw.results.map((i) => `<article class="draw-result ${i.rarity.toLowerCase()}"><span class="rarity">${i.rarity}</span>${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt=""></div>` : "✦"}<h3>${escape(i.name)}</h3><p>${i.duplicate ? "중복 보상 → " : ""}${i.materials ? "성장의 조각 +" + i.materials : "새 보상 획득"}</p></article>`).join("")}</div>${button("바로 꾸미기", 'data-live-bag="adventurer"')}`;
     return;
   }
-  panel.innerHTML = `<h2>5장 중 3장을 골라주세요</h2><p>선택 ${pendingPositions.size} / 3 · 남은 보상 ${draws.filter((d) => !d.claimed_at).length}회</p><div class="live-draw-cards">${[0, 1, 2, 3, 4].map((pos) => `<button type="button" class="live-card-back ${pendingPositions.has(pos) ? "selected" : ""}" data-live-position="${pos}" aria-label="${pos + 1}번째 카드" aria-pressed="${pendingPositions.has(pos)}"><span>✦</span><b>${pendingPositions.has(pos) ? "선택" : "DANGO"}</b></button>`).join("")}</div><button type="button" class="primary" data-live-claim ${pendingPositions.size !== 3 ? "disabled" : ""}>선택한 카드 3장 열기</button>`;
+  panel.innerHTML = `<h2>5장 중 1장을 골라주세요</h2><p>남은 보상 ${draws.filter((d) => !d.claimed_at).length}회</p><div class="live-draw-cards">${[0, 1, 2, 3, 4].map((pos) => `<button type="button" class="live-card-back ${pendingPositions.has(pos) ? "selected" : ""}" data-live-position="${pos}" aria-label="${pos + 1}번째 카드" aria-pressed="${pendingPositions.has(pos)}"><span>✦</span><b>${pendingPositions.has(pos) ? "선택" : "DANGO"}</b></button>`).join("")}</div><button type="button" class="primary" data-live-claim ${pendingPositions.size !== 1 ? "disabled" : ""}>선택한 카드 열기</button>`;
 }
 async function renderGrowth(ticket) {
   const [records, progress] = await Promise.all([
@@ -1470,8 +1479,10 @@ async function click(button) {
   }
   if (button.hasAttribute("data-live-position")) {
     const pos = Number(button.dataset.livePosition);
-    if (pendingPositions.has(pos)) pendingPositions.delete(pos);
-    else if (pendingPositions.size < 3) pendingPositions.add(pos);
+    // 한 장만 고른다. 다른 카드를 누르면 선택이 그 카드로 바뀐다
+    const picked = pendingPositions.has(pos);
+    pendingPositions.clear();
+    if (!picked) pendingPositions.add(pos);
     renderDraw($("#live-bag-panel"));
     return;
   }
@@ -1561,7 +1572,7 @@ async function click(button) {
 function renderDrawReceipt(receipt) {
   const remaining = draws.filter((d) => !d.claimed_at).length;
   const panel = $("#live-bag-panel");
-  panel.innerHTML = `<h2>보상 3개를 받았어요!</h2><div class="reward-results">${receipt.results.map((i) => `<article class="draw-result ${i.rarity.toLowerCase()}"><span class="rarity">${i.rarity}</span>${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt=""></div>` : "✦"}<h3>${escape(i.name)}</h3><p>${i.duplicate ? "중복 → " : ""}${i.materials ? "성장의 조각 +" + i.materials : "새 보상 획득"}</p></article>`).join("")}</div>${remaining ? button(`다음 보상 고르기 · ${remaining}회`, 'data-live-bag="draw"') : ""}${button("바로 꾸미기", 'data-live-bag="adventurer"')}`;
+  panel.innerHTML = `<h2>보상을 받았어요!</h2><div class="reward-results">${receipt.results.map((i) => `<article class="draw-result ${i.rarity.toLowerCase()}"><span class="rarity">${i.rarity}</span>${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt=""></div>` : "✦"}<h3>${escape(i.name)}</h3><p>${i.duplicate ? "중복 → " : ""}${i.materials ? "성장의 조각 +" + i.materials : "새 보상 획득"}</p></article>`).join("")}</div>${remaining ? button(`다음 보상 고르기 · ${remaining}회`, 'data-live-bag="draw"') : ""}${button("바로 꾸미기", 'data-live-bag="adventurer"')}`;
 }
 document.addEventListener("click", (event) => {
   const target = event.target.closest("button");

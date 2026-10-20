@@ -614,3 +614,63 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* 성장의 조각 (보상 규칙 v2). 결정 그림과 금빛 테두리로 RARE 재료임을 보인다 */
+.live-shard-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 5px 14px 5px 5px;
+  border: 1.5px solid #d3b462;
+  border-radius: 999px;
+  background: #fff9e9;
+  color: #6b4f12;
+  font-size: 13px;
+  font-weight: 700;
+}
+.live-shard-chip img {
+  width: 30px;
+  height: 30px;
+}
+.live-shard-chip b {
+  font-size: 16px;
+}
+.live-shard-chip small {
+  margin-left: 6px;
+  color: #8b651a;
+  font-weight: 600;
+}
+.growth-display .growth-shard {
+  display: block;
+  width: 88px;
+  height: 88px;
+  margin: 0 auto 6px;
+  filter: drop-shadow(0 6px 14px rgb(112 94 224 / 0.35));
+}
+.live-shard-progress {
+  height: 10px;
+  margin: 10px 0 4px;
+  border-radius: 999px;
+  background: #ece7fb;
+  overflow: hidden;
+}
+.live-shard-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #8b7af0, #e9bd77);
+}
+.draw-result.rare {
+  box-shadow:
+    0 0 0 1px #d3b462,
+    0 8px 22px rgb(211 180 98 / 0.35);
+}
+.draw-result .equipment-thumbnail img[src$="growth-shard.webp"] {
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .draw-result {
+    animation: none;
+  }
+}

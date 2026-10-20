@@ -170,8 +170,8 @@ async function mock(page, state = {}) {
       data = {
         equipment: state.equipment || {},
         room: {},
-        materials: 0,
-        item_stage: 1,
+        materials: state.materials ?? 0,
+        item_stage: state.stage ?? 1,
       };
     } else if (p === "/reward-draws" && state.manyDraws) {
       // 최신순 101건 중 가장 오래된 1건만 아직 받지 않았다
@@ -211,7 +211,9 @@ async function mock(page, state = {}) {
       data = {
         draw_id: 8,
         claimed_at: "2026-10-18T12:00:00+09:00",
-        results: [{ ...hat, duplicate: false, materials: 0 }],
+        results: state.drawResult
+          ? [state.drawResult]
+          : [{ ...hat, duplicate: false, materials: 0 }],
       };
     } else if (p === "/user-challenges/21/timers/77")
       data = {
@@ -501,23 +503,29 @@ test("새로고침한 타이머는 서버 세션을 복원하고 기기 시간�
     assert.equal(completed.body.value, undefined);
   }));
 
-test("카드 3장 선택은 서버 수령 후 장착하며 새로고침 후 장착을 복원한다", async () =>
+test("카드 5장 중 1장을 골라 서버 수령 후 장착하며 새로고침 후 장착을 복원한다", async () =>
   withPage(async (page, base) => {
     const state = { draw: true };
     const calls = await mock(page, state);
     await page.goto(new URL(path + "#rewards", base).href);
     await page.getByRole("button", { name: "카드 뽑기", exact: true }).click();
-    for (const index of [0, 2, 4])
+    await page.getByText("5장 중 1장을 골라주세요", { exact: true }).waitFor();
+    // 다른 카드를 누르면 선택이 그 카드로 바뀐다
+    for (const index of [0, 2])
       await page
         .getByRole("button", { name: `${index + 1}번째 카드`, exact: true })
         .click();
+    assert.equal(
+      await page.locator('.live-card-back[aria-pressed="true"]').count(),
+      1,
+    );
     await page
-      .getByRole("button", { name: "선택한 카드 3장 열기", exact: true })
+      .getByRole("button", { name: "선택한 카드 열기", exact: true })
       .click();
-    await page.getByText("보상 3개를 받았어요!", { exact: true }).waitFor();
+    await page.getByText("보상을 받았어요!", { exact: true }).waitFor();
     assert.deepEqual(
       calls.find((c) => c.path.endsWith("/claim")).body.positions,
-      [0, 2, 4],
+      [2],
     );
     await page
       .getByRole("button", { name: "바로 꾸미기", exact: true })
@@ -698,7 +706,7 @@ test("받을 보상이 있으면 가방 아이콘에 표시하고 가방을 카�
     assert.equal(await bag.getAttribute("aria-label"), "가방, 받을 보상 1개");
     await bag.click();
     await page
-      .getByText("5장 중 3장을 골라주세요", { exact: true })
+      .getByText("5장 중 1장을 골라주세요", { exact: true })
       .waitFor({ timeout: 3000 });
     assert.equal(
       await page
@@ -1386,4 +1394,60 @@ test("서비스 주소 /frontend/ 는 v5 화면을 열고 주소의 화면 이�
     const url = new URL(page.url());
     assert.equal(decodeURIComponent(url.pathname), decodeURIComponent(path));
     assert.equal(url.hash, "#signup");
+  }));
+
+test("성장의 조각은 결정 그림으로 보이고 RARE 재료로 받는다", async () =>
+  withPage(async (page, base) => {
+    const shard = {
+      code: "material",
+      name: "성장의 조각",
+      slot: "material",
+      rarity: "RARE",
+      asset: "growth-shard.webp",
+      duplicate: false,
+      materials: 2,
+    };
+    await mock(page, { draw: true, drawResult: shard, materials: 14 });
+    await page.goto(new URL(path + "#rewards", base).href);
+    const chip = page.locator(".live-shard-chip");
+    await chip.waitFor();
+    assert.match(await chip.textContent(), /성장의 조각\s*14/);
+    assert.match(
+      await chip.locator("img").getAttribute("src"),
+      /growth-shard\.webp$/,
+    );
+    await page.getByRole("button", { name: "카드 뽑기", exact: true }).click();
+    await page.getByRole("button", { name: "4번째 카드", exact: true }).click();
+    await page
+      .getByRole("button", { name: "선택한 카드 열기", exact: true })
+      .click();
+    const result = page.locator(".draw-result.rare");
+    await result.waitFor();
+    assert.match(await result.textContent(), /성장의 조각 \+2/);
+    assert.match(
+      await result.locator("img").getAttribute("src"),
+      /growth-shard\.webp$/,
+    );
+  }));
+
+test("아이템 단계는 2단계에 조각 20개, 3단계에 40개가 필요하다", async () =>
+  withPage(async (page, base) => {
+    const state = { materials: 14, stage: 1 };
+    await mock(page, state);
+    await page.goto(new URL(path + "#rewards", base).href);
+    const growth = page.locator(".growth-display");
+    await growth.waitFor();
+    assert.match(await growth.textContent(), /14 \/ 20/);
+    assert.match(await growth.textContent(), /다음 단계까지 조각 6개/);
+    assert.equal(
+      await growth.locator("[data-live-upgrade]").isDisabled(),
+      true,
+    );
+    Object.assign(state, { materials: 40, stage: 2 });
+    await page.reload();
+    await growth.waitFor();
+    assert.match(await growth.textContent(), /40 \/ 40/);
+    const upgrade = growth.locator("[data-live-upgrade]");
+    assert.equal(await upgrade.isDisabled(), false);
+    assert.match(await upgrade.textContent(), /조각 40개로 3단계/);
   }));
