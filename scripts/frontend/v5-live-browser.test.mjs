@@ -177,6 +177,24 @@ async function mock(page, state = {}) {
             owned: true,
           },
           {
+            code: "room-basic-desk",
+            name: "기본 컴퓨터 책상",
+            slot: "computer",
+            rarity: "COMMON",
+            asset: "room-decor-v1/basic-desk.webp",
+            starter: true,
+            owned: true,
+          },
+          {
+            code: "lantern",
+            name: "모험가의 등불",
+            slot: "ornament",
+            rarity: "COMMON",
+            asset: "room-decor-v1/lantern.webp",
+            starter: false,
+            owned: true,
+          },
+          {
             code: "room-cloud-chair",
             name: "구름 라운지 의자",
             slot: "chair",
@@ -191,7 +209,7 @@ async function mock(page, state = {}) {
       if (req.method() === "PATCH") state.equipment = body.equipment;
       data = {
         equipment: state.equipment || {},
-        room: {},
+        room: state.room || {},
         materials: state.materials ?? 0,
         item_stage: state.stage ?? 1,
       };
@@ -630,6 +648,63 @@ for (const [tab, label, subject] of [
         );
       }
     }));
+
+test("방 가구는 방 그림의 바닥 위에 놓이고 책상이 문을 가리지 않는다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, {
+      room: {
+        bed: "room-basic-bed",
+        computer: "room-basic-desk",
+        ornament: "lantern",
+      },
+    });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(new URL(path + "#rewards", base).href);
+    await page.getByRole("button", { name: "방 꾸미기", exact: true }).click();
+    await page.locator(".room-stage .room-ornament").waitFor();
+    // 방 그림(5:4) 기준 퍼센트. 바닥 꼭짓점과 문 오른쪽 끝은 room-base.webp 에서 잰 값이다
+    const boxes = await page.evaluate(() => {
+      const stage = document
+        .querySelector(".live-decorate-stage .room-stage")
+        .getBoundingClientRect();
+      const pct = (el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          left: ((r.left - stage.left) / stage.width) * 100,
+          cx: ((r.left + r.width / 2 - stage.left) / stage.width) * 100,
+          bottom: ((r.bottom - stage.top) / stage.height) * 100,
+        };
+      };
+      return {
+        ratio: stage.width / stage.height,
+        ornament: pct(document.querySelector(".room-ornament")),
+        desk: pct(document.querySelector(".room-desk")),
+      };
+    });
+    const floor = [
+      [50, 32],
+      [91, 60],
+      [50, 88],
+      [11, 56],
+    ];
+    const inside = (x, y) =>
+      floor.every(([x1, y1], i) => {
+        const [x2, y2] = floor[(i + 1) % floor.length];
+        return (x2 - x1) * (y - y1) - (y2 - y1) * (x - x1) >= 0;
+      });
+    assert.ok(
+      Math.abs(boxes.ratio - 1.25) < 0.02,
+      "방 틀은 그림과 같은 5:4 다",
+    );
+    assert.ok(
+      inside(boxes.ornament.cx, boxes.ornament.bottom),
+      `장식은 바닥 안에 놓인다 (${boxes.ornament.cx.toFixed(1)}, ${boxes.ornament.bottom.toFixed(1)})`,
+    );
+    assert.ok(
+      boxes.desk.left >= 25,
+      `책상이 문(19~28%)을 가리지 않는다 (${boxes.desk.left.toFixed(1)})`,
+    );
+  }));
 
 test("320px에서도 가방·후보 도감·성장 달력이 가로로 넘치지 않는다", async () =>
   withPage(async (page, base) => {

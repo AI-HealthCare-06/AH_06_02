@@ -181,35 +181,41 @@
   position: absolute;
   object-fit: contain;
 }
+/* 가구 자리는 방 그림(5:4) 기준 퍼센트다. 바닥 꼭짓점: 뒤 50%·32%, 왼쪽 11%·56%, 오른쪽 91%·60%, 앞 50%·88% */
 .room-stage .room-bed {
   width: 45%;
   height: 45%;
   left: 49%;
   top: 43%;
+  z-index: 3;
 }
 .room-stage .room-desk {
-  width: 43%;
-  height: 43%;
-  left: 12%;
-  top: 18%;
+  width: 30%;
+  height: 37.5%;
+  left: 27%;
+  top: 20%;
+  z-index: 1;
 }
 .room-stage .room-chair {
-  width: 25%;
-  height: 30%;
-  left: 23%;
-  top: 39%;
+  width: 20%;
+  height: 25%;
+  left: 31%;
+  top: 41%;
+  z-index: 4;
 }
 .room-stage .room-light {
   width: 20%;
   height: 33%;
   left: 76%;
   top: 27%;
+  z-index: 2;
 }
 .room-stage .room-ornament {
-  width: 20%;
-  height: 25%;
-  left: 7%;
-  top: 49%;
+  width: 11%;
+  height: 13.75%;
+  left: 23%;
+  top: 55%;
+  z-index: 5;
 }
 .live-token {
   display: grid;
