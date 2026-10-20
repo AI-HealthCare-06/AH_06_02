@@ -277,6 +277,22 @@ async function mock(page, state = {}) {
             },
           },
         });
+      // 실제 서버처럼 생성할 때마다 새 추천 행을 만든다. 쿨다운·제외가 없는 거절은 다시 추천된다
+      if (state.cards) {
+        const latest = state.cards.filter(
+          (c, i) =>
+            state.cards.findIndex((o) => o.challenge_id === c.challenge_id) ===
+            i,
+        );
+        const again = latest
+          .filter((c) => c.action === "rejected" && !c.suppressed_until_manual)
+          .map((c) => ({
+            ...c,
+            recommendation_id: c.recommendation_id + 100,
+            action: null,
+          }));
+        state.cards = [...again, ...state.cards];
+      }
       data = { items: state.cards || [] };
     } else if (
       /^\/challenge-recommendations\/\d+\/unsuppress$/.test(p) &&

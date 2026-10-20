@@ -108,6 +108,8 @@ let user,
   navigation = 0;
 // 추천 생성(CHLG-01)이 슬롯 없음으로 거절됐는지. 카드 조회 API 에는 남은 슬롯이 없어 생성 결과로 안다
 let slotsFull = false;
+// 추천을 넘기거나 제외한 직후에는 새로 생성하지 않는다. 생성하면 방금 넘긴 챌린지가 바로 다시 추천된다 (v4 와 같음)
+let keepRecommendations = false;
 // 예측 접수 여부를 모르거나 다시 시도할 수 없는 실패면 '결과 다시 확인'은 다시 보내지 않고 지도로 간다
 let retryGoesToMap = false;
 const SLOTS_FULL_NOTICE =
@@ -512,7 +514,8 @@ async function renderBattle(ticket) {
     return;
   }
   village = m.code;
-  const notice = await refreshRecommendations();
+  const notice = keepRecommendations ? "" : await refreshRecommendations();
+  keepRecommendations = false;
   if (ticket !== navigation) return;
   // 추천 이력 전체(최신순). 제외한 챌린지 목록도 여기서 모은다
   const history = await allPages("/challenge-recommendations");
@@ -636,6 +639,7 @@ async function actOnRecommendation(card, action) {
     });
   }
   selected = null;
+  keepRecommendations = true;
   await go("reco");
   if (active === "reco") message("선택을 저장했어요.");
 }
