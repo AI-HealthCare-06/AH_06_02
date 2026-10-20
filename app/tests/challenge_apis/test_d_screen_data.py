@@ -159,13 +159,14 @@ class TestDScreenData(TestCase):
         assert card["daily_xp"] == 21
         assert card["safety_check_required"] is False
 
-    async def test_d_frontend_and_shared_client_are_served_without_exposing_repository_files(self) -> None:
+    async def test_frontend_entry_and_shared_client_are_served_without_exposing_repository_files(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            html = await client.get("/frontend/d/")
+            html = await client.get("/frontend/")
             module = await client.get("/frontend/shared/api.mjs")
             outside = await client.get("/frontend/%2e%2e/app/core/config.py")
         assert html.status_code == 200
-        assert "data-dango-screens" in html.text
+        # 서비스 화면은 v5 다. 입구는 v5 HTML 로 넘긴다
+        assert "당고킬러-모험시안_v5.html" in html.text
         assert module.status_code == 200
         assert "createApiClient" in module.text
         assert outside.status_code == 404

@@ -32,7 +32,7 @@ test("HTML 개발 서버는 파일과 모듈을 제공하고 인증 헤더·쿠�
   try {
     const page = await fetch(`${base}/`);
     assert.equal(page.status, 200);
-    assert.ok((await page.text()).includes("data-dango-app"));
+    assert.ok((await page.text()).includes("당고킬러-모험시안_v5.html"));
     const module = await fetch(`${base}/frontend/shared/auth.mjs`);
     assert.match(module.headers.get("content-type"), /javascript/);
     const secret = await fetch(`${base}/.env`);

@@ -1329,3 +1329,13 @@ test("예측 접수 중 연결이 끊기면 다시 보내지 않고 지도에서
       "예측을 두 번 접수하지 않는다",
     );
   }));
+
+test("서비스 주소 /frontend/ 는 v5 화면을 열고 주소의 화면 이름을 이어받는다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { signedOut: true });
+    await page.goto(new URL("/frontend/#signup", base).href);
+    await page.locator('.scene[data-page="signup"]:not([hidden])').waitFor();
+    const url = new URL(page.url());
+    assert.equal(decodeURIComponent(url.pathname), decodeURIComponent(path));
+    assert.equal(url.hash, "#signup");
+  }));
