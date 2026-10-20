@@ -71,9 +71,11 @@ test("가입부터 공략 수행·보상·꾸미기까지 연결하고 중단해
     await page.getByRole("button", {name: "이 챌린지 시작하기 →", exact: true}).click();
     await page.locator('.today .slot:not([hidden]) .verify').first().click();
     await page.locator('[data-growth-action="draw"]').click();
-    for (const index of [0, 1, 2]) await page.locator(`[data-pick-card="${index}"]`).click();
+    // 보상 규칙 v2: 5장 중 1장. 다른 카드를 누르면 선택이 바뀐다
+    for (const index of [0, 2]) await page.locator(`[data-pick-card="${index}"]`).click();
+    assert.equal(await page.locator('.draw-back[aria-pressed="true"]').count(), 1);
     await page.locator('[data-reward-action="open"]').click();
-    assert.equal(await page.locator(".draw-result").count(), 3);
+    assert.equal(await page.locator(".draw-result").count(), 1);
     await page.locator('[data-reward-view="inventory"]').click();
     await page.getByRole("heading", {name: "성장 아이템",exact: true}).waitFor();
     assert.doesNotMatch(await page.locator("#reward-panel").innerText(), /undefined/);

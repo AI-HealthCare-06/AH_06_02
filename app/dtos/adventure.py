@@ -16,7 +16,7 @@ class TimerStartRequest(AdventureRequest):
 
 
 class RewardClaimRequest(AdventureRequest):
-    positions: list[Annotated[int, Field(strict=True, ge=0, le=4)]] = Field(min_length=3, max_length=3)
+    positions: list[Annotated[int, Field(strict=True, ge=0, le=4)]] = Field(min_length=1, max_length=1)
 
 
 class AdventurerUpdateRequest(AdventureRequest):
