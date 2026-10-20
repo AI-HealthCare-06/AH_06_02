@@ -273,6 +273,52 @@ async function mock(page, state = {}) {
           },
         });
       data = { items: state.cards || [] };
+    } else if (
+      /^\/challenge-recommendations\/\d+\/unsuppress$/.test(p) &&
+      req.method() === "PATCH"
+    ) {
+      const id = Number(p.split("/")[2]);
+      state.cards = state.cards.map((c) =>
+        c.recommendation_id === id
+          ? { ...c, suppressed_until_manual: false }
+          : c,
+      );
+      data = { recommendation_id: id, suppressed_until_manual: false };
+    } else if (
+      /^\/challenge-recommendations\/\d+$/.test(p) &&
+      req.method() === "PATCH"
+    ) {
+      // 3회 연속 거절이면 서버는 재추천 시점을 고르라고 거절한다
+      if (state.cooldownRequired && !body.cooldown_choice)
+        return route.fulfill({
+          status: 400,
+          json: {
+            success: false,
+            error: {
+              code: "CHLG_INVALID_COOLDOWN",
+              message: "다시 추천받을 시점을 골라주세요.",
+            },
+          },
+        });
+      const id = Number(p.split("/")[2]);
+      const suppressed =
+        body.action === "not_applicable" ||
+        body.cooldown_choice === "until_manual";
+      state.cards = state.cards.map((c) =>
+        c.recommendation_id === id
+          ? {
+              ...c,
+              action: body.action,
+              suppressed_until_manual: suppressed,
+            }
+          : c,
+      );
+      data = {
+        recommendation_id: id,
+        action: body.action,
+        cooldown_choice: body.cooldown_choice || null,
+        suppressed_until_manual: suppressed,
+      };
     } else if (p === "/challenge-recommendations")
       data = { items: state.cards || [] };
     else if (p === "/auth/signup")
@@ -1115,4 +1161,78 @@ test("건강 기록이 100건을 넘어도 오래된 기록까지 보여준다",
       .locator(".live-health-history")
       .getByText("체중 99.9 kg", { exact: false })
       .waitFor();
+  }));
+
+async function openRecoCard(page, base, state) {
+  const calls = await mock(page, state);
+  await page.goto(new URL(path + "#reco", base).href);
+  await page
+    .locator(".reco-card")
+    .filter({ hasText: "계단으로 올라가기" })
+    .click();
+  await page.locator("[data-live-start]").waitFor();
+  return calls;
+}
+const recoPatches = (calls) =>
+  calls.filter(
+    (c) =>
+      c.method === "PATCH" && c.path.startsWith("/challenge-recommendations/"),
+  );
+
+test("추천 카드를 '나중에 할게요'로 넘기면 저장하고 전투 화면에서 뺀다", async () =>
+  withPage(async (page, base) => {
+    const state = { cards: [card()] };
+    const calls = await openRecoCard(page, base, state);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "나중에 할게요" }).click();
+    await page.getByText("선택을 저장했어요", { exact: false }).waitFor();
+    assert.equal(await page.evaluate(() => document.body.dataset.page), "reco");
+    assert.deepEqual(
+      recoPatches(calls).map((c) => [c.path, c.body]),
+      [["/challenge-recommendations/31", { action: "rejected" }]],
+    );
+    assert.equal(
+      await page
+        .locator(".reco-card")
+        .filter({ hasText: "계단으로 올라가기" })
+        .count(),
+      0,
+    );
+  }));
+
+test("연속 거절이면 다시 추천받을 시점을 고르게 한다", async () =>
+  withPage(async (page, base) => {
+    const state = { cards: [card()], cooldownRequired: true };
+    const calls = await openRecoCard(page, base, state);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "나중에 할게요" }).click();
+    const choice = page.locator("#live-choice");
+    await choice.getByText("언제 다시 추천받을까요?").waitFor();
+    await choice.getByRole("button", { name: "30일 후" }).click();
+    await page.getByText("선택을 저장했어요", { exact: false }).waitFor();
+    assert.deepEqual(
+      recoPatches(calls).map((c) => c.body),
+      [{ action: "rejected" }, { action: "rejected", cooldown_choice: "30d" }],
+    );
+  }));
+
+test("'해당 없어요'로 제외한 챌린지는 목록에 모아 두고 다시 켤 수 있다", async () =>
+  withPage(async (page, base) => {
+    const state = { cards: [card()] };
+    const calls = await openRecoCard(page, base, state);
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "해당 없어요" }).click();
+    const excluded = page.locator(".live-excluded");
+    await excluded.getByText("계단으로 올라가기").waitFor();
+    assert.match(await excluded.textContent(), /추천에서 제외한 챌린지/);
+    await excluded.getByRole("button", { name: "추천 다시 켜기" }).click();
+    await page.getByText("다시 추천받을 수 있어요", { exact: false }).waitFor();
+    assert.equal(await page.locator(".live-excluded").count(), 0);
+    assert.deepEqual(
+      recoPatches(calls).map((c) => [c.path, c.body]),
+      [
+        ["/challenge-recommendations/31", { action: "not_applicable" }],
+        ["/challenge-recommendations/31/unsuppress", null],
+      ],
+    );
   }));

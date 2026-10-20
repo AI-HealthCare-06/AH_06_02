@@ -493,8 +493,14 @@ async function renderBattle(ticket) {
   village = m.code;
   const notice = await refreshRecommendations();
   if (ticket !== navigation) return;
-  const cards = (await api("/challenge-recommendations?size=100")).items;
+  // 추천 이력 전체(최신순). 제외한 챌린지 목록도 여기서 모은다
+  const history = await allPages("/challenge-recommendations");
   if (ticket !== navigation) return;
+  // 챌린지마다 가장 최근 추천만 본다. 최근 추천을 거절했으면 예전 추천이 다시 보이지 않는다
+  const cards = history.filter(
+    (row, index) =>
+      history.findIndex((c) => c.challenge_id === row.challenge_id) === index,
+  );
   $("#battle-title").textContent = labels[m.code] + "와의 전투";
   $("#battle-monster-name").textContent = labels[m.code];
   $("#battle-monster-art").innerHTML = art(m.code, stage(m));
@@ -516,10 +522,6 @@ async function renderBattle(ticket) {
         (row) => row.action === null && row.target_monster?.code === m.code,
       )
       .filter(
-        (row, index, rows) =>
-          rows.findIndex((c) => c.challenge_id === row.challenge_id) === index,
-      )
-      .filter(
         (row) =>
           !missions.some(
             (mission) => mission.challenge_id === row.challenge_id,
@@ -536,7 +538,85 @@ async function renderBattle(ticket) {
         .join("")
     : '<p class="live-empty">지금 시작할 수 있는 챌린지가 없어요. 건강정보를 다시 확인해 주세요.</p>';
   $(".reco-list")._cards = entries;
+  renderExcluded(cards.filter((row) => row.suppressed_until_manual));
   if (notice) message(notice);
+}
+// '해당 없어요'·'직접 다시 켤 때까지'로 뺀 챌린지. 다시 켜기 전까지 추천되지 않는다 (CHLG-03)
+function renderExcluded(rows) {
+  $(".live-excluded")?.remove();
+  if (!rows.length) return;
+  $(".reco-list").insertAdjacentHTML(
+    "afterend",
+    `<section class="live-excluded"><h2>추천에서 제외한 챌린지</h2>${rows.map((row) => `<div class="live-excluded-item"><b>${escape(row.title)}</b>${button("추천 다시 켜기", `data-live-restore="${row.challenge_id}"`)}</div>`).join("")}</section>`,
+  );
+}
+// 선택지가 여럿인 확인 창. 고른 key, 취소하면 null 을 돌려준다.
+// 앱이 폼 제출을 모두 막고 진행 중 클릭을 무시하므로 창 안의 클릭은 여기서 직접 처리한다
+function choose(title, copy, choices) {
+  let dialog = $("#live-choice");
+  if (!dialog) {
+    dialog = document.createElement("dialog");
+    dialog.id = "live-choice";
+    dialog.setAttribute("aria-labelledby", "live-choice-title");
+    dialog.addEventListener("click", (event) => {
+      const option = event.target.closest("[data-choice]");
+      if (!option) return;
+      event.stopPropagation();
+      dialog.close(option.dataset.choice);
+    });
+    document.body.append(dialog);
+  }
+  dialog.innerHTML = `<h2 id="live-choice-title">${escape(title)}</h2><p>${escape(copy)}</p><div class="live-choice-options">${choices.map((c) => `<button type="button" data-choice="${escape(c.key)}">${escape(c.text)}</button>`).join("")}<button type="button" class="secondary-action" data-choice="cancel">취소</button></div>`;
+  dialog.returnValue = "";
+  dialog.showModal();
+  return new Promise((resolve) =>
+    dialog.addEventListener(
+      "close",
+      () =>
+        resolve(
+          dialog.returnValue && dialog.returnValue !== "cancel"
+            ? dialog.returnValue
+            : null,
+        ),
+      { once: true },
+    ),
+  );
+}
+// 추천 카드 거절('나중에 할게요')·제외('해당 없어요'). v4 D 화면과 같은 문구·순서를 따른다
+async function actOnRecommendation(card, action) {
+  const rejected = action === "rejected";
+  if (
+    !confirm(
+      rejected
+        ? "나중에 할까요? 다른 챌린지를 선택할 수 있어요."
+        : "이 챌린지를 제외할까요? 직접 다시 켜기 전까지 추천에서 제외돼요.",
+    )
+  )
+    return;
+  const path = `/challenge-recommendations/${card.recommendation_id}`;
+  try {
+    await api(path, { method: "PATCH", body: { action } });
+  } catch (error) {
+    // 같은 챌린지를 3회 연속 거절하면 서버가 재추천 시점을 고르라고 한다
+    if (error.code !== "CHLG_INVALID_COOLDOWN") throw error;
+    const choice = await choose(
+      "언제 다시 추천받을까요?",
+      "같은 챌린지를 연속으로 거절해 추천을 잠시 쉬어갈 수 있어요.",
+      [
+        { key: "7d", text: "7일 후" },
+        { key: "30d", text: "30일 후" },
+        { key: "until_manual", text: "직접 다시 켤 때까지" },
+      ],
+    );
+    if (!choice) return;
+    await api(path, {
+      method: "PATCH",
+      body: { action, cooldown_choice: choice },
+    });
+  }
+  selected = null;
+  await go("reco");
+  if (active === "reco") message("선택을 저장했어요.");
 }
 // 카드 이름은 v5 시안(presentQuestCards)에 정한 공격 이름을 그대로 쓴다. 새 이름을 만들지 않는다
 function attackName(card) {
@@ -890,7 +970,7 @@ async function renderToday() {
   }
   const mission = missions.find((m) => m.challenge_id === card.challenge_id);
   if (!mission) {
-    area.innerHTML = `<h1>${escape(card.title)}</h1><p class="small-copy">${escape(card.description || "실천 내용을 확인하고 내 생활에 맞게 시작해요.")}</p><div class="live-details">${cardFacts(card)}</div>${card.safety_check_required ? `<p class="field-help">${SAFETY_GUIDE}</p><label class="live-check"><input type="checkbox" id="live-safety"> 운동 전 안전 안내를 확인했고 무리 없이 수행할 수 있어요.</label>` : ""}${card.context_type === "event" ? '<label>예정 이용일<input id="live-scheduled-date" type="date" min="' + dateKey() + '"></label><p class="small-copy">예정된 이용일을 선택해주세요.</p>' : ""}<button type="button" class="primary" data-live-start>이 챌린지 시작하기</button>${button("다른 챌린지 보기", "data-live-quests")}`;
+    area.innerHTML = `<h1>${escape(card.title)}</h1><p class="small-copy">${escape(card.description || "실천 내용을 확인하고 내 생활에 맞게 시작해요.")}</p><div class="live-details">${cardFacts(card)}</div>${card.safety_check_required ? `<p class="field-help">${SAFETY_GUIDE}</p><label class="live-check"><input type="checkbox" id="live-safety"> 운동 전 안전 안내를 확인했고 무리 없이 수행할 수 있어요.</label>` : ""}${card.context_type === "event" ? '<label>예정 이용일<input id="live-scheduled-date" type="date" min="' + dateKey() + '"></label><p class="small-copy">예정된 이용일을 선택해주세요.</p>' : ""}<button type="button" class="primary" data-live-start>이 챌린지 시작하기</button>${button("다른 챌린지 보기", "data-live-quests")}${card.recommendation_id ? `<div class="live-reco-actions">${button("나중에 할게요", 'data-live-reco="rejected"')}${button("해당 없어요", 'data-live-reco="not_applicable"')}</div>` : ""}`;
     return;
   }
   selected = { ...mission, live: true };
@@ -1264,6 +1344,27 @@ async function click(button) {
   if (button.hasAttribute("data-live-mission")) {
     selected = missions[Number(button.dataset.liveMission)];
     await go("today");
+    return;
+  }
+  if (button.dataset.liveReco) {
+    await actOnRecommendation(selected, button.dataset.liveReco);
+    return;
+  }
+  if (button.dataset.liveRestore) {
+    const rows = (await allPages("/challenge-recommendations")).filter(
+      (row) =>
+        row.suppressed_until_manual &&
+        row.challenge_id === Number(button.dataset.liveRestore),
+    );
+    for (const row of rows)
+      await api(
+        `/challenge-recommendations/${row.recommendation_id}/unsuppress`,
+        {
+          method: "PATCH",
+        },
+      );
+    await go("reco");
+    if (active === "reco") message("다시 추천받을 수 있어요.");
     return;
   }
   if (button.hasAttribute("data-live-start")) {
