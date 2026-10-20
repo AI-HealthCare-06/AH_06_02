@@ -108,6 +108,8 @@ let user,
   navigation = 0;
 // 추천 생성(CHLG-01)이 슬롯 없음으로 거절됐는지. 카드 조회 API 에는 남은 슬롯이 없어 생성 결과로 안다
 let slotsFull = false;
+// 예측 접수 여부를 모르거나 다시 시도할 수 없는 실패면 '결과 다시 확인'은 다시 보내지 않고 지도로 간다
+let retryGoesToMap = false;
 const SLOTS_FULL_NOTICE =
   "지금은 챌린지를 더 시작할 수 없어요. 진행 중인 챌린지를 이어가세요.";
 let busy = false,
@@ -236,6 +238,7 @@ function reset() {
   signupDraft = null;
   healthRecordId = null;
   slotsFull = false;
+  retryGoesToMap = false;
   rememberPrediction(null);
   sex = undefined;
   smoking = undefined;
@@ -897,6 +900,19 @@ async function saveIntake() {
     ).health_record_id;
   await submitPrediction();
 }
+// 실패한 예측을 다시 접수한다. 새로고침으로 건강기록 ID 를 잃었으면 가장 최근 기록을 쓴다 (v4 와 같음)
+async function retryPrediction() {
+  if (!healthRecordId)
+    healthRecordId =
+      (await api("/dashboard/summary")).latest_health_record
+        ?.health_record_id ?? null;
+  if (!healthRecordId) {
+    await go("health");
+    message("다시 예측할 건강기록이 없어요. 건강정보를 입력해주세요.");
+    return;
+  }
+  await submitPrediction();
+}
 // PRED-01 접수 후 결과를 기다린다. 이미 접수한 예측이 있으면 다시 접수하지 않는다
 async function submitPrediction() {
   await go("waiting");
@@ -915,6 +931,13 @@ async function submitPrediction() {
         healthRecordId = null;
         await go("risk");
         return;
+      }
+      // 응답 전에 연결이 끊기면 접수됐는지 알 수 없다. 다시 보내면 예측이 하나 더 생길 수 있다
+      if (error.status === 0) {
+        retryGoesToMap = true;
+        throw new Error(
+          "예측이 접수됐는지 확인하지 못했어요. 다시 보내면 예측이 겹칠 수 있어요. '결과 다시 확인'을 누르면 지도에서 최근 결과를 확인해요.",
+        );
       }
       throw error;
     }
@@ -936,10 +959,15 @@ async function pollPrediction() {
       await go("risk");
       return;
     }
-    if (result.status === "failed")
+    if (result.status === "failed") {
+      // 실패한 예측은 다시 조회해도 실패다. 다시 시도하면 새로 접수한다
+      rememberPrediction(null);
+      retryGoesToMap = result.failure?.retryable === false;
       throw new Error(
-        "예측을 완료하지 못했어요. 입력을 확인한 뒤 다시 시도해주세요.",
+        (result.failure?.message || "예측을 완료하지 못했어요.") +
+          (retryGoesToMap ? " 지도에서 최근 결과를 확인해주세요." : ""),
       );
+    }
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
   message("예측을 처리 중이에요. 아래에서 결과를 다시 확인할 수 있어요.");
@@ -1510,7 +1538,11 @@ async function click(button) {
     return;
   }
   if (button.hasAttribute("data-live-retry")) {
-    if (predictionId) await pollPrediction();
+    if (retryGoesToMap) {
+      retryGoesToMap = false;
+      await go("risk");
+    } else if (predictionId) await pollPrediction();
+    else if (auth.signedIn) await retryPrediction();
     else await saveIntake();
     return;
   }

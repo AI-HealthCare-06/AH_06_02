@@ -104,6 +104,7 @@ async function mock(page, state = {}) {
       data = {
         prediction_available: true,
         prediction_id: 5,
+        latest_health_record: { health_record_id: 9 },
         risks: [
           {
             disease: "diabetes",
@@ -367,9 +368,21 @@ async function mock(page, state = {}) {
         });
       }
       data = { health_record_id: 9 };
-    } else if (p === "/predictions" && req.method() === "POST")
+    } else if (p === "/predictions" && req.method() === "POST") {
+      // 응답 전에 연결이 끊기면 앱은 접수 여부를 알 수 없다
+      if (state.dropPrediction) return route.abort("failed");
       data = { prediction_id: 5 };
-    else if (p === "/predictions/5")
+    } else if (p === "/predictions/5" && state.failPrediction) {
+      state.failPrediction = false;
+      data = {
+        status: "failed",
+        failure: {
+          code: "INTERNAL_ERROR",
+          message: "예측에 실패했습니다. 다시 시도해주세요.",
+          retryable: true,
+        },
+      };
+    } else if (p === "/predictions/5")
       data = { status: state.predicting ? "pending" : "done" };
     else if (p === "/health-records" && state.manyRecords) {
       // 최신순 101건 중 가장 오래된 1건만 체중이 99.9kg 이다
@@ -1253,5 +1266,66 @@ test("재측정하면 위험도 칸에 직전 대비 변화량을 보여준다",
       await page.locator("#htn-risk .live-risk-delta").count(),
       0,
       "비교할 직전 예측이 없으면 표시하지 않는다",
+    );
+  }));
+
+const predictionPosts = (calls) =>
+  calls.filter((c) => c.path === "/predictions" && c.method === "POST");
+
+test("예측이 실패하면 다시 시도할 때 같은 건강기록으로 새로 접수한다", async () =>
+  withPage(async (page, base) => {
+    const calls = await mock(page, { signedOut: true, failPrediction: true });
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.getByText("예측에 실패했습니다", { exact: false }).waitFor();
+    await page.locator(".waiting [data-live-retry]").click();
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    assert.deepEqual(
+      predictionPosts(calls).map((c) => c.body),
+      [{ health_record_id: 9 }, { health_record_id: 9 }],
+    );
+  }));
+
+test("새로고침 뒤 예측이 실패해도 가장 최근 건강기록으로 다시 접수한다", async () =>
+  withPage(async (page, base) => {
+    const state = { signedOut: true, predicting: true };
+    const calls = await mock(page, state);
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator('.scene[data-page="waiting"]:not([hidden])').waitFor();
+    Object.assign(state, {
+      signedOut: false,
+      predicting: false,
+      failPrediction: true,
+    });
+    await page.reload();
+    await page.getByText("예측에 실패했습니다", { exact: false }).waitFor();
+    await page.locator(".waiting [data-live-retry]").click();
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    assert.equal(predictionPosts(calls).length, 2);
+    assert.deepEqual(predictionPosts(calls).at(-1).body, {
+      health_record_id: 9,
+    });
+  }));
+
+test("예측 접수 중 연결이 끊기면 다시 보내지 않고 지도에서 확인하게 한다", async () =>
+  withPage(async (page, base) => {
+    const state = { signedOut: true, dropPrediction: true };
+    const calls = await mock(page, state);
+    await page.goto(new URL(path + "#login", base).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page
+      .getByText("접수됐는지 확인하지 못했어요", { exact: false })
+      .waitFor();
+    state.dropPrediction = false;
+    await page.locator(".waiting [data-live-retry]").click();
+    await page.locator("#dm-risk strong").filter({ hasText: "7.5" }).waitFor();
+    assert.equal(
+      predictionPosts(calls).length,
+      1,
+      "예측을 두 번 접수하지 않는다",
     );
   }));
