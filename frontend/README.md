@@ -104,7 +104,7 @@ export function mount({ root, ui, api, auth, router, route, signal }) {
 
 ## 인증·오류·날짜 규칙
 
-공통 액세스 토큰은 메모리에만 둔다. localStorage·sessionStorage에 새로 저장하지 않는다.
+공통 액세스 토큰은 메모리에만 둔다. 토큰과 개인정보는 localStorage·sessionStorage에 저장하지 않는다. 새로고침 복원에 필요한 식별자(예: 예측 번호)만 sessionStorage에 둘 수 있다.
 새로고침은 AUTH-04의 서버 HttpOnly 쿠키로 복원한 뒤 USER-01로 본인을 확인한다.
 로그아웃 뒤 늦게 도착한 갱신 응답이 이전 토큰을 다시 넣지 못하도록 세션 버전을 확인한다.
 조회는 401일 때 한 번 갱신 후 다시 읽는다. 시작·저장·중단 등의 쓰기는 자동 재전송하지 않는다.
