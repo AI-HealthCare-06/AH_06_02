@@ -23,14 +23,3 @@ repos:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
-
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.2
-    hooks:
-      - id: uv-export
-        args:
-          - --frozen
-          - --no-dev
-          - --no-hashes
-          - --output-file=requirements.txt
-          - --quiet
