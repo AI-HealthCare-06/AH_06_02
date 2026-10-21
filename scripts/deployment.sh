@@ -37,13 +37,15 @@ build_and_push () {
 # ---------- Docker login Prompt ----------
 echo "${COLOR_BLUE}도커 유저네임과 비밀번호(PAT)을 입력해주세요.${COLOR_NC}"
 read -p "username: " docker_user
-read -p "password: " docker_pw
+# 토큰은 화면에 보이지 않게 받는다
+read -s -p "password: " docker_pw
 echo ""
 
 
 # ---------- Docker Login ----------
 echo "${COLOR_BLUE}Docker login${COLOR_NC}"
-if ! docker login -u ${docker_user} -p ${docker_pw} ; then
+# 토큰을 명령줄 인자로 넘기면 프로세스 목록에 보이므로 표준 입력으로 넘긴다
+if ! printf '%s' "${docker_pw}" | docker login -u "${docker_user}" --password-stdin ; then
   echo "${COLOR_RED}도커 로그인에 실패했습니다. 도커 유저네임과 비밀번호를 확인해주세요.${COLOR_NC}"
 fi
 echo "${COLOR_GREEN}도커 로그인 성공!${COLOR_NC}"
@@ -128,16 +130,13 @@ fi
 # ---------- EC2 배포 자동화  ----------
 echo "${COLOR_BLUE}EC2 인스턴스에 SSH 접속을 시도합니다.${COLOR_NC}"
 chmod 400 ~/.ssh/${ssh_key_file}
+# 서버는 Docker Hub에 로그인하지 않는다. 이미지 저장소가 공개라 로그인 없이 받을 수 있고,
+# 로그인하면 토큰이 서버의 ~/.docker/config.json 에 남는다. 저장소를 비공개로 바꾸면 이 전제가 깨진다
 ssh -i ~/.ssh/${ssh_key_file} ubuntu@${ec2_ip} \
-  "DOCKER_USERNAME=${docker_user} \
-   DOCKER_PAT=${docker_pw} \
-   DEPLOY_SERVICES='${DEPLOY_SERVICES[*]}' \
+  "DEPLOY_SERVICES='${DEPLOY_SERVICES[*]}' \
    bash -s" << 'EOF'
   set -e
   cd project
-
-  echo "Docker login"
-  docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PAT"
 
   # valkey가 처음이면 따로 기동
   docker compose up -d valkey
