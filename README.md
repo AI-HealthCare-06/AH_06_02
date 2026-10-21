@@ -29,14 +29,14 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 | 코티니 | 흡연 |
 | 비세라 | 내장지방 · 비만 · 활동 부족 |
 
-**3. 캐릭터마다 챌린지를 받습니다.**
-코티니가 날뛰고 있으면 금연 관련 챌린지가 뜹니다. 하루하루 수행하면 공략 점수가 쌓입니다.
+**3. 가장 위협적인 캐릭터부터 챌린지로 공략합니다.**
+위협도가 가장 높은 캐릭터 하나를 28일 동안 공략합니다. 코티니가 날뛰고 있으면 금연 관련 챌린지가 뜹니다. 하루하루 수행하면 공략 점수가 쌓이고, 수행을 인정받을 때마다 보상 카드 5장 중 1장을 골라 모험가와 방을 꾸밉니다.
 
 **4. 다시 측정하면 위협도가 움직입니다.**
 4주 뒤 건강정보를 다시 넣고 예측을 다시 돌립니다. 그때 캐릭터가 약해집니다.
 
 **5. 조건을 채우면 봉인됩니다.**
-최근 28일 중 그 요인 챌린지를 20일 이상 해내고 위협도가 40 아래로 내려가면 봉인. 만성질환에 완치 엔딩은 없으니 처치가 아니라 봉인입니다. 관리를 멈추면 다시 깨어납니다.
+최근 28일 중 그 요인 챌린지를 20일 이상 해내고 위협도가 40 아래로 내려가면 봉인. 만성질환에 완치 엔딩은 없으니 처치가 아니라 봉인입니다. 관리를 멈추면 다시 깨어납니다. 지금(1단계)은 봉인 판정을 하지 않고, 28일이 지나면 "기간 종료"로 보여줍니다.
 
 ---
 
@@ -64,8 +64,8 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 | --- | --- | --- |
 | A | 배수빈 | 회원·인증 · 공통 기반 · ERD · 요구사항 · 문서 총괄 · 배포 |
 | B | 홍서윤 | 예측 모델 · SHAP · 전처리 (2026-10-07 퇴소) |
-| C | 최병주 | 건강정보 · 대시보드 · 예측 API · 인프라 |
-| D | 김이경 | 챌린지 · 보상 · 도감 · 위협도 · 와이어프레임 |
+| C | 최병주 | 건강정보 · 대시보드 · 예측 API · 예측 워커 · 인프라 |
+| D | 김이경 | 챌린지 · 보상 · 도감 · 위협도 · 와이어프레임 (2026-10-16 퇴소, D 후속은 배수빈) |
 
 ---
 
@@ -77,7 +77,7 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 | 추론 | 별도 컨테이너 (`ai_worker`)로 분리 |
 | DB | MySQL + Tortoise ORM |
 | 캐시·큐 | Valkey |
-| 프런트엔드 | React + TypeScript + Vite |
+| 프런트엔드 | HTML + JavaScript 모듈 (빌드 없음, FastAPI가 `/frontend/`로 제공) |
 | 패키지 | uv |
 | 배포 | Docker Compose + EC2 + Nginx + Certbot |
 
@@ -87,10 +87,10 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 
 | 찾는 것 | 보는 곳 |
 | --- | --- |
-| 무엇을 만들기로 했는가 | `docs/01_planning/requirements.md` (73항목) |
-| 어떤 테이블에 뭐가 들어가는가 | `docs/01_planning/table-spec.md` (14테이블 223컬럼) |
+| 무엇을 만들기로 했는가 | `docs/01_planning/requirements.md` (77항목) |
+| 어떤 테이블에 뭐가 들어가는가 | `docs/01_planning/table-spec.md` (17테이블 252컬럼) |
 | 테이블이 어떻게 엮이는가 | `docs/01_planning/erd.md` · `erd.sql` |
-| 어떤 API를 어떻게 부르는가 | `docs/01_planning/api-spec.md` (32개) |
+| 어떤 API를 어떻게 부르는가 | `docs/01_planning/api-spec.md` (43개) |
 | 예측 API 상세 계약 | `docs/01_planning/api-predictions.md` |
 | 모델 입력·SHAP·서비스 계약 | `docs/03_ai_data/model.md` |
 | 색·간격·버튼을 어떻게 쓰는가 | `docs/02_team/design.md` |
@@ -190,7 +190,17 @@ uv run --group app --group model --with 'shap==0.50.0' python -m ai_worker.main 
 
 ## 배포
 
-`scripts/deployment.sh`가 이미지 빌드부터 EC2 컨테이너 실행까지 처리하고, HTTPS는 `scripts/certbot.sh`로 Let's Encrypt 인증서를 받아 적용합니다. 둘 다 `chmod +x` 한 번 해두고 실행하면 됩니다. 자세한 절차와 검증 항목은 배포·검증 계획서를 보세요.
+`scripts/deployment.sh`가 이미지 빌드·푸시와 EC2의 앱·워커 컨테이너 실행을 처리하고, HTTPS는 `scripts/certbot.sh`로 Let's Encrypt 인증서를 받아 적용합니다. 둘 다 `chmod +x` 한 번 해두고 실행하면 됩니다. 자세한 절차와 검증 항목은 배포·검증 계획서를 보세요.
+
+`deployment.sh`는 아이디와 토큰을 물어보는 대화형 스크립트라 터미널에서 직접 실행합니다. 마이그레이션과 시드는 하지 않으니 끝난 뒤 서버의 `~/project`에서 따로 돌립니다.
+
+```bash
+docker compose up -d mysql nginx    # 첫 배포 때만. 스크립트는 고른 서비스만 올립니다
+docker compose exec fastapi uv run --no-sync aerich upgrade
+docker compose exec fastapi uv run --no-sync python -m scripts.seed.seed_monsters   # seed_challenges · seed_rewards도 같은 방식
+```
+
+스크립트가 로컬의 `infra/nginx/prod_http.conf`에서 `server_name`을 서버 IP로 바꿔 두므로, 배포 뒤에는 `git checkout infra/nginx/prod_http.conf`로 되돌립니다.
 
 ---
 
