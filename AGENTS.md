@@ -4,7 +4,7 @@ Rules to read before writing code in the 당고킬러 (DangoKiller) repository.
 They apply to humans and agents alike.
 
 The project overview is in [README](README.md). Typing, style and architecture
-rules are in [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md). On any conflict the
+rules are in [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md). On any conflict the
 precedence is: `pyproject.toml` settings > SYSTEM_DESIGN.md > this document.
 
 This file is written in English because agents follow English instructions more
@@ -321,10 +321,12 @@ The gap is structural: diagnosed users never run a prediction.
 │   ├── services/       # business rules
 │   └── main.py
 ├── data/               # model artifacts and raw data (never committed)
-├── docs/               # design documents
+├── docs/               # design documents, including SYSTEM_DESIGN.md
 ├── envs/               # environment variables
+├── frontend/           # v5 service screen (HTML + JS modules)
 ├── infra/              # Docker and Nginx configuration
 ├── scripts/            # deploy, CI, seed and sync scripts
+├── tests/              # model contract and script tests
 ├── docker-compose.yml
 └── pyproject.toml
 ```
