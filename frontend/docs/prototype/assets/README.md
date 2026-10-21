@@ -6,8 +6,11 @@
 - `room-decor-v1/`: 방 배경·기본 및 보상 가구·소품. `catalog.json`은 이 폴더의 파일을 가리킨다.
 - `v5-reference-*`: 제공 HTML에 내장돼 있던 이미지·영상 중 기존 v4 자산과 일치하지 않는 파일.
 - `growth-shard.webp`: 성장의 조각. 사용자가 이미지 도구로 만든 조각 시안(A안 "별빛 결정 조각")에서 원형 아이콘만 잘라 바깥을 투명하게 한 140px WebP.
+- `growth-crystal-stage-1.webp`: 작은 별의 결정. 기존 `growth-shard.webp`의 질감을 참고해 내장 이미지 생성 도구로 제작하고, 재료와 구분되는 수직 결정·금색 별 받침으로 수정한 투명 배경 512px WebP.
+- `growth-crystal-stage-2.webp`: 은하의 결정. 기존 조각과 1단계의 질감을 참고해 내장 이미지 생성 도구로 제작한 결정 군집, 투명 배경 512px WebP.
+- `growth-crystal-stage-3.webp`: 별빛 왕관. 기존 조각과 2단계의 질감을 참고해 내장 이미지 생성 도구로 제작한 결정 군집·금색 왕관 장식, 투명 배경 512px WebP.
 - 나머지 WebP: 모험가 기본·전투 모습, 장비, 단계별 캐릭터와 마을 지도.
 
-원래 PNG 이미지는 보이는 픽셀과 투명도를 유지하는 무손실 WebP로 변환했다. v4와 같이 쓰는 폰트(`v4-1.ttf` 제목용 Black Han Sans·`v4-2.woff2` Pretendard)와 그림(`v4-3.png` 캐릭터·`v4-4.png` 배경), 폰트 라이선스(`BlackHanSans-OFL.txt`·`Pretendard-LICENSE.txt`)도 이 폴더에 둔다. ZIP·`.DS_Store`·변환 전 파일 크기 기준의 품질 보고서는 포함하지 않는다.
+단계별 성장 결정은 품질 92의 WebP로 최적화했다. 그 외 원래 PNG 이미지는 보이는 픽셀과 투명도를 유지하는 무손실 WebP로 변환했다. v4와 같이 쓰는 폰트(`v4-1.ttf` 제목용 Black Han Sans·`v4-2.woff2` Pretendard)와 그림(`v4-3.png` 캐릭터·`v4-4.png` 배경), 폰트 라이선스(`BlackHanSans-OFL.txt`·`Pretendard-LICENSE.txt`)도 이 폴더에 둔다. ZIP·`.DS_Store`·변환 전 파일 크기 기준의 품질 보고서는 포함하지 않는다.
 
 원래 생성 프롬프트는 원문을 유지한다. 이 폴더의 시각 표현은 2026-10-20 팀 합의로 서비스 화면에 쓴다. 획득량과 희귀도는 서버(`app/services/adventure_rewards.py`)가 정한다. 카드는 5장 중 1장, 카드마다 RARE 15%다. 중복 COMMON은 조각 2개, RARE는 3개, 조각 카드(RARE)는 2개를 주고, 아이템 단계는 2단계에 조각 20개, 3단계에 40개가 든다. 보상은 건강 위험도나 임상적 판단의 근거로 사용하지 않는다.
