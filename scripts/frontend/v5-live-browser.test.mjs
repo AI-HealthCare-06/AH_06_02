@@ -1664,11 +1664,11 @@ test("서버의 성장 단계에 맞는 결정 이름과 외형을 표시하고 
     const state = { materials: 0, stage: 1 };
     await mock(page, state);
     const stages = [
-      [1, "새싹의 결정", "#a2d2c1", 1],
-      [2, "숲의 결정", "#5bb6ad", 1.08],
-      [3, "별빛의 결정", "#e5c362", 1.18],
+      [1, "새싹의 결정", "growth-crystal-stage-1.webp", 1],
+      [2, "숲의 결정", "growth-crystal-stage-2.webp", 1.08],
+      [3, "별빛의 결정", "growth-crystal-stage-3.webp", 1.18],
     ];
-    for (const [stage, name, color, scale] of stages) {
+    for (const [stage, name, filename, scale] of stages) {
       state.stage = stage;
       if (stage === 1) await page.goto(new URL(path + "#rewards", base).href);
       else await page.reload();
@@ -1676,7 +1676,12 @@ test("서버의 성장 단계에 맞는 결정 이름과 외형을 표시하고 
       await growth.waitFor();
       assert.equal(await growth.getByRole("img").count(), 1);
       const crystal = growth.getByRole("img", { name: `${name} ${stage}단계`, exact: true });
-      assert.equal(await crystal.locator("svg path").first().getAttribute("fill"), color);
+      const artwork = crystal.locator("img");
+      assert.equal(await artwork.count(), 1);
+      assert.ok((await artwork.getAttribute("src")).endsWith(filename));
+      assert.equal(await artwork.getAttribute("alt"), "");
+      await artwork.evaluate((img) => img.decode());
+      assert.ok(await artwork.evaluate((img) => img.naturalWidth >= 320));
       assert.equal(await growth.getByRole("heading", { name, exact: true }).count(), 1);
       assert.equal(await growth.getAttribute("data-stage"), String(stage));
       const transform = await crystal.evaluate((el) => {
