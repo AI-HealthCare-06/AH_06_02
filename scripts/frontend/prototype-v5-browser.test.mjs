@@ -115,3 +115,20 @@ test("모든 화면은 320px에서 가로로 넘치지 않고 축소 모션에�
     }
   });
 });
+
+test("시안 파일 하나를 직접 열어도 체험 보상 화면과 단계별 그림이 동작한다", async () => {
+  await withPage(async (page) => {
+    const errors = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
+    const file = new URL("../../frontend/docs/prototype/당고킬러-모험시안_v5.html?demo=1#rewards", import.meta.url);
+    await page.goto(file.href);
+    await page.locator('.scene[data-page="rewards"]').waitFor({ state: "visible", timeout: 5000 });
+    await page.locator('[data-reward-view="inventory"]').click();
+    const artwork = page.locator(".growth-display .growth-gem img");
+    assert.match(await artwork.getAttribute("src"), /^data:image\/webp;base64,/);
+    await artwork.evaluate((img) => img.decode());
+    assert.ok(await artwork.evaluate((img) => img.naturalWidth >= 320));
+    assert.deepEqual(errors, []);
+  });
+});

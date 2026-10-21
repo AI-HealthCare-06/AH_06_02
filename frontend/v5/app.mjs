@@ -1,6 +1,7 @@
 /** v5 실제 연결. 시안 체험은 ?demo=1로 분리하고 서버 응답만 진행 상태로 표시한다. */
 import { AuthSession } from "../shared/auth.mjs";
 import { createEvidenceUploader } from "../shared/evidence.mjs";
+import { growthArt, growthName } from "../shared/growth-crystal.mjs";
 import {
   FACTOR_LABELS,
   FACTOR_MONSTER,
@@ -1204,12 +1205,13 @@ function itemTile(i) {
 // 아이템 단계와 다음 단계까지 모은 조각. 단계마다 필요한 조각이 늘어난다 (2단계 20개, 3단계 40개)
 function growthDisplay() {
   const stage = adventurer.item_stage;
+  const name = growthName(stage);
   const have = adventurer.materials;
   const cost = UPGRADE_COST[stage];
   const progress = cost
     ? `<div class="live-shard-progress" role="progressbar" aria-label="다음 단계까지 모은 조각" aria-valuemin="0" aria-valuemax="${cost}" aria-valuenow="${Math.min(have, cost)}"><i style="width:${Math.min(100, (have / cost) * 100)}%"></i></div><p>${have} / ${cost} · ${have >= cost ? "지금 단계를 올릴 수 있어요" : `다음 단계까지 조각 ${cost - have}개`}</p>`
     : "<p>최대 단계에 도착했어요.</p>";
-  return `<section class="growth-display"><img class="growth-shard" src="${asset("growth-shard.webp")}" alt=""><h2>아이템 ${stage}단계</h2>${progress}<button type="button" class="reward-apply" data-live-upgrade ${!cost || have < cost ? "disabled" : ""}>${cost ? `조각 ${cost}개로 ${stage + 1}단계 올리기` : "최대 단계"}</button></section>`;
+  return `<section class="growth-display" data-stage="${stage}"><div class="growth-gem" role="img" aria-label="${name} ${stage}단계">${growthArt(stage)}</div><h2>${name}</h2><p>아이템 ${stage}단계</p>${progress}<button type="button" class="reward-apply" data-live-upgrade ${!cost || have < cost ? "disabled" : ""}>${cost ? `조각 ${cost}개로 ${stage + 1}단계 올리기` : "최대 단계"}</button></section>`;
 }
 function roomArt() {
   const room = adventurer.room || {};

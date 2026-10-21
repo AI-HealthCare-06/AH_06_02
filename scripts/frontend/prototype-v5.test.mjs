@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
+import { growthArt, growthName } from "../../frontend/shared/growth-crystal.mjs";
 
 const html = readFileSync(
   new URL("../../frontend/docs/prototype/당고킬러-모험시안_v5.html", import.meta.url),
@@ -35,7 +36,7 @@ test("보상함은 성장 아이템을 표시하고 정의되지 않은 문구�
     `const rewardPool=[],rewardState={inventory:new Set(),stage:1,materials:0};
      const document={querySelectorAll:()=>[],getElementById:()=>({value:'',innerHTML:''})};
      const growthTab='character';function renderCharacterGrowth(){return '';}
-     function growthArt(){return '';}`,
+     function growthArt(){return '';} function growthName(){return '작은 별의 결정';}`,
     "renderInventory()",
   );
   assert.match(output, /성장 아이템/);
@@ -145,4 +146,15 @@ test("공통 종료일 뒤에는 빈 슬롯이 있어도 새 챌린지를 시작
     "remainingChallengeSlots()",
   );
   assert.equal(output, 0);
+});
+
+test("시안에 내장한 단계별 결정 이름과 이미지가 실제 화면의 공통 자산과 일치한다", () => {
+  for (const stage of [1, 2, 3]) {
+    assert.equal(evaluate(["growthName"], "", `growthName(${stage})`), growthName(stage));
+    const embedded = evaluate(["growthArt"], "", `growthArt(${stage})`);
+    const source = embedded.match(/src="data:image\/webp;base64,([^" ]+)"/)[1];
+    const shared = growthArt(stage).match(/src="([^"]+)"/)[1];
+    assert.deepEqual(Buffer.from(source, "base64"), readFileSync(new URL(shared)));
+    assert.equal(embedded.replace(/src="[^"]+"/, 'src=""'), growthArt(stage).replace(/src="[^"]+"/, 'src=""'));
+  }
 });
