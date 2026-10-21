@@ -661,13 +661,6 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
   color: #8b651a;
   font-weight: 600;
 }
-.growth-display .growth-shard {
-  display: block;
-  width: 88px;
-  height: 88px;
-  margin: 0 auto 6px;
-  filter: drop-shadow(0 6px 14px rgb(112 94 224 / 0.35));
-}
 .live-shard-progress {
   height: 10px;
   margin: 10px 0 4px;
