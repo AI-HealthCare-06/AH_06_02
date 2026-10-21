@@ -4,7 +4,7 @@ Rules to read before writing code in the 당고킬러 (DangoKiller) repository.
 They apply to humans and agents alike.
 
 The project overview is in [README](README.md). Typing, style and architecture
-rules are in [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md). On any conflict the
+rules are in [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md). On any conflict the
 precedence is: `pyproject.toml` settings > SYSTEM_DESIGN.md > this document.
 
 This file is written in English because agents follow English instructions more
@@ -321,10 +321,12 @@ The gap is structural: diagnosed users never run a prediction.
 │   ├── services/       # business rules
 │   └── main.py
 ├── data/               # model artifacts and raw data (never committed)
-├── docs/               # design documents
+├── docs/               # design documents, including SYSTEM_DESIGN.md
 ├── envs/               # environment variables
+├── frontend/           # v5 service screen (HTML + JS modules)
 ├── infra/              # Docker and Nginx configuration
 ├── scripts/            # deploy, CI, seed and sync scripts
+├── tests/              # model contract and script tests
 ├── docker-compose.yml
 └── pyproject.toml
 ```
@@ -339,6 +341,10 @@ The gap is structural: diagnosed users never run a prediction.
   `TORTOISE_APP_MODELS` in `app/core/db/databases.py`.
 - New inference logic: write it in `ai_worker/tasks/` and call it from
   `ai_worker/main.py`.
+- Nothing new goes at the repository root. Documents go in `docs/`, scripts in
+  `scripts/`, infrastructure config in `infra/`. Only files a tool looks for at
+  the root stay there. `scripts/ci/check_root_files.py` enforces this in
+  pre-commit and GitHub Actions; extend its allowlist only for such a tool file.
 
 Inference and SHAP computation happen in `ai_worker` only. Running them inside
 `app` breaks the 3-second P95 response budget. `app` enqueues the job and

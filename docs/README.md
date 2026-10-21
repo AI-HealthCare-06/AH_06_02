@@ -10,6 +10,7 @@
 | 화면 기준 | HTML v5 · 보완 설계 | `../frontend/docs/prototype/당고킬러-모험시안_v5.html` · `02_team/design.md` |
 | v5 연결 범위·보상 규칙 | 이 저장소 | `02_team/prototype-v5-proposal.md` |
 | 구현 규칙 | 이 저장소 | `../AGENTS.md` |
+| 타입·스타일·구조 규칙 | 이 저장소 | `SYSTEM_DESIGN.md` |
 
 **구글 시트가 원본입니다.** 이 폴더의 마크다운은 사본이고, 코드를 쓸 때 읽기 위한 것입니다.
 

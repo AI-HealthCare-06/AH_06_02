@@ -16,6 +16,8 @@ repos:
       - id: check-merge-conflict
       - id: end-of-file-fixer
       - id: trailing-whitespace
+        # 마크다운 줄 끝 공백 두 칸은 줄바꿈이라 남긴다
+        args: [--markdown-linebreak-ext=md]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.15.0
@@ -24,13 +26,12 @@ repos:
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
 
-  - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.10.2
+  - repo: local
     hooks:
-      - id: uv-export
-        args:
-          - --frozen
-          - --no-dev
-          - --no-hashes
-          - --output-file=requirements.txt
-          - --quiet
+      # 루트에 허용 목록 밖의 파일·폴더가 생기면 커밋을 막는다 (scripts/ci/check_root_files.py)
+      - id: check-root-files
+        name: 루트 파일 허용 목록 검사
+        entry: python scripts/ci/check_root_files.py
+        language: python
+        pass_filenames: false
+        always_run: true
