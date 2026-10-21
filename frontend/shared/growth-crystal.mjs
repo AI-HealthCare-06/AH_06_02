@@ -1,6 +1,6 @@
 /** 체험 시안과 실제 화면이 함께 쓰는 단계별 성장 결정. */
 export function growthName(stage) {
-  return ["새싹의 결정", "숲의 결정", "별빛의 결정"][stage - 1];
+  return ["작은 별의 결정", "은하의 결정", "별빛 왕관"][stage - 1];
 }
 
 export function growthArt(stage) {

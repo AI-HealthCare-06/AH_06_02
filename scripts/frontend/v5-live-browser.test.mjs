@@ -1664,9 +1664,9 @@ test("서버의 성장 단계에 맞는 결정 이름과 외형을 표시하고 
     const state = { materials: 0, stage: 1 };
     await mock(page, state);
     const stages = [
-      [1, "새싹의 결정", "growth-crystal-stage-1.webp", 1],
-      [2, "숲의 결정", "growth-crystal-stage-2.webp", 1.08],
-      [3, "별빛의 결정", "growth-crystal-stage-3.webp", 1.18],
+      [1, "작은 별의 결정", "growth-crystal-stage-1.webp", 1],
+      [2, "은하의 결정", "growth-crystal-stage-2.webp", 1.08],
+      [3, "별빛 왕관", "growth-crystal-stage-3.webp", 1.18],
     ];
     for (const [stage, name, filename, scale] of stages) {
       state.stage = stage;
