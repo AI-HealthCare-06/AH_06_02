@@ -341,6 +341,10 @@ The gap is structural: diagnosed users never run a prediction.
   `TORTOISE_APP_MODELS` in `app/core/db/databases.py`.
 - New inference logic: write it in `ai_worker/tasks/` and call it from
   `ai_worker/main.py`.
+- Nothing new goes at the repository root. Documents go in `docs/`, scripts in
+  `scripts/`, infrastructure config in `infra/`. Only files a tool looks for at
+  the root stay there. `scripts/ci/check_root_files.py` enforces this in
+  pre-commit and GitHub Actions; extend its allowlist only for such a tool file.
 
 Inference and SHAP computation happen in `ai_worker` only. Running them inside
 `app` breaks the 3-second P95 response budget. `app` enqueues the job and
