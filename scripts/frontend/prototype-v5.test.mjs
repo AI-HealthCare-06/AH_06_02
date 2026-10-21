@@ -35,7 +35,7 @@ test("보상함은 성장 아이템을 표시하고 정의되지 않은 문구�
     `const rewardPool=[],rewardState={inventory:new Set(),stage:1,materials:0};
      const document={querySelectorAll:()=>[],getElementById:()=>({value:'',innerHTML:''})};
      const growthTab='character';function renderCharacterGrowth(){return '';}
-     function growthArt(){return '';}`,
+     function growthArt(){return '';} function growthName(){return '새싹의 결정';}`,
     "renderInventory()",
   );
   assert.match(output, /성장 아이템/);
