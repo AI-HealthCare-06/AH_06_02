@@ -47,6 +47,8 @@ echo "${COLOR_BLUE}Docker login${COLOR_NC}"
 # 토큰을 명령줄 인자로 넘기면 프로세스 목록에 보이므로 표준 입력으로 넘긴다
 if ! printf '%s' "${docker_pw}" | docker login -u "${docker_user}" --password-stdin ; then
   echo "${COLOR_RED}도커 로그인에 실패했습니다. 도커 유저네임과 비밀번호를 확인해주세요.${COLOR_NC}"
+  # 실패한 채로 이미지를 10분 넘게 빌드하지 않도록 여기서 멈춘다
+  exit 1
 fi
 echo "${COLOR_GREEN}도커 로그인 성공!${COLOR_NC}"
 echo ""
