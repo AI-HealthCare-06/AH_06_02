@@ -37,7 +37,7 @@ KST = ZoneInfo("Asia/Seoul")
 NOW = datetime(2026, 10, 6, 21, 0, tzinfo=KST)
 TODAY = NOW.date()
 
-CSV_ROWS = 19
+CSV_ROWS = 33
 
 #: 1단계 운영 후보 7개. 예정 이용일 입력이 생겨 한 정거장 걷기도 포함한다.
 PHASE1_CODES = {
@@ -47,10 +47,24 @@ PHASE1_CODES = {
     "CH_STAIRS",
     "CH_STRENGTH_10",
     "CH_WALK_ONE_STOP",
+    "CH_WALK_EVENING_20",
+    "CH_HOUSEWORK_15",
+    "CH_SQUAT_15",
+    "CH_WALL_PUSHUP_10",
+    "CH_STAND_CALL",
+    "CH_SCREEN_BREAK",
+    "CH_WATER_NOT_SWEET",
+    "CH_NO_LATE_SNACK",
     # 알데
     "CH_NO_DRINK_TODAY",
+    "CH_NO_ALCOHOL_AT_HOME",
+    "CH_ALCOHOL_FREE_DRINK",
+    "CH_POSTPONE_DRINKS",
     # 코티니
     "CH_NO_SMOKE_TODAY",
+    "CH_DELAY_FIRST_CIG",
+    "CH_SMOKE_FREE_HOME",
+    "CH_QUIT_REASON",
 }
 #: 카드 자체는 1단계 대상이지만 sodium_behavior 추천 적용 보류로 빠지는 소디 카드
 HELD_SODIUM_CODES = {"CH_LEAVE_SOUP", "CH_NO_EATING_OUT", "CH_HOME_MEAL"}
@@ -59,6 +73,11 @@ HELD_SODIUM_CODES = {"CH_LEAVE_SOUP", "CH_NO_EATING_OUT", "CH_HOME_MEAL"}
 async def _seed() -> dict[str, Challenge]:
     await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
     return {item.code: item for item in await Challenge.all()}
+
+
+async def _only_smoking_card(code: str = "CH_NO_SMOKE_TODAY") -> None:
+    """흡연 요인 챌린지를 하나만 남긴다. 카드가 하나일 때의 합치기·거절·해당없음 흐름을 보는 테스트용."""
+    await Challenge.filter(factor_key="smoking_current").exclude(code=code).update(is_enabled=False)
 
 
 async def _user(email: str, *, dm: bool = False, htn: bool = False) -> User:
@@ -153,6 +172,7 @@ class TestGenerateRecommendations(TestCase):
 
     async def test_diagnosed_path_uses_global_score_times_weight(self) -> None:
         await _seed()
+        await _only_smoking_card()
         user = await _user("r-diag@example.com", dm=True, htn=True)
         await make_target(user.id, ["smoking_current"])
         await HealthRecord.create(user_id=user.id, recorded_at=NOW, smoking_current=True)
@@ -226,6 +246,7 @@ class TestGenerateRecommendations(TestCase):
 
     async def test_both_paths_merge_into_one_card(self) -> None:
         await _seed()
+        await _only_smoking_card()
         user = await _user("r-merge@example.com", htn=True)
         await make_target(user.id, ["smoking_current"])
         await self._prediction(user, {"diabetes": 0.0064}, TEST_MODEL_VERSION)
@@ -541,6 +562,7 @@ class TestRejectAndCooldown(TestCase):
 
     async def test_cooled_down_challenge_is_not_recommended(self) -> None:
         challenges = await _seed()
+        await _only_smoking_card()
         user = await _user("cool-gen@example.com", dm=True, htn=True)
         await make_target(user.id, ["smoking_current"])
         await HealthRecord.create(user_id=user.id, recorded_at=NOW, smoking_current=True)
@@ -610,6 +632,7 @@ def test_policy_version_is_the_agreed_constant() -> None:
 class TestNotApplicable(TestCase):
     async def test_not_applicable_excludes_until_manual_and_comes_back(self) -> None:
         await _seed()
+        await _only_smoking_card()
         user = await _user("na-flow@example.com", dm=True, htn=True)
         await make_target(user.id, ["smoking_current"])
         await HealthRecord.create(user_id=user.id, recorded_at=NOW, smoking_current=True)

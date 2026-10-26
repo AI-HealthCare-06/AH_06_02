@@ -100,8 +100,8 @@ class TestPredictionFreshness(TestCase):
 
         generated = await RecommendationService(lambda: artifact).generate(user)
 
-        assert len(generated.items) == 1
-        assert generated.items[0].factor_score == Decimal("50")
+        assert generated.items
+        assert {item.factor_score for item in generated.items} == {Decimal("50")}
 
     async def test_late_previous_record_result_does_not_hide_current_result(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -116,8 +116,8 @@ class TestPredictionFreshness(TestCase):
 
         generated = await RecommendationService(lambda: artifact).generate(user)
 
-        assert len(generated.items) == 1
-        assert generated.items[0].factor_score == Decimal("50")
+        assert generated.items
+        assert {item.factor_score for item in generated.items} == {Decimal("50")}
 
     async def test_different_version_does_not_hide_matching_current_result(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -135,8 +135,8 @@ class TestPredictionFreshness(TestCase):
 
         generated = await RecommendationService(lambda: artifact).generate(user)
 
-        assert len(generated.items) == 1
-        assert generated.items[0].factor_score == Decimal("50")
+        assert generated.items
+        assert {item.factor_score for item in generated.items} == {Decimal("50")}
 
     async def test_medication_without_diagnosis_uses_global_recommendation(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

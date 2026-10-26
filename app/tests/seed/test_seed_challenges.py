@@ -14,7 +14,7 @@ from scripts.seed.seed_challenges import (
     upsert_challenges,
 )
 
-CSV_ROWS = 19
+CSV_ROWS = 33
 
 
 def test_bom_does_not_break_code_column() -> None:
@@ -26,7 +26,7 @@ def test_bom_does_not_break_code_column() -> None:
     assert rows[0]["code"] == "CH_WALK_AFTER_MEAL"
 
 
-def test_csv_has_19_rows_with_unique_codes() -> None:
+def test_csv_rows_have_unique_codes() -> None:
     rows = read_csv(DEFAULT_CSV)
 
     assert len(rows) == CSV_ROWS
@@ -36,7 +36,7 @@ def test_csv_has_19_rows_with_unique_codes() -> None:
 def test_operational_values_are_filled_by_the_10_6_agreement() -> None:
     rows = read_csv(DEFAULT_CSV)
 
-    # 10/6 A·D 합의로 19행 모두 채워져 플래그 없이 진행한다
+    # 10/6 A·D 합의 이후 모든 행이 채워져 플래그 없이 진행한다
     assert missing_operational_values(rows) == {}
     assert check_operational_values(rows, allow_missing=False) is True
 
@@ -72,7 +72,7 @@ def test_unknown_column_is_rejected(tmp_path: Path) -> None:
 
 
 class TestUpsertChallenges(TestCase):
-    async def test_all_19_rows_are_inserted(self) -> None:
+    async def test_all_rows_are_inserted(self) -> None:
         result = await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
 
         assert result.created == CSV_ROWS
@@ -82,7 +82,7 @@ class TestUpsertChallenges(TestCase):
         assert walk.context_slots == ["lunch", "dinner"]
         assert walk.daily_target_count == 2
 
-    async def test_running_twice_keeps_19_rows(self) -> None:
+    async def test_running_twice_keeps_the_same_rows(self) -> None:
         parsed = parse_rows(read_csv(DEFAULT_CSV))
         await upsert_challenges(parsed)
         second = await upsert_challenges(parsed)
