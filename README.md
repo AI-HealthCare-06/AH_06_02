@@ -190,16 +190,11 @@ uv run --group app --group model --with 'shap==0.50.0' python -m ai_worker.main 
 
 ## 배포
 
-평소 배포는 버전 태그로 합니다. main에 머지된 커밋에 `vX.Y.Z` 태그를 올리면 GitHub Actions(`.github/workflows/deploy.yml`)가 앱·워커 이미지를 그 버전으로 빌드해 올리고, 서버에서 마이그레이션 → 재시작 → 상태 확인 → 시드까지 진행합니다. 상태 확인에 실패하면 이전 버전으로 되돌립니다.
+평소 배포는 자동입니다. 서버에서 도는 코드(`app/` · `ai_worker/` · `frontend/` · `scripts/` · 의존성 · 마스터 CSV)가 바뀐 PR이 main에 머지되면 GitHub Actions(`.github/workflows/deploy.yml`)가 앱·워커 이미지를 `v1.1.N`(N은 실행 번호)으로 빌드해 올리고, 서버에서 마이그레이션 → 재시작 → 상태 확인 → 시드까지 진행합니다. 상태 확인에 실패하면 이전 버전으로 되돌립니다. 머지부터 반영까지 5~10분 걸립니다.
 
-```bash
-git switch main && git pull
-git tag v1.0.1
-git push origin v1.0.1
-```
-
-- `v*` 태그는 저장소 관리자만 만들 수 있고, main에 없는 커밋의 태그는 배포하지 않습니다.
-- 진행 상황은 저장소 Actions 탭의 deploy에서, 서버 기록은 `~/deploy.log`에서 봅니다.
+- 문서만 바뀐 머지는 배포하지 않습니다.
+- 다시 배포하려면 Actions 탭 → deploy → Run workflow에서 main을 고릅니다.
+- 진행 상황은 Actions 탭의 deploy에서, 서버 기록은 `~/deploy.log`에서 봅니다.
 - 서버 쪽 스크립트는 `infra/deploy/server-deploy.sh`입니다. 서버에는 `/home/ubuntu/deploy.sh`로 직접 설치돼 있어서, 이 파일을 고치면 서버 사본도 같이 바꿔야 합니다.
 - `docker-compose.prod.yml`, nginx 설정, `.prod.env`, 모델 파일은 자동 배포 대상이 아닙니다. 바뀔 때만 아래 수동 절차를 씁니다.
 
