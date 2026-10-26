@@ -134,7 +134,7 @@
   background: #fff;
   border-radius: 18px;
 }
-.live-avatar-layout h1 {
+.live-avatar-layout h2 {
   margin: 18px 0;
 }
 .live-avatar-layout p {
@@ -310,7 +310,6 @@
   font-size: 13px;
 }
 .quest-history h3 {
-  font-size: 14px;
   margin-top: 15px;
 }
 .history-week-card > .evolution-art {
@@ -371,9 +370,6 @@ button:focus-visible {
   .live-monster .evolution-art {
     width: 96px;
     height: 108px;
-  }
-  .live-monster h2 {
-    font-size: 16px;
   }
   .live-monster p {
     font-size: 12px;
@@ -503,7 +499,6 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
 }
 .live-top-factors h3 {
   margin: 14px 0 8px;
-  font-size: 15px;
 }
 .live-top-factors .factor-list {
   display: grid;
@@ -573,7 +568,6 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
 }
 .live-excluded h2 {
   margin: 0 0 8px;
-  font-size: 15px;
 }
 .live-excluded-item {
   display: flex;
@@ -598,7 +592,6 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
 }
 #live-choice h2 {
   margin: 0 0 6px;
-  font-size: 18px;
 }
 .live-choice-options {
   display: grid;

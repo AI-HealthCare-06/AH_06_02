@@ -1698,3 +1698,53 @@ test("서버의 성장 단계에 맞는 결정 이름과 외형을 표시하고 
       }
     }
   }));
+
+// docs/02_team/design.md 2절. 화면 제목 28px · 섹션 제목 18px · 소제목 15px, 굵기 700, 글꼴 Adventure.
+// 예외는 같은 절에 이유와 함께 적은 곳만 둔다.
+const HEADING_SIZE = { H1: "28px", H2: "18px", H3: "15px" };
+const HEADING_EXCEPTIONS = [".hero-copy", ".signup-copy", ".waiting-copy", ".growth-level", ".reward-tile", ".draw-result", ".room-prop", "#app-menu"];
+
+async function headingReport(page) {
+  return page.evaluate(
+    ([sizes, exceptions]) => {
+      const scene = document.querySelector(".scene:not([hidden])");
+      const headings = [...scene.querySelectorAll("h1,h2,h3")].filter((h) => h.getClientRects().length > 0);
+      const bad = headings
+        .filter((h) => !exceptions.some((selector) => h.closest(selector)))
+        .map((h) => {
+          const style = getComputedStyle(h);
+          return { tag: h.tagName, size: style.fontSize, weight: style.fontWeight, family: style.fontFamily.split(",")[0].trim(), text: h.textContent.trim().slice(0, 16) };
+        })
+        .filter((h) => h.size !== sizes[h.tag] || h.weight !== "700" || h.family !== "Adventure");
+      return { page: scene.dataset.page, h1: headings.filter((h) => h.tagName === "H1").length, bad };
+    },
+    [HEADING_SIZE, HEADING_EXCEPTIONS],
+  );
+}
+
+test("모든 화면의 제목은 디자인 규칙의 크기·굵기·글꼴을 따르고 화면 제목은 하나다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { materials: 0, stage: 1 });
+    const problems = [];
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const id of ["risk", "monsters", "reco", "today", "evolution", "health", "health2", "health3", "progress", "rewards"]) {
+        await page.goto(new URL(path + "#" + id, base).href);
+        await page.locator(`.scene[data-page="${id}"]:not([hidden])`).waitFor();
+        await page.waitForTimeout(300);
+        const tabs = id === "progress" ? "[data-growth-tab]" : id === "rewards" ? "[data-live-bag]" : null;
+        const count = tabs ? await page.locator(tabs).count() : 1;
+        for (let i = 0; i < count; i++) {
+          if (tabs) {
+            await page.locator(tabs).nth(i).click();
+            await page.waitForTimeout(300);
+          }
+          const report = await headingReport(page);
+          const where = `${width}px ${id}${tabs ? ` 탭${i + 1}` : ""}`;
+          if (report.h1 !== 1) problems.push(`${where}: 화면 제목 ${report.h1}개`);
+          for (const h of report.bad) problems.push(`${where}: ${h.tag} ${h.size} ${h.weight} ${h.family} "${h.text}"`);
+        }
+      }
+    }
+    assert.deepEqual(problems, []);
+  }));
