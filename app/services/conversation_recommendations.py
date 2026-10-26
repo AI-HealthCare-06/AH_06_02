@@ -34,14 +34,18 @@ class ConversationResult:
     reasons: dict[int, str]
 
 
+#: 질문 문구가 전제하는 마스터 목표(목표값·하루 횟수·슬롯·인증 방식). 마스터가 바뀌면 질문과 함께 고친다
+FIXED_GOALS: dict[str, tuple[Decimal | None, int, list[str] | None, str]] = {
+    "CH_WALK_AFTER_MEAL": (Decimal("10"), 2, ["lunch", "dinner"], "timer"),
+    "CH_WALK_ONE_STOP": (None, 1, None, "manual"),
+    "CH_STAND_HOURLY": (Decimal("3"), 3, None, "timer"),
+}
+
+
 class ConversationRecommendationService:
     @staticmethod
     def _matches_fixed_contract(challenge: Challenge) -> bool:
-        expected = {
-            "CH_WALK_AFTER_MEAL": (Decimal("10"), 2, ["lunch", "dinner"], "timer"),
-            "CH_WALK_ONE_STOP": (None, 1, None, "manual"),
-            "CH_STAND_HOURLY": (Decimal("3"), 3, None, "timer"),
-        }.get(challenge.code)
+        expected = FIXED_GOALS.get(challenge.code)
         return (
             expected is None
             or (
