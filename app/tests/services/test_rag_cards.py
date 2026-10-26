@@ -6,6 +6,8 @@ import pytest
 from pydantic import ValidationError
 
 from app.services.rag_cards import (
+    ANSWER_FIELDS,
+    QUESTION_TEXT,
     SUPPORTED_CODES,
     EvidenceCard,
     SituationAnswers,
@@ -136,3 +138,9 @@ def test_every_supported_code_has_an_approved_card_in_the_corpus() -> None:
     # 승인 카드가 없는 코드는 검색에 걸리지 않아 대화형 추천이 늘 규칙 추천으로 돌아간다
     approved = {card.challenge_code for card in load_cards(CORPUS) if card.status == "approved" and card.approved_by}
     assert approved == SUPPORTED_CODES
+
+
+def test_every_supported_code_has_its_own_question_and_answer_field() -> None:
+    assert set(ANSWER_FIELDS) == SUPPORTED_CODES
+    assert set(ANSWER_FIELDS.values()) == set(QUESTION_TEXT)
+    assert set(QUESTION_TEXT) <= set(SituationAnswers.model_fields)
