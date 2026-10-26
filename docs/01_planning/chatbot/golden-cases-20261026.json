@@ -579,5 +579,300 @@
       ]
     },
     "asked": []
+  },
+  {
+    "case_id": "E35",
+    "kind": "search",
+    "query": "퇴근 후 저녁 동네 산책",
+    "answers": {
+      "evening_walk": "yes"
+    },
+    "allowed_codes": [
+      "CH_WALK_EVENING_20"
+    ],
+    "expected": "C21",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E36",
+    "kind": "search",
+    "query": "주말에 청소 빨래 집안일",
+    "answers": {
+      "housework": "yes"
+    },
+    "allowed_codes": [
+      "CH_HOUSEWORK_15"
+    ],
+    "expected": "C23",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E37",
+    "kind": "search",
+    "query": "집에서 다리 근력 스쿼트",
+    "answers": {
+      "squat": "yes"
+    },
+    "allowed_codes": [
+      "CH_SQUAT_15"
+    ],
+    "expected": "C25",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E38",
+    "kind": "search",
+    "query": "벽 짚고 팔굽혀펴기 상체",
+    "answers": {
+      "wall_pushup": "yes"
+    },
+    "allowed_codes": [
+      "CH_WALL_PUSHUP_10"
+    ],
+    "expected": "C27",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E39",
+    "kind": "search",
+    "query": "업무 전화 통화가 많아요",
+    "answers": {
+      "stand_call": "yes"
+    },
+    "allowed_codes": [
+      "CH_STAND_CALL"
+    ],
+    "expected": "C29",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E40",
+    "kind": "search",
+    "query": "TV 드라마 유튜브 영상",
+    "answers": {
+      "screen_break": "yes"
+    },
+    "allowed_codes": [
+      "CH_SCREEN_BREAK"
+    ],
+    "expected": "C31",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E41",
+    "kind": "search",
+    "query": "탄산 음료 단 커피 주스",
+    "answers": {
+      "sweet_drink": "yes"
+    },
+    "allowed_codes": [
+      "CH_WATER_NOT_SWEET"
+    ],
+    "expected": "C33",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E42",
+    "kind": "search",
+    "query": "밤에 배달 야식",
+    "answers": {
+      "late_snack": "yes"
+    },
+    "allowed_codes": [
+      "CH_NO_LATE_SNACK"
+    ],
+    "expected": "C35",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E43",
+    "kind": "search",
+    "query": "편의점에서 사서 냉장고 집에서",
+    "answers": {
+      "home_alcohol": "yes"
+    },
+    "allowed_codes": [
+      "CH_NO_ALCOHOL_AT_HOME"
+    ],
+    "expected": "C37",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E44",
+    "kind": "search",
+    "query": "저녁 식사 반주 무알코올",
+    "answers": {
+      "alcohol_free": "yes"
+    },
+    "allowed_codes": [
+      "CH_ALCOHOL_FREE_DRINK"
+    ],
+    "expected": "C39",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E45",
+    "kind": "search",
+    "query": "친구 모임 회식 약속",
+    "answers": {
+      "postpone_drinks": "yes"
+    },
+    "allowed_codes": [
+      "CH_POSTPONE_DRINKS"
+    ],
+    "expected": "C41",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E46",
+    "kind": "search",
+    "query": "아침 일어나 출근 전 첫 담배",
+    "answers": {
+      "first_cig": "yes"
+    },
+    "allowed_codes": [
+      "CH_DELAY_FIRST_CIG"
+    ],
+    "expected": "C43",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E47",
+    "kind": "search",
+    "query": "집이랑 차에서 가족 아이",
+    "answers": {
+      "smoke_free_home": "yes"
+    },
+    "allowed_codes": [
+      "CH_SMOKE_FREE_HOME"
+    ],
+    "expected": "C45",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E48",
+    "kind": "search",
+    "query": "건강 가족 때문에 결심 이유",
+    "answers": {
+      "quit_reason": "yes"
+    },
+    "allowed_codes": [
+      "CH_QUIT_REASON"
+    ],
+    "expected": "C47",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E49",
+    "kind": "empty",
+    "query": "다리 아파 저녁 산책",
+    "answers": {
+      "evening_walk": "limited"
+    },
+    "allowed_codes": [
+      "CH_WALK_EVENING_20"
+    ],
+    "expected": null,
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E50",
+    "kind": "empty",
+    "query": "무릎 통증 스쿼트",
+    "answers": {
+      "squat": "limited"
+    },
+    "allowed_codes": [
+      "CH_SQUAT_15"
+    ],
+    "expected": null,
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E51",
+    "kind": "empty",
+    "query": "밤에 배달 야식",
+    "answers": {
+      "late_snack": "no"
+    },
+    "allowed_codes": [
+      "CH_NO_LATE_SNACK"
+    ],
+    "expected": null,
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E52",
+    "kind": "questions",
+    "query": "",
+    "answers": {},
+    "allowed_codes": [
+      "CH_NO_DRINK_TODAY",
+      "CH_NO_ALCOHOL_AT_HOME",
+      "CH_ALCOHOL_FREE_DRINK"
+    ],
+    "expected": [
+      "no_drink",
+      "home_alcohol",
+      "alcohol_free"
+    ],
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E53",
+    "kind": "questions",
+    "query": "",
+    "answers": {},
+    "allowed_codes": [
+      "CH_NO_SMOKE_TODAY",
+      "CH_DELAY_FIRST_CIG",
+      "CH_SMOKE_FREE_HOME"
+    ],
+    "expected": [
+      "no_smoke",
+      "first_cig",
+      "smoke_free_home"
+    ],
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E54",
+    "kind": "reject",
+    "query": "",
+    "answers": {
+      "quit_reason": "yes"
+    },
+    "allowed_codes": [
+      "CH_QUIT_REASON"
+    ],
+    "expected": null,
+    "output": {
+      "selections": [
+        {
+          "challenge_code": "CH_QUIT_REASON",
+          "evidence_card_id": "C45"
+        }
+      ]
+    },
+    "asked": []
   }
 ]

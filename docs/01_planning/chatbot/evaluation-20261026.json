@@ -1,6 +1,6 @@
 {
   "scope": "승인 테스트 fixture의 결정적 태그 검색·출력 검증·주기 계약. 실제 LLM 호출 없음.",
-  "production_card_status": "20/20개 승인",
+  "production_card_status": "48/48개 승인",
   "cases": [
     {
       "case_id": "E01",
@@ -244,8 +244,164 @@
       "kind": "reject",
       "passed": true,
       "observed": "rejected"
+    },
+    {
+      "case_id": "E35",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C21"
+      ]
+    },
+    {
+      "case_id": "E36",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C23"
+      ]
+    },
+    {
+      "case_id": "E37",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C25"
+      ]
+    },
+    {
+      "case_id": "E38",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C27"
+      ]
+    },
+    {
+      "case_id": "E39",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C29"
+      ]
+    },
+    {
+      "case_id": "E40",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C31"
+      ]
+    },
+    {
+      "case_id": "E41",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C33"
+      ]
+    },
+    {
+      "case_id": "E42",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C35"
+      ]
+    },
+    {
+      "case_id": "E43",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C37"
+      ]
+    },
+    {
+      "case_id": "E44",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C39"
+      ]
+    },
+    {
+      "case_id": "E45",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C41"
+      ]
+    },
+    {
+      "case_id": "E46",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C43"
+      ]
+    },
+    {
+      "case_id": "E47",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C45"
+      ]
+    },
+    {
+      "case_id": "E48",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C47"
+      ]
+    },
+    {
+      "case_id": "E49",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E50",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E51",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E52",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "no_drink",
+        "home_alcohol",
+        "alcohol_free"
+      ]
+    },
+    {
+      "case_id": "E53",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "no_smoke",
+        "first_cig",
+        "smoke_free_home"
+      ]
+    },
+    {
+      "case_id": "E54",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
     }
   ],
-  "passed": 34,
-  "total": 34
+  "passed": 54,
+  "total": 54
 }
