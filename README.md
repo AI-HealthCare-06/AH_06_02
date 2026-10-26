@@ -190,6 +190,21 @@ uv run --group app --group model --with 'shap==0.50.0' python -m ai_worker.main 
 
 ## 배포
 
+평소 배포는 버전 태그로 합니다. main에 머지된 커밋에 `vX.Y.Z` 태그를 올리면 GitHub Actions(`.github/workflows/deploy.yml`)가 앱·워커 이미지를 그 버전으로 빌드해 올리고, 서버에서 마이그레이션 → 재시작 → 상태 확인 → 시드까지 진행합니다. 상태 확인에 실패하면 이전 버전으로 되돌립니다.
+
+```bash
+git switch main && git pull
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+- `v*` 태그는 저장소 관리자만 만들 수 있고, main에 없는 커밋의 태그는 배포하지 않습니다.
+- 진행 상황은 저장소 Actions 탭의 deploy에서, 서버 기록은 `~/deploy.log`에서 봅니다.
+- 서버 쪽 스크립트는 `infra/deploy/server-deploy.sh`입니다. 서버에는 `/home/ubuntu/deploy.sh`로 직접 설치돼 있어서, 이 파일을 고치면 서버 사본도 같이 바꿔야 합니다.
+- `docker-compose.prod.yml`, nginx 설정, `.prod.env`, 모델 파일은 자동 배포 대상이 아닙니다. 바뀔 때만 아래 수동 절차를 씁니다.
+
+아래 수동 배포는 비상용입니다. 수동 스크립트는 로컬 `envs/.prod.env`를 서버에 덮어쓰므로, 그 전에 `APP_VERSION` · `AI_WORKER_VERSION`을 지금 운영 중인 버전과 맞춥니다.
+
 `scripts/deployment.sh`가 이미지 빌드·푸시와 EC2의 앱·워커 컨테이너 실행을 처리하고, HTTPS는 `scripts/certbot.sh`로 Let's Encrypt 인증서를 받아 적용합니다. 둘 다 `chmod +x` 한 번 해두고 실행하면 됩니다. 자세한 절차와 검증 항목은 배포·검증 계획서를 보세요.
 
 `deployment.sh`는 아이디와 토큰을 물어보는 대화형 스크립트라 터미널에서 직접 실행합니다. 마이그레이션과 시드는 하지 않으니 끝난 뒤 서버의 `~/project`에서 따로 돌립니다.
