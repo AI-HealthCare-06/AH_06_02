@@ -1,0 +1,61 @@
+name: frontend
+
+# 화면(frontend/)이나 화면 테스트(scripts/frontend/)가 바뀌면 프론트 테스트를 돌린다.
+# 백엔드 검사(checks.yml)는 frontend/ 변경을 건너뛰므로 화면 규칙은 여기서 막는다.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - 'scripts/frontend/**'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - 'scripts/frontend/**'
+      - '.github/workflows/frontend.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      # 외부 Action은 커밋 해시로 고정한다. 주석은 그 해시의 버전이다
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # 브라우저 테스트가 python -m http.server 로 화면을 띄운다
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: 단위 테스트
+        run: npm run test:unit
+
+      - name: 체험 시안 테스트
+        run: npm run test:prototype
+
+      - name: 실제 연결 화면 테스트
+        run: npm run test:v5
