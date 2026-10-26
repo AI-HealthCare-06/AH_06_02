@@ -1,0 +1,91 @@
+name: deploy
+
+# v1.0.1 같은 버전 태그를 올리면 그 버전으로 운영 서버에 배포한다.
+# v* 태그는 저장소 관리자만 만들 수 있고(「배포 태그 보호」 규칙),
+# Secrets는 v* 태그 실행에만 열리는 production 환경에 있다.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# 배포가 겹치지 않게 한 번에 하나씩 돌린다
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/dangokiller
+      VERSION: ${{ github.ref_name }}
+    steps:
+      # 외부 Action은 커밋 해시로 고정한다. 주석은 그 해시의 버전이다
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: 태그 형식과 main 포함 여부 확인
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::태그는 vX.Y.Z 형식이어야 합니다: $VERSION"
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::main에 머지되지 않은 커밋의 태그는 배포하지 않습니다."
+            exit 1
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Docker Hub 로그인
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 앱 이미지 빌드·푸시
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: app/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:app-${{ env.VERSION }}
+          cache-from: type=gha,scope=app
+          cache-to: type=gha,mode=max,scope=app
+
+      - name: AI 워커 이미지 빌드·푸시
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ai_worker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:ai-${{ env.VERSION }}
+          cache-from: type=gha,scope=ai
+          cache-to: type=gha,mode=max,scope=ai
+
+      # 배포 키는 서버에서 "deploy vX.Y.Z" 한 줄만 실행할 수 있다 (infra/deploy/server-deploy.sh)
+      - name: 서버 배포
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            "ubuntu@${DEPLOY_HOST}" "deploy ${VERSION}"
+
+      - name: 운영 화면 응답 확인
+        run: curl -fsS -o /dev/null "http://${{ vars.DEPLOY_HOST }}/frontend/"
