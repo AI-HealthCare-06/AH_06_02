@@ -7,7 +7,7 @@ React나 번들러 없이 ES 모듈을 사용한다. 시안의 가상 위험도�
 기준 커밋은 main `fc6a645`이고 작업 브랜치는 `feature/d-html-api-20261012`다.
 
 이후 통합된 main `b7b65b3` 기준 공통 기반에서는 `/frontend/`를 기본 진입점으로 사용한다.
-현재 실행·담당자 연결 규약은 [frontend/README.md](../../frontend/README.md)를 우선한다.
+현재 실행·담당자 연결 규약은 [frontend/README.md](../../../frontend/README.md)를 우선한다.
 아래 독립 D 진입점과 인증 연결 예시는 최초 전달본의 별도 실행 방법이다.
 
 ## 화면과 API

@@ -9,7 +9,7 @@
 | KNHANES 전처리 | 성인 17,262행 canonical 데이터와 집계 audit 생성. 원자료·개인별 결과는 `.gitignore` 아래 로컬 `data/`에만 보관 | 로컬 완료·비공개 |
 | 두 질환 1회전 | KNHANES 전처리, 30회 후보 탐색, seed 42/43/44의 2024 비교, 선택 모델 seed 42 전체 2022-reference 재학습·SHAP 산출 완료 | 선택 실험 모델 산출 완료; 2024가 후보 선택에 사용되어 독립 일반화 성능이나 배포 승인을 뜻하지 않음 |
 | LS_VEG 채소 후보 | `LS_VEG2`(김치·장아찌 제외) 1~9 범주를 별도 `vegetable_intake_low`로 전처리·ablation. 당뇨 AP +0.00239, 고혈압 AP −0.00729 등 성능이 엇갈려 final X에 미채택 | 후보 검증 완료; 서비스 입력 필드·성능 합의 대기 |
-| `docs/model.md` | X/y, 혈압·혈당 누수 제외, P95 기준, 요인/NULL/API 계약 정리. 자세한 기술 근거는 `docs/03_ai_data/model.md` | 완료 |
+| `docs/03_ai_data/model-inputs.md` | X/y, 혈압·혈당 누수 제외, P95 기준, 요인/NULL/API 계약 정리. 자세한 기술 근거는 `docs/03_ai_data/model.md` | 완료 |
 | API 3개 | 예측 접수·상태/결과 조회(폴링)·기여도 조회를 지정 B 탭 기준으로 문서화 | 완료·시트 대조 |
 | 전역 중요도·positive SHAP 기준값 | 선택 모델의 질환×factor별 `mean(|grouped SHAP|)`, `positive_shap_p95`, `positive_n`, normalized score를 전체 2022 eligible reference에서 산출해 [`factor-scales.md`](factor-scales.md)에 기록 | 산출 완료; report/artifact에 `threat_eligible` 판정도 포함 |
 | ERD 여섯 칸 및 `source_prediction_id` | Slack 제공 v2-1에서 설명 여섯 칸과 진단자 NULL·미진단 prediction ID 경로를 검토했다. 파일은 185컬럼이라고 적혀 있지만 저장소 기준은 186컬럼이라 로컬 검토본에만 기록했다 | B 필드 검토 완료; 전체 최신본 여부와 원본 시트 반영은 확인 필요 |

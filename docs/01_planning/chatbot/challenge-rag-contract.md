@@ -121,6 +121,6 @@ LLM 호출이 실패하거나 응답이 검증을 못 넘으면 오류를 내지
 ## 참고 문서
 
 - 기획안: [`rag-plan-20261002.md`](rag-plan-20261002.md)
-- 내부 연결 준비 기록: [`../../02_team/d-rag-preparation-20261012.md`](../../02_team/d-rag-preparation-20261012.md)
+- 내부 연결 준비 기록: [`../../02_team/d-part/d-rag-preparation-20261012.md`](../../02_team/d-part/d-rag-preparation-20261012.md)
 - 챌린지 원본: [`../challenge-master.csv`](../challenge-master.csv), 매핑 [`../challenge-factor-map.md`](../challenge-factor-map.md)
 - API 원본: [`../api-spec.md`](../api-spec.md) D 절

@@ -34,7 +34,7 @@
 ## B 예측·모델 문서
 
 - `01_planning/api-predictions.md` — 지정 B API 시트와 대조한 예측 API 3개 계약
-- `model.md` — X/y 정의와 혈압·혈당 제외 사유를 빠르게 찾는 모델 입력 요약
+- `03_ai_data/model-inputs.md` — X/y 정의와 혈압·혈당 제외 사유를 빠르게 찾는 모델 입력 요약
 - `03_ai_data/model.md` — X/y 정의, 전역 중요도와 위협도 산식, 내부 호출 계약
 - `03_ai_data/input-code-map.md` — KNHANES 원 코드와 서비스 입력값 매핑
 - `03_ai_data/data.md` — KNHANES 자료원 및 전처리 현황
