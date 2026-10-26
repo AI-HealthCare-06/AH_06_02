@@ -123,117 +123,23 @@ SHAP으로 "무엇이 이 확률을 밀어올렸는지"를 구하고, 요인마�
 
 ---
 
-## 실행
-
-### 준비물
-
-- Python 3.13 이상
-- [uv](https://github.com/astral-sh/uv)
-- Docker · Docker Compose
-
-### 설치
+## 빠르게 실행하기
 
 ```bash
 uv sync --group app --group dev
+cp envs/example.local.env envs/.local.env && ln -s envs/.local.env .env
+docker compose up -d --build
 ```
 
-API 서버와 테스트에 필요한 것이 `app` · `dev` 그룹에 있습니다. `uv sync`만 하면 기본 의존성만 깔려서 `tortoise`나 `fastapi`를 못 찾습니다.
+화면은 http://localhost/frontend/, Swagger는 http://localhost/api/docs 에서 열립니다. 처음이면 마이그레이션과 시드를 먼저 넣어야 합니다. 환경 변수, DB 준비, 워커 단독 실행은 [`docs/development.md`](docs/development.md)에 있습니다.
 
-모델 학습을 한다면 `--group ai`를 더합니다.
-
-### 환경 변수
-
-```bash
-cp envs/example.local.env envs/.local.env
-cp envs/example.prod.env envs/.prod.env
-ln -s envs/.local.env .env
-```
-
-실제 값은 `envs/.local.env`에 적고, 저장소 루트의 `.env`는 그 파일을 가리키는 심볼릭 링크로 둡니다. `app/core/config.py`, `docker-compose.yml`, `scripts/ci/run_test.sh` 셋 다 루트의 `.env`를 보기 때문에 링크가 없으면 서버가 안 뜹니다.
-
-`envs/.prod.env`는 배포용이라 로컬에서는 건드리지 않습니다.
-
-값은 각자 환경에 맞게 고치세요. `envs/.local.env`와 `.env`는 커밋되지 않습니다.
-
-### 전체 실행
-
-```bash
-docker-compose up -d --build
-```
-
-띄우고 나면 화면은 [http://localhost/frontend/](http://localhost/frontend/), Swagger는 [http://localhost/api/docs](http://localhost/api/docs)에서 열립니다.
-
-`port is already allocated`가 나오면 예전에 깔아둔 로컬 MySQL이 포트를 잡고 있는 겁니다.
-
-```bash
-sudo lsof -nP -iTCP:3306 -sTCP:LISTEN
-```
-
-### 스키마 반영
-
-모델이 바뀐 커밋을 받았다면 마이그레이션을 올립니다.
-
-```bash
-uv run aerich upgrade
-```
-
-### 처음 DB 준비
-
-처음에는 마이그레이션 → 몬스터·챌린지·보상 시드 → 건강정보 저장 순서로 진행합니다.
-
-```bash
-uv run aerich upgrade
-uv run python -m scripts.seed.seed_monsters
-uv run python -m scripts.seed.seed_challenges
-uv run python -m scripts.seed.seed_rewards
-```
-
-시드 없이 건강정보를 먼저 저장하면 사용자별 몬스터가 생기지 않아 도감이 미측정으로 남거나 추천이 안 뜰 수 있습니다. 시드를 넣은 뒤 건강정보를 다시 저장하면 새 기록 기준으로 갱신되고, 기존 기록은 지우지 않습니다.
-
-챌린지 마스터를 고쳤을 때도 챌린지 시드를 다시 돌려야 DB에 반영됩니다.
-
-### 개별 실행
-
-```bash
-uv run uvicorn app.main:app --reload      # API 서버
-uv run --group app --group model --with 'shap==0.50.0' python -m ai_worker.main   # AI 워커
-```
-
-워커는 shap 이 lock 에 없어서(`pyproject.toml` model 그룹 주석) 실행할 때 버전을 고정해 붙입니다.
-`data/experiment-refit/` 에 `background-diabetes.npy` · `background-hypertension.npy` 가 있어야 합니다.
-없으면 워커는 켜져 있어도 예측을 모두 실패로 기록합니다. 두 파일은 모델 폴더(드라이브)에서 받습니다.
+배포는 main에 머지하면 자동으로 됩니다. 자세한 흐름과 비상용 수동 배포는 [`docs/deployment.md`](docs/deployment.md)를 봅니다.
 
 ---
 
 ## 코드를 쓰기 전에
 
 라우터·모델·워커를 어디에 붙이는지, 품질 검사를 어떻게 돌리는지, 커밋과 PR 규칙은 [AGENTS.md](AGENTS.md)에 있습니다. 사람도 에이전트도 같은 문서를 봅니다.
-
----
-
-## 배포
-
-평소 배포는 자동입니다. 서버에서 도는 코드(`app/` · `ai_worker/` · `frontend/` · `scripts/` · 의존성 · 마스터 CSV)가 바뀐 PR이 main에 머지되면 GitHub Actions(`.github/workflows/deploy.yml`)가 앱·워커 이미지를 `v1.1.N`(N은 실행 번호)으로 빌드해 올리고, 서버에서 마이그레이션 → 재시작 → 상태 확인 → 시드까지 진행합니다. 상태 확인에 실패하면 이전 버전으로 되돌립니다. 머지부터 반영까지 5~10분 걸립니다.
-
-- 문서만 바뀐 머지는 배포하지 않습니다.
-- 다시 배포하려면 Actions 탭 → deploy → Run workflow에서 main을 고릅니다.
-- 진행 상황은 Actions 탭의 deploy에서, 서버 기록은 `~/deploy.log`에서 봅니다.
-- 서버 쪽 스크립트는 `infra/deploy/server-deploy.sh`입니다. 서버에는 `/home/ubuntu/deploy.sh`로 직접 설치돼 있어서, 이 파일을 고치면 서버 사본도 같이 바꿔야 합니다.
-- `docker-compose.prod.yml`, nginx 설정, `.prod.env`, 모델 파일은 자동 배포 대상이 아닙니다. 바뀔 때만 아래 수동 절차를 씁니다.
-
-아래 수동 배포는 비상용입니다. 수동 스크립트는 로컬 `envs/.prod.env`를 서버에 덮어쓰므로, 그 전에 `APP_VERSION` · `AI_WORKER_VERSION`을 지금 운영 중인 버전과 맞춥니다.
-
-`scripts/deploy/deployment.sh`가 이미지 빌드·푸시와 EC2의 앱·워커 컨테이너 실행을 처리하고, HTTPS는 `scripts/deploy/certbot.sh`로 Let's Encrypt 인증서를 받아 적용합니다. 둘 다 `chmod +x` 한 번 해두고 실행하면 됩니다. 자세한 절차와 검증 항목은 배포·검증 계획서를 보세요.
-
-`deployment.sh`는 아이디와 토큰을 물어보는 대화형 스크립트라 터미널에서 직접 실행합니다. 마이그레이션과 시드는 하지 않으니 끝난 뒤 서버의 `~/project`에서 따로 돌립니다.
-
-```bash
-docker compose up -d mysql nginx    # 첫 배포 때만. 스크립트는 고른 서비스만 올립니다
-docker compose exec fastapi uv run --no-sync aerich upgrade
-docker compose exec fastapi uv run --no-sync python -m scripts.seed.seed_monsters   # seed_challenges · seed_rewards도 같은 방식
-```
-
-스크립트가 로컬의 `infra/nginx/prod_http.conf`에서 `server_name`을 서버 IP로 바꿔 두므로, 배포 뒤에는 `git checkout infra/nginx/prod_http.conf`로 되돌립니다.
 
 ---
 

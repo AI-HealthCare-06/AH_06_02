@@ -10,6 +10,8 @@
 | 화면 기준 | HTML v5 · 보완 설계 | `../frontend/docs/prototype/당고킬러-모험시안_v5.html` · `02_team/design.md` |
 | v5 연결 범위·보상 규칙 | 이 저장소 | `02_team/prototype-v5-proposal.md` |
 | 챌린지 ↔ AI·RAG 연결 계약 | 이 저장소 | `01_planning/chatbot/challenge-rag-contract.md` |
+| 개발 환경과 실행 | 이 저장소 | `development.md` |
+| 배포 | 이 저장소 | `deployment.md` |
 | 구현 규칙 | 이 저장소 | `../AGENTS.md` |
 | 타입·스타일·구조 규칙 | 이 저장소 | `SYSTEM_DESIGN.md` |
 
