@@ -12,8 +12,8 @@ from app.models.health_records import HealthRecord
 from app.models.predictions import Disease, Prediction, PredictionContribution, PredictionStatus
 from app.models.users import User
 from app.services.challenges import ChallengeCoreService
-from app.services.conversation_recommendations import ConversationRecommendationService
-from app.services.rag_cards import SituationAnswers, load_cards
+from app.services.conversation_recommendations import FIXED_GOALS, ConversationRecommendationService
+from app.services.rag_cards import SUPPORTED_CODES, SituationAnswers, load_cards
 from app.services.recommendations import RecommendationService
 from app.tests.d_fixtures import fake_artifact, make_target
 from scripts.seed.seed_challenges import DEFAULT_CSV, parse_rows, read_csv, upsert_challenges
@@ -82,6 +82,13 @@ class TestConversationRecommendation(TestCase):
             for card in load_cards(CORPUS)
         ]
         return user, rules, generated, cards
+
+    async def test_every_supported_code_has_a_fixed_goal_matching_the_master(self):
+        # 표에 없는 코드는 목표 검사 없이 통과하므로, 지원 코드는 전부 표에 있어야 한다
+        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
+        assert set(FIXED_GOALS) == SUPPORTED_CODES
+        for challenge in await Challenge.filter(code__in=list(SUPPORTED_CODES)):
+            assert ConversationRecommendationService._matches_fixed_contract(challenge), challenge.code
 
     async def test_conversation_stores_trace_without_creating_or_changing_missions(self):
         user, rules, generated, cards = await self.prepare()

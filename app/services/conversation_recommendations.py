@@ -39,6 +39,10 @@ FIXED_GOALS: dict[str, tuple[Decimal | None, int, list[str] | None, str]] = {
     "CH_WALK_AFTER_MEAL": (Decimal("10"), 2, ["lunch", "dinner"], "timer"),
     "CH_WALK_ONE_STOP": (None, 1, None, "manual"),
     "CH_STAND_HOURLY": (Decimal("3"), 3, None, "timer"),
+    "CH_STAIRS": (None, 1, None, "manual"),
+    "CH_STRENGTH_10": (Decimal("10"), 1, None, "timer"),
+    "CH_NO_DRINK_TODAY": (None, 1, None, "manual"),
+    "CH_NO_SMOKE_TODAY": (None, 1, None, "manual"),
 }
 
 
