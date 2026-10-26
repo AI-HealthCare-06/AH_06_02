@@ -7,7 +7,7 @@
 ## 1. 최신 팀 결정 반영
 
 - `sedentary_time_high`는 독립 factor로 확정됐고 비세라에 연결한다. `physical_activity_low`에 좌식 SHAP을 다시 더하지 않는다. 2024 비교 평가를 거쳐 첫 실험 설정은 당뇨에 `sitting_minutes`, 고혈압에 `dining_out_freq`를 각각 추가한다. sodium 대리변수는 팀 범위에 맞춰 고혈압에만 둔다.
-- 사용자 용어는 **HP → 위협도**, **주간 데미지 → 공략 점수**다. 이에 대응하는 DB·함수는 `user_monsters.impact_score`, `weekly_progress`, `impact_source`, `monsters.default_impact_source`, `challenges.progress_value`, `refresh_impact_from_prediction()` 및 `refresh_impact_from_health_record()`다.
+- 사용자 용어는 **위협도**와 **공략 점수**다. 이에 대응하는 DB·함수는 `user_monsters.impact_score`, `weekly_progress`, `impact_source`, `monsters.default_impact_source`, `challenges.progress_value`, `refresh_impact_from_prediction()` 및 `refresh_impact_from_health_record()`다.
 - 미진단자의 위협도 근거는 `contribution`, 실측 혈당 스파이크는 `measured`, 진단 질환의 전역 중요도·생활패턴 경로는 `global`이며 `user_monsters.impact_source`에 저장한다.
 - B는 예측과 기여도 저장을 커밋한 뒤 D의 `refresh_impact_from_prediction(user_id, prediction_id)`를 호출한다. B가 `user_monsters`를 직접 수정하지 않는다.
 - C는 건강정보 저장 뒤 D의 `refresh_impact_from_health_record(user_id, health_record_id)`를 호출한다. D가 스파이크와 진단자 global 경로를 처리한다.

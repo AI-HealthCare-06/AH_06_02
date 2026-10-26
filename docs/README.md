@@ -9,13 +9,14 @@
 | API | 구글 시트 `당고킬러_API 명세서` | `01_planning/api-spec.md` |
 | 화면 기준 | HTML v5 · 보완 설계 | `../frontend/docs/prototype/당고킬러-모험시안_v5.html` · `02_team/design.md` |
 | v5 연결 범위·보상 규칙 | 이 저장소 | `02_team/prototype-v5-proposal.md` |
+| 챌린지·몬스터·보상 마스터 | 이 저장소 (시드가 읽는 원본) | `01_planning/challenge-master.csv` · `monster-master.csv` · `reward-master.csv` |
 | 챌린지 ↔ AI·RAG 연결 계약 | 이 저장소 | `01_planning/chatbot/challenge-rag-contract.md` |
 | 개발 환경과 실행 | 이 저장소 | `development.md` |
 | 배포 | 이 저장소 | `deployment.md` |
 | 구현 규칙 | 이 저장소 | `../AGENTS.md` |
 | 타입·스타일·구조 규칙 | 이 저장소 | `SYSTEM_DESIGN.md` |
 
-**구글 시트가 원본입니다.** 이 폴더의 마크다운은 사본이고, 코드를 쓸 때 읽기 위한 것입니다.
+요구사항·테이블·API 문서는 구글 시트에서 뽑은 사본이고, 코드를 쓸 때 읽기 위한 것입니다.
 
 코드를 먼저 바꿔도 됩니다. 시트는 뒤따라 고치고 사본을 다시 뽑습니다. 사본만 손으로 고치면 다음에 뽑을 때 덮어써집니다.
 
@@ -27,13 +28,13 @@
 
 ## 사본 갱신
 
-문서별 항목 수는 각 원본 시트를 기준으로 확인한다. 2026-10-01 현재 B 예측 API는 지정 B 탭에 확정된 예측 접수·상태/결과 조회·기여도 조회 3개다. 전체 테이블·API·요구사항 수는 원본 시트에서 확인하며 이 README에는 오래된 집계를 복제하지 않는다.
+시트를 받은 뒤 `uv run scripts/sync_specs.py`로 세 사본을 다시 뽑는다. 항목 수는 사본 맨 위나 시트에서 확인하고, 이 README에는 집계를 따로 적지 않는다.
 
 ## 데이터 문서 상태
 
 `03_ai_data/data.md` — KNHANES 출처, 라이선스 확인 항목, 코드북 대조, 전처리 규칙, 표본 수와 데이터 한계를 기록합니다. raw data와 개인별 결과는 ignored `data/`에만 둡니다. `NFR-MODL-003` · `NFR-MODL-005` · `NFR-MODL-006`은 이 파일을 지목합니다.
 
-## B 예측·모델 문서
+## 예측·모델 문서
 
 - `01_planning/api-predictions.md` — 지정 B API 시트와 대조한 예측 API 3개 계약
 - `03_ai_data/model-inputs.md` — X/y 정의와 혈압·혈당 제외 사유를 빠르게 찾는 모델 입력 요약
