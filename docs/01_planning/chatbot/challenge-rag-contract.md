@@ -51,7 +51,7 @@ AI·RAG를 붙이기 전에 챌린지 쪽이 어디까지 만들었고, AI가 �
 
 ## 2. 1단계에서 끝난 것과 안 하는 것
 
-**끝난 것**: 위 흐름 전체(CHLG-01~14), 도감(MNSTR-01), 보상 카드·꾸미기·성장 아이템(RWRD-01~07), 성장 기록(PROG-01). 화면은 v5로 연결했고 운영 서버에서 확인했다.
+**끝난 것**: 위 흐름 전체(CHLG-01\~14), 도감(MNSTR-01), 보상 카드·꾸미기·성장 아이템(RWRD-01\~07), 성장 기록(PROG-01). 화면은 v5로 연결했고 운영 서버에서 확인했다.
 
 **1단계에서 안 하는 것**
 
@@ -100,7 +100,7 @@ LLM 호출이 실패하거나 응답이 검증을 못 넘으면 오류를 내지
 | --- | --- |
 | `conversation_snapshot` | `policy_version` · `fingerprint` · `answers` · `asked` · `card_versions` · `model_version`(예측 모델) · `health_record_id` |
 | `llm_model_version` | 선택에 쓴 LLM 식별자 (32자 이내) |
-| `evidence_card_ids` | 근거로 쓴 승인 카드 ID 배열 (`C01`~`C12`) |
+| `evidence_card_ids` | 근거로 쓴 승인 카드 ID 배열 (`C01`\~`C12`) |
 
 - `source_type`은 원래 값(`prediction_personal` · `diagnosis_global`)을 그대로 둔다. 대화를 거쳤다고 `conversation`으로 바꾸지 않는다 (10/13 A·D 합의).
 - `proposed_goal`은 NULL이다. 목표는 챌린지 마스터 값을 그대로 쓴다.
@@ -113,7 +113,7 @@ LLM 호출이 실패하거나 응답이 검증을 못 넘으면 오류를 내지
 | `app/services/conversation_recommendations.py` | 규칙 후보 배치를 받아 질문·검색·선택·검증·저장. 기본 `enabled=False` |
 | `app/services/rag_cards.py` | 카드 스키마, 승인 카드 필터, 태그 검색, 선택 검증. 지원 코드는 `CH_WALK_AFTER_MEAL` · `CH_WALK_ONE_STOP` · `CH_STAND_HOURLY` 3개 |
 | `app/services/rag_provider.py` | `SelectionProvider` 인터페이스와 OpenAI 어댑터. 실제 호출은 해 보지 않았다 |
-| `docs/01_planning/chatbot/cards-draft-20261012.json` | 카드 C01~C12. 모두 `draft` |
+| `docs/01_planning/chatbot/cards-draft-20261012.json` | 카드 C01\~C12. 모두 `draft` |
 | `scripts/evaluate_rag_preparation.py` | 외부 호출 없이 도는 고정 평가 20건 |
 
 공개 API, 화면, LLM 설정값(API 키·모델 이름)은 아직 없다. 임베딩이나 벡터 DB 없이 작은 카드 묶음을 태그로 검색하는 방식이다. 검색 방식은 RAG 담당이 바꿔도 되지만, 위 입출력과 검증은 지킨다.

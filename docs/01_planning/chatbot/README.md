@@ -13,7 +13,7 @@
 | 파일 | 작성 | 내용 |
 | --- | --- | --- |
 | [rag-plan-20261002.md](rag-plan-20261002.md) | 최병주 · 10/2 | 기획안. MVP 범위, 코퍼스 설계, JSON 출력, 서버 검증, 작업 분담 |
-| [challenge-cards-20261002.md](challenge-cards-20261002.md) | 김이경 · 10/2 | 걷기·좌식 상황 카드 12개(C01~C12), 기존 60개 미션 선택지 재분류, 연결 전 확인 항목 |
+| [challenge-cards-20261002.md](challenge-cards-20261002.md) | 김이경 · 10/2 | 걷기·좌식 상황 카드 12개(C01\~C12), 기존 60개 미션 선택지 재분류, 연결 전 확인 항목 |
 | [../../02_team/d-part/d-workpack-20261002.md](../../02_team/d-part/d-workpack-20261002.md) | 김이경 · 10/2 | 6절에 RAG 연결 카드 12개, 8절에 가상 검증 사례 20개 |
 
 둘 다 "승인 전 초안"이라고 명시하고 있다. 두 문서 모두 공유 명세·DB·코드를 바꾸지 않았다고 적혀 있다.
@@ -26,7 +26,7 @@
 | --- | --- |
 | `conversation_snapshot` | 질문·답변 기록. 저장 키는 `policy_version` · `fingerprint` · `answers` · `asked` · `card_versions` · `model_version`(예측 모델) · `health_record_id` |
 | `llm_model_version` | 후보 선택에 쓴 LLM 식별자. snapshot 의 `model_version` 과 다르다 |
-| `evidence_card_ids` | 제안 근거로 전달된 승인 카드 ID 배열. `C01`~`C12` 고정값 |
+| `evidence_card_ids` | 제안 근거로 전달된 승인 카드 ID 배열. `C01`\~`C12` 고정값 |
 
 대화로 고른 추천도 `source_type` 은 원래 값(`prediction_personal`, `diagnosis_global`)을 유지한다. 대화를 거쳤다는 이유만으로 `conversation` 으로 바꾸지 않으므로, 세 칸은 `source_type` 과 무관하게 채운다 (10/13 A·D 합의).
 

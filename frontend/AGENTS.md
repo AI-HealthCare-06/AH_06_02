@@ -27,12 +27,12 @@ in the v5 HTML follow the code meanings in
 and the app sends the code itself as the value. Keep these lists and that file
 in step; do not invent new options.
 
-- 음주 빈도 `alcohol_frequency` 1~6: 최근 4주 동안 마시지 않음 · 월 1회 미만 ·
-  월 1회 정도 · 월 2~4회 · 주 2~3회 · 주 4회 이상
-- 음주량 `alcohol_amount` 1~5: 1~2잔 · 3~4잔 · 5~6잔 · 7~9잔 · 10잔 이상.
+- 음주 빈도 `alcohol_frequency` 1\~6: 최근 4주 동안 마시지 않음 · 월 1회 미만 ·
+  월 1회 정도 · 월 2\~4회 · 주 2\~3회 · 주 4회 이상
+- 음주량 `alcohol_amount` 1\~5: 1\~2잔 · 3\~4잔 · 5\~6잔 · 7\~9잔 · 10잔 이상.
   Hidden when 음주 빈도 is 1, and then sent as 0. 10잔 이상 is not an exact count.
-- 외식 빈도 `dining_out_freq` 1~7: 하루 2회 이상 · 하루 1회 · 주 5~6회 ·
-  주 3~4회 · 주 1~2회 · 월 1~3회 · 월 1회 미만. It runs backwards — 1 is the
+- 외식 빈도 `dining_out_freq` 1\~7: 하루 2회 이상 · 하루 1회 · 주 5\~6회 ·
+  주 3\~4회 · 주 1\~2회 · 월 1\~3회 · 월 1회 미만. It runs backwards — 1 is the
   most frequent and 7 is almost never.
 
 The screen asks about the last 4 weeks while the KNHANES items ask about the

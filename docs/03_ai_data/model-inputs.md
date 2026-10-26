@@ -11,11 +11,11 @@
 | bmi | kg/m² | `HE_BMI` | `bmi_high` |
 | waist_cm | cm | `HE_wc` | `waist_high` |
 | smoking_current | 0/1 | `sm_presnt` | `smoking_current` |
-| alcohol_frequency | 1~6 범주 | `BD1_11` | `alcohol_frequency` |
-| alcohol_amount | 0~5 범주 | `BD2_1` | `alcohol_amount` |
-| walking_days | 0~7일/주 | `BE3_31`을 0부터 시작하도록 변환 | `physical_activity_low` |
+| alcohol_frequency | 1\~6 범주 | `BD1_11` | `alcohol_frequency` |
+| alcohol_amount | 0\~5 범주 | `BD2_1` | `alcohol_amount` |
+| walking_days | 0\~7일/주 | `BE3_31`을 0부터 시작하도록 변환 | `physical_activity_low` |
 | walking_minutes | 분/회 | `BE3_32`, `BE3_33` | `physical_activity_low` |
-| strength_days | 0~5일/주(5는 5일 이상) | `BE5_1`을 변환 | `strength_activity_low` |
+| strength_days | 0\~5일/주(5는 5일 이상) | `BE5_1`을 변환 | `strength_activity_low` |
 | family_history_dm | 0/1 | `HE_DMfh1~3` | `family_history_dm` |
 | family_history_htn | 0/1 | `HE_HPfh1~3` | `family_history_htn` |
 

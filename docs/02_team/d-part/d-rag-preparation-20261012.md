@@ -7,7 +7,7 @@
 
 | 항목 | 상태 |
 | --- | --- |
-| 현재 마스터에 연결한 C01~C12 카드 JSON | 출처 확인·D 검토 초안. 운영 상태는 모두 draft |
+| 현재 마스터에 연결한 C01\~C12 카드 JSON | 출처 확인·D 검토 초안. 운영 상태는 모두 draft |
 | 승인 카드 태그 검색·최대 3개 검색 | 코드 구현·fixture 검증 |
 | 선택형 상황 질문 | 기존 답변 재사용·질문 최대 3개. 모르는 값 추정 없음 |
 | LLM 구조화 선택·서버 검증 | provider 교체 가능. 실제 OpenAI 호출은 미실행 |
@@ -25,8 +25,8 @@
 - 이번 내부 서비스는 기존 후보만 고르므로 새로운 `source_type=conversation` 추천을 생성하지 않는다. 반환 `mode=conversation`은 대화 개인화 처리 상태이며 DB 출처 값과 별개다.
 - 질문·답변·LLM·근거 이력은 기존 세 컬럼에 별도로 기록하고, 동일 배치 재호출 판정은 출처가 아닌 snapshot의 fingerprint를 사용한다.
 - snapshot은 질문·선택지 코드, 정책/카드/모델 버전, fingerprint, 건강기록 ID를 포함한다. 자유 입력 원문·이름·연락처는 저장하지 않는다. 건강기록 ID도 개인과 연결될 수 있으므로 이 전체 저장 범위를 원본 시트에서 합의한다.
-- LLM 식별자는 32자 이내다. C01~C12를 문서 순서와 무관한 고정 카드 ID로 사용하는 안을 제안하며, 수정 이력은 version으로 관리하고 삭제 ID는 재사용하지 않는다.
-- 운영 승인은 12개 전체가 아니라 핵심 2~3개부터 받을 수 있다. 다른 카드는 draft로 유지하고 승인 카드만 검색에 사용한다. 좌식 카드는 기존 서버 후보에 실제 포함될 때만 연결되며 대화가 후보 제한을 우회하지 않는다.
+- LLM 식별자는 32자 이내다. C01\~C12를 문서 순서와 무관한 고정 카드 ID로 사용하는 안을 제안하며, 수정 이력은 version으로 관리하고 삭제 ID는 재사용하지 않는다.
+- 운영 승인은 12개 전체가 아니라 핵심 2\~3개부터 받을 수 있다. 다른 카드는 draft로 유지하고 승인 카드만 검색에 사용한다. 좌식 카드는 기존 서버 후보에 실제 포함될 때만 연결되며 대화가 후보 제한을 우회하지 않는다.
 - 외부 예측 모델의 현재 버전 확인과 모델 파일 다운로드·큐/워커 연결은 C/A 범위다. 실제 done → reco 자동 전환 확인은 워커 연결 후 통합 검사로 남긴다.
 
 ## 현재 키·목표 계약
@@ -49,7 +49,7 @@ LLM 제안에는 난이도·시간·횟수·점수·기간·새 factor를 넣지
 - app/services/rag_cards.py: 카드 스키마·승인 필터·질문·검색·선택 검증.
 - app/services/rag_provider.py: SelectionProvider, OpenAI Responses API의 엄격한 JSON 스키마 선택 어댑터.
 - app/services/conversation_recommendations.py: 서버가 생성한 규칙 후보를 개인화하는 내부 연결.
-- docs/01_planning/chatbot/cards-draft-20261012.json: C01~C12의 출처·연결 키·상황·승인 상태.
+- docs/01_planning/chatbot/cards-draft-20261012.json: C01\~C12의 출처·연결 키·상황·승인 상태.
 - docs/01_planning/chatbot/golden-cases-20261012.json: 최신 계약의 20개 평가 입력·기대 결과.
 - scripts/evaluate_rag_preparation.py: 외부 호출 없이 실행하는 고정 평가.
 
@@ -86,7 +86,7 @@ DB 저장이 실패하면 트랜잭션 전체가 취소된다. 다른 사용자 
 | 입력 | weight 제안 | 의미 |
 | --- | --- | --- |
 | alcohol_frequency=1, alcohol_amount가 NULL/0 | 0 | 비음주 코드. 추천하지 않음 |
-| alcohol_frequency=2~6 | 1 | 기존 비음주일 챌린지 적용 후보. 위험음주 등급 판정 아님 |
+| alcohol_frequency=2\~6 | 1 | 기존 비음주일 챌린지 적용 후보. 위험음주 등급 판정 아님 |
 | 결측·비유효 코드·빈도 1인데 양 양수 | 미평가 | 추정하지 않음 |
 | alcohol_amount 요인 | 기존 보류 | 이 작업에서 양별 cutoff를 승인하지 않음 |
 
@@ -104,7 +104,7 @@ uv run --group app --no-sync python -m scripts.evaluate_rag_preparation
 
 평가 보고서의 20개는 승인 테스트 fixture로 수행한 태그 검색·JSON 검증·D28 계약 체크다.
 실제 LLM의 선택·설명 정확도, 임상 효과, 팀 운영 승인이나 검색 품질 90% 달성을 입증하지 않는다.
-기존 초안의 E17~E19처럼 미확정이던 주기 사례는 현재 공통 D28·허용 키·중복 정책 기준으로 다시 작성했다.
+기존 초안의 E17\~E19처럼 미확정이던 주기 사례는 현재 공통 D28·허용 키·중복 정책 기준으로 다시 작성했다.
 
 확인한 외부 출처:
 - WHO Physical activity, 2024-06-26, Overview / How much physical activity is recommended?: https://www.who.int/news-room/fact-sheets/detail/physical-activity (확인 2026-10-12).
