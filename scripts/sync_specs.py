@@ -56,6 +56,8 @@ def cell(value: Any) -> str:
         value = int(value)
     text = str(value).strip()
     text = text.replace("\r\n", " ").replace("\n", " ").replace("|", "\\|")
+    # GitHub 은 한 줄의 물결표 두 개 사이를 취소선으로 그린다. 범위 표기(1~7)가 지워지지 않게 이스케이프한다
+    text = text.replace("~", "\\~")
     return re.sub(r"\s{2,}", " ", text)
 
 

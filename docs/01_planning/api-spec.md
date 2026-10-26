@@ -1,6 +1,6 @@
 # 당고킬러 API 명세서
 
-> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-20 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_API 명세서`입니다. 이 파일은 2026-10-26 기준 사본입니다.
 > 계약을 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -300,7 +300,7 @@
 `GET /api/v1/predictions/{prediction_id}/contributions`
 
 - **인증**: 필요
-- **요청 파라미터**: prediction_id(양의 정수), disease=diabetes\|hypertension(선택), limit=1~100(기본 100; 화면은 3 지정). limit은 질환마다 따로 적용한다
+- **요청 파라미터**: prediction_id(양의 정수), disease=diabetes\|hypertension(선택), limit=1\~100(기본 100; 화면은 3 지정). limit은 질환마다 따로 적용한다
 - **요청 본문**: —
 - **응답 (성공)**: HTTP 200 { success:true, data:{ prediction_id, status:"pending"\|"done"\|"failed", model_version, model_experimental, factor_dictionary_version, contribution_unit:"probability", diseases:[{ disease, items:[{ factor_key, contribution, direction, rank, modifiable }] }] } }. pending/failed 상태에는 diseases 생략; done이면 질환별로 지원 factor 전량(0 포함). disease 생략 시 예측에 포함된 모든 미진단 질환을 담고, disease 지정 시에도 길이 1 배열로 같은 모양을 쓴다. rank는 질환 안에서 매긴다
 - **주요 에러**: NOT_FOUND(404), PRED_NOT_FOUND(404 · disease를 지정했는데 그 질환 결과가 없음), VALIDATION_ERROR(400), UNAUTHORIZED(401), INTERNAL_ERROR(500)
@@ -318,7 +318,7 @@
 
 - **인증**: 필요
 - **요청 파라미터**: — (토큰 사용자 기준)
-- **요청 본문**: 간편(simple, 최근 4주): weight_kg, waist_cm, smoking_current, alcohol_frequency, alcohol_amount(음주 시), walking_days, walking_minutes, strength_days, sitting_minutes, family_history_dm, family_history_htn, dining_out_freq(1~7). birth_year·sex·height_cm은 A users 프로필에서 입력·수정하고 C 화면에서 확인한다(누락 시 저장/예측 불가). bmi는 height_cm·weight_kg로 서버 계산. 정밀(detail): 간편값 + sbp, dbp, fasting_glucose, hba1c, triglyceride, hdl(6항목 선택). total_cholesterol은 현재 사용자 입력에서 제외. 일일(daily): weight_kg, waist_cm, sbp, dbp, fasting_glucose 전부 선택. 하나 이상 있으면 저장하고 전부 비면 400. 예측을 호출하지 않는다
+- **요청 본문**: 간편(simple, 최근 4주): weight_kg, waist_cm, smoking_current, alcohol_frequency, alcohol_amount(음주 시), walking_days, walking_minutes, strength_days, sitting_minutes, family_history_dm, family_history_htn, dining_out_freq(1\~7). birth_year·sex·height_cm은 A users 프로필에서 입력·수정하고 C 화면에서 확인한다(누락 시 저장/예측 불가). bmi는 height_cm·weight_kg로 서버 계산. 정밀(detail): 간편값 + sbp, dbp, fasting_glucose, hba1c, triglyceride, hdl(6항목 선택). total_cholesterol은 현재 사용자 입력에서 제외. 일일(daily): weight_kg, waist_cm, sbp, dbp, fasting_glucose 전부 선택. 하나 이상 있으면 저장하고 전부 비면 400. 예측을 호출하지 않는다
 - **응답 (성공)**: { health_record_id, input_mode, recorded_at, bmi } (201)
 - **주요 에러**: HLTH_PROFILE_INCOMPLETE(400: birth_year·sex·height_cm 누락), HLTH_VALUE_OUT_OF_RANGE(400: 허용 범위 포함), VALIDATION_ERROR, UNAUTHORIZED
 - **관련 요구사항**: REQ-HLTH-001·002·003·004
@@ -401,7 +401,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음. ※ A 제안 — 10/6. 응답 최상위에 model_version, model_experimental 추가. model_version은 이 추천을 만든 모델 버전으로 predictions.model_version과 같은 값이며 CharField(64)를 넘지 않는다. model_experimental은 boolean으로, 아직 독립 검증을 통과하지 않은 실험 아티팩트로 만든 추천이면 true다. 화면은 true일 때 실험 모델임을 표시한다. 추천 가능 여부와 factor_score 계산에는 영향을 주지 않는다. 추천 카드 조회(CHLG-02)에는 넣지 않았다. 생성 당시 실험 여부를 저장할 컬럼이 없어 지금 아티팩트 기준으로 붙이면 다른 모델로 만든 카드에 틀린 표시가 붙기 때문이다. D 확인 완료 — 2026.10.12 김이경, ※ 10/12 추가. 응답 최상위에 cycle_end_date. 연결된 주기의 end_date 이며 KST YYYY-MM-DD 다. 화면이 남은 기간을 계산하는 데 쓴다. ※ 시트 누락 보완 — 10/12. items 각 항목에 목표 안내 필드가 함께 나간다: context_type, daily_target_count, target_value, unit, daily_xp, safety_check_required, manual_fallback_allowed. 선택 전 안내값이며 시작 이후에는 미션 snapshot 을 쓴다. 응답 최상위에 remaining_slots 도 있다. 셋 다 이번에 새로 만든 필드가 아니라 기존 구현에 있던 것을 명세에 반영한 것이다. ※ 2026.10.15 추천 불가 구분: 기존 CHLG_RECOMMENDATION_UNAVAILABLE(409)에 error.reason 추가. model_unavailable=모델 자료 부재, target_unavailable=공략 대상 미산정, slots_unavailable=추가 슬롯 없음, no_additional_candidates=진행 미션이 있는 상태에서 남은 후보 없음, no_eligible_candidates=승인 후보 없음, no_positive_factors=현재 기록에서 양수 추천 요인 없음. no_additional_candidates·slots_unavailable은 진행 중인 공략으로 안내. 원인이 지정된 409는 예측 완료 직후에도 자동 재시도하지 않음. 기존 reason 없는 409의 한정 재시도는 유지.
+- **응답 (성공)**: { items: [{ recommendation_id, challenge_id, title, factor_key, factor_score, rank, difficulty, verification_type, context_label, cycle_id, target_monster: { monster_id, code, name } }], total } ※ factor_score는 0\~100 개인화 점수. 미진단 질환은 개인 SHAP normalized_score, 진단 질환은 global normalized_score × behavior_weight를 사용. factor별 behavior_weight 변환 기준은 2주차 모델 1회전 후 확정. ※ target_monster는 이번 주기의 공략 대상 캐릭터. factor_key로 매핑하며 한 주기에 한 캐릭터만 공략한다 (REQ-RECO-006). ※ 1단계 집중 공략 수용안: 추천을 연결한 draft/active 주기의 대상 monsters.factor_keys에 해당하는 승인 후보만 제시. 적합 후보가 없으면 보류. cycle_id는 서버가 현재 주기로 연결하며 지난 주기 추천을 재사용하지 않는다. ※ 첫 추천은 기간이 없는 draft 주기에 연결 가능. 기존 active 주기가 있으면 그 주기에서 후보 검색. 사용자 확인 전에는 기간 시작 없음. ※ A 제안 — 10/6. 응답 최상위에 model_version, model_experimental 추가. model_version은 이 추천을 만든 모델 버전으로 predictions.model_version과 같은 값이며 CharField(64)를 넘지 않는다. model_experimental은 boolean으로, 아직 독립 검증을 통과하지 않은 실험 아티팩트로 만든 추천이면 true다. 화면은 true일 때 실험 모델임을 표시한다. 추천 가능 여부와 factor_score 계산에는 영향을 주지 않는다. 추천 카드 조회(CHLG-02)에는 넣지 않았다. 생성 당시 실험 여부를 저장할 컬럼이 없어 지금 아티팩트 기준으로 붙이면 다른 모델로 만든 카드에 틀린 표시가 붙기 때문이다. D 확인 완료 — 2026.10.12 김이경, ※ 10/12 추가. 응답 최상위에 cycle_end_date. 연결된 주기의 end_date 이며 KST YYYY-MM-DD 다. 화면이 남은 기간을 계산하는 데 쓴다. ※ 시트 누락 보완 — 10/12. items 각 항목에 목표 안내 필드가 함께 나간다: context_type, daily_target_count, target_value, unit, daily_xp, safety_check_required, manual_fallback_allowed. 선택 전 안내값이며 시작 이후에는 미션 snapshot 을 쓴다. 응답 최상위에 remaining_slots 도 있다. 셋 다 이번에 새로 만든 필드가 아니라 기존 구현에 있던 것을 명세에 반영한 것이다. ※ 2026.10.15 추천 불가 구분: 기존 CHLG_RECOMMENDATION_UNAVAILABLE(409)에 error.reason 추가. model_unavailable=모델 자료 부재, target_unavailable=공략 대상 미산정, slots_unavailable=추가 슬롯 없음, no_additional_candidates=진행 미션이 있는 상태에서 남은 후보 없음, no_eligible_candidates=승인 후보 없음, no_positive_factors=현재 기록에서 양수 추천 요인 없음. no_additional_candidates·slots_unavailable은 진행 중인 공략으로 안내. 원인이 지정된 409는 예측 완료 직후에도 자동 재시도하지 않음. 기존 reason 없는 409의 한정 재시도는 유지.
 - **주요 에러**: CHLG_RECOMMENDATION_UNAVAILABLE, PRED_NOT_FOUND, UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-001·002
 - **사용 테이블**: predictions·prediction_contributions 읽기 / challenges 읽기 / challenge_recommendations 쓰기 / user_attack_cycles·user_monsters·monsters 읽기
@@ -452,7 +452,7 @@
 
 - **인증**: 필요
 - **요청 파라미터**: —
-- **요청 본문**: recommendation_ids: [int] (1~3개), safety_confirmed?: boolean. 시작 목표는 본인 추천의 검증된 proposed_goal에서 읽고 허용 조합·슬롯·기회를 재검증한다. 초기 진행 합계 최대 2개, 2주차부터 적합 후보와 사용자 희망일 때 주기당 1개 추가, 기존 포함 최대 3개. safety_check_required=true인 마스터만 사용자가 직접 safety_confirmed=true로 확인; LLM 생성값 불인정. ※ 공략 미션은 본인 주기와 연결한다. 첫 시작은 draft→active 전환을 함께 검증하고, 추가 시작은 기존 active 주기만 허용한다. 추천의 cycle_id가 그 주기와 같아야 하며 challenge.factor_key가 대상 monsters.factor_keys에 포함되어야 한다. LLM이 대상/주기를 바꾸지 않는다. 기존 + scheduled_dates: ["YYYY-MM-DD", ...] 예정 이용일을 사용자가 확인해야 하는 챌린지에 쓴다. CH_WALK_ONE_STOP 처럼 발생 시점을 추정할 수 없는 카드가 해당한다. 평일·매일로 추정하지 않는다. ※ 첫 사용자 확인 때 draft 주기→active와 D0/D28을 함께 확정. 추천 조회로 기간을 시작하지 않음. 미션 생성·주기 전환은 동일 트랜잭션.
+- **요청 본문**: recommendation_ids: [int] (1\~3개), safety_confirmed?: boolean. 시작 목표는 본인 추천의 검증된 proposed_goal에서 읽고 허용 조합·슬롯·기회를 재검증한다. 초기 진행 합계 최대 2개, 2주차부터 적합 후보와 사용자 희망일 때 주기당 1개 추가, 기존 포함 최대 3개. safety_check_required=true인 마스터만 사용자가 직접 safety_confirmed=true로 확인; LLM 생성값 불인정. ※ 공략 미션은 본인 주기와 연결한다. 첫 시작은 draft→active 전환을 함께 검증하고, 추가 시작은 기존 active 주기만 허용한다. 추천의 cycle_id가 그 주기와 같아야 하며 challenge.factor_key가 대상 monsters.factor_keys에 포함되어야 한다. LLM이 대상/주기를 바꾸지 않는다. 기존 + scheduled_dates: ["YYYY-MM-DD", ...] 예정 이용일을 사용자가 확인해야 하는 챌린지에 쓴다. CH_WALK_ONE_STOP 처럼 발생 시점을 추정할 수 없는 카드가 해당한다. 평일·매일로 추정하지 않는다. ※ 첫 사용자 확인 때 draft 주기→active와 D0/D28을 함께 확정. 추천 조회로 기간을 시작하지 않음. 미션 생성·주기 전환은 동일 트랜잭션.
 - **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, cycle_id, status, start_date, end_date, daily_target_count, target_value, duration_days, goal_config_snapshot }], active_count } ※ 목표는 개인 snapshot. 같은 공략 주기 D28 00:00 KST 종료, end_date는 마지막 수행일(D0+27) 포함. D7 추가 duration_days=21. 공통 마스터를 사용자별로 덮어쓰지 않는다. ※ 응답 cycle_id는 연결 주기 ID. 주기 end_date로 공통 종료·실제 일수를 snapshot 저장. 상대 주차는 주기 시작일로 계산. 추가 시작은 주기 잠금 후 extra_added_count≤1 검증.
 - **주요 에러**: CHLG_LIMIT_EXCEEDED, CHLG_RECOMMENDATION_NOT_FOUND, CHLG_ALREADY_ACTIVE, CHLG_SAFETY_CONFIRMATION_REQUIRED, VALIDATION_ERROR
 - **관련 요구사항**: REQ-CHLG-002 · REQ-CHLG-010 · REQ-CHLG-011 · REQ-CHLG-012
@@ -466,7 +466,7 @@
 - **인증**: 필요
 - **요청 파라미터**: ?status=active&page=1&size=20
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, title, factor_key, difficulty, verification_type, context_type, context_label, cycle_id, cycle_week, target_monster: { monster_id, code, name }, start_date, end_date, completed_count, daily_target_count, target_value, goal_config_snapshot, scheduled_opportunity_count, progress_rate, habit_established }], total, page, size } ※ difficulty·목표·슬롯은 사용자 snapshot. completed_count=인정 완료한 예정 기회, progress_rate=완료 기회/해당 기간 예정 기회(0~1, 분모 0이면 NULL). weekly_progress 게임 점수와 별개. 초기 최대 2개, 2주차부터 적합 후보+사용자 희망일 때 주기당 하나 추가·진행 포함 최대 3개. 1단계 habit_established=NULL 미평가, 습관 졸업 표시 없음. ※ cycle_week는 주기 start_date로 계산한 응답값이며 DB 중복 저장하지 않는다. 대상·공통 종료는 cycle_id의 주기에서 조회. ※ v5 새로고침 복원: today_occurrences 각 항목에 timer_session_id?: int 추가. 이미 시작한 서버 타이머가 있는 기회만 식별자를 반환하며 조회만으로 타이머를 시작하지 않는다.
+- **응답 (성공)**: { items: [{ user_challenge_id, challenge_id, title, factor_key, difficulty, verification_type, context_type, context_label, cycle_id, cycle_week, target_monster: { monster_id, code, name }, start_date, end_date, completed_count, daily_target_count, target_value, goal_config_snapshot, scheduled_opportunity_count, progress_rate, habit_established }], total, page, size } ※ difficulty·목표·슬롯은 사용자 snapshot. completed_count=인정 완료한 예정 기회, progress_rate=완료 기회/해당 기간 예정 기회(0\~1, 분모 0이면 NULL). weekly_progress 게임 점수와 별개. 초기 최대 2개, 2주차부터 적합 후보+사용자 희망일 때 주기당 하나 추가·진행 포함 최대 3개. 1단계 habit_established=NULL 미평가, 습관 졸업 표시 없음. ※ cycle_week는 주기 start_date로 계산한 응답값이며 DB 중복 저장하지 않는다. 대상·공통 종료는 cycle_id의 주기에서 조회. ※ v5 새로고침 복원: today_occurrences 각 항목에 timer_session_id?: int 추가. 이미 시작한 서버 타이머가 있는 기회만 식별자를 반환하며 조회만으로 타이머를 시작하지 않는다.
 - **주요 에러**: UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-003·004·005·011 · REQ-RECO-006
 - **사용 테이블**: user_challenges·challenges·challenge_logs 읽기 / user_attack_cycles·user_monsters·monsters 읽기
@@ -518,7 +518,7 @@
 - **인증**: 필요
 - **요청 파라미터**: —
 - **요청 본문**: —
-- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, is_target, weekly_progress, progress_week_start, seal_progress, sealed_at, seal_count, reawakened_at, impact_source }] } ※ state: rage \| caution \| stable \| not_contributing \| resolved \| sealed \| unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시. ※ is_target은 active 주기의 대상과 일치하는지 계산한 표시값이다. user_monsters.is_target 저장은 제거안이며 공략 주기 테이블을 조인한다 (REQ-RECO-006 수용안). seal_progress는 28일 누적 진행률 0~100으로 외형 단계 표시에 쓴다 (REQ-RECO-008). 봉인은 재측정으로 위협도가 올라가도 해제되지 않으며 reawakened_at에 상승 시각만 기록한다 (REQ-RECO-007). ※ 10/12 CHLG-10 연동. items 각 항목에 user_monster_id(없으면 null), target_change_allowed(boolean) 추가. target_change_allowed 는 현재 주기가 draft 이고, 해당 요인에 user_monster 행이 있고, state 가 rage/caution/stable 이고, impact_score 가 null 이 아닐 때만 true. is_target 은 draft·active 중 현재 주기의 target_user_monster_id 와 비교해 계산한다. 화면은 target_change_allowed 가 true 인 항목에만 대상 변경 버튼을 노출한다. ※ 2026.10.15 D 산정 설명 추가: items 각 항목에 impact_explanation:{status:available\|unavailable\|pending, model_version?, policy_version?, calculated_at?, winners:[{disease,factor_key,score,source}]} 추가. 저장 당시 snapshot과 점수·출처·근거 참조 일치할 때만 available. 과거 snapshot 없는 점수는 unavailable, 미산정은 pending. 동점 대표 요인은 모두 반환, 현재 모델로 과거 설명 역산 금지.
+- **응답 (성공)**: { items: [{ monster_id, code, name, title, disease_scope, impact_score, state, is_target, weekly_progress, progress_week_start, seal_progress, sealed_at, seal_count, reawakened_at, impact_source }] } ※ state: rage \| caution \| stable \| not_contributing \| resolved \| sealed \| unmeasured. 공략 대상은 rage·caution·stable만. not_contributing은 '현재 위험 기여 없음', resolved는 '요인 해소됨'으로 표시. ※ is_target은 active 주기의 대상과 일치하는지 계산한 표시값이다. user_monsters.is_target 저장은 제거안이며 공략 주기 테이블을 조인한다 (REQ-RECO-006 수용안). seal_progress는 28일 누적 진행률 0\~100으로 외형 단계 표시에 쓴다 (REQ-RECO-008). 봉인은 재측정으로 위협도가 올라가도 해제되지 않으며 reawakened_at에 상승 시각만 기록한다 (REQ-RECO-007). ※ 10/12 CHLG-10 연동. items 각 항목에 user_monster_id(없으면 null), target_change_allowed(boolean) 추가. target_change_allowed 는 현재 주기가 draft 이고, 해당 요인에 user_monster 행이 있고, state 가 rage/caution/stable 이고, impact_score 가 null 이 아닐 때만 true. is_target 은 draft·active 중 현재 주기의 target_user_monster_id 와 비교해 계산한다. 화면은 target_change_allowed 가 true 인 항목에만 대상 변경 버튼을 노출한다. ※ 2026.10.15 D 산정 설명 추가: items 각 항목에 impact_explanation:{status:available\|unavailable\|pending, model_version?, policy_version?, calculated_at?, winners:[{disease,factor_key,score,source}]} 추가. 저장 당시 snapshot과 점수·출처·근거 참조 일치할 때만 available. 과거 snapshot 없는 점수는 unavailable, 미산정은 pending. 동점 대표 요인은 모두 반환, 현재 모델로 과거 설명 역산 금지.
 - **주요 에러**: UNAUTHORIZED
 - **관련 요구사항**: REQ-CHLG-007 · REQ-RECO-005·006·007·008 · REQ-PRED-010·011
 - **사용 테이블**: monsters·user_monsters 읽기 / user_attack_cycles 읽기
@@ -608,7 +608,7 @@
 
 - **인증**: 필요
 - **요청 파라미터**: path: draw_id
-- **요청 본문**: { positions: [2] } (0~4 중 1개)
+- **요청 본문**: { positions: [2] } (0\~4 중 1개)
 - **응답 (성공)**: { draw_id, selected_positions, results: [{ code, name, slot, rarity, asset, duplicate, materials }], claimed_at }. 동일 선택 재요청은 동일 영수증 반환, 선택 변경은 거절
 - **주요 에러**: UNAUTHORIZED, CHLG_NOT_FOUND, VALIDATION_ERROR
 - **관련 요구사항**: REQ-RECO-010
