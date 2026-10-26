@@ -1,12 +1,23 @@
 name: deploy
 
-# v1.0.1 같은 버전 태그를 올리면 그 버전으로 운영 서버에 배포한다.
-# v* 태그는 저장소 관리자만 만들 수 있고(「배포 태그 보호」 규칙),
-# Secrets는 v* 태그 실행에만 열리는 production 환경에 있다.
+# main에 머지되면 운영 서버에 바로 배포한다. 버전은 실행 번호로 v1.1.N 을 붙인다.
+# Secrets는 main 브랜치 실행에만 열리는 production 환경에 있다.
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches:
+      - main
+    # 서버에서 도는 코드·화면·시드 원본이 바뀔 때만 배포한다. 문서만 바뀐 머지는 건너뛴다
+    paths:
+      - 'app/**'
+      - 'ai_worker/**'
+      - 'frontend/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'docs/01_planning/*-master.csv'
+      - '.github/workflows/deploy.yml'
+  # Actions 탭에서 main을 골라 다시 배포할 수 있다
+  workflow_dispatch:
 
 # 배포가 겹치지 않게 한 번에 하나씩 돌린다
 concurrency:
@@ -22,25 +33,19 @@ jobs:
     environment: production
     env:
       IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/dangokiller
-      VERSION: ${{ github.ref_name }}
+      VERSION: v1.1.${{ github.run_number }}
     steps:
       # 외부 Action은 커밋 해시로 고정한다. 주석은 그 해시의 버전이다
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
 
-      - name: 태그 형식과 main 포함 여부 확인
+      - name: main 브랜치 확인
         run: |
-          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::태그는 vX.Y.Z 형식이어야 합니다: $VERSION"
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::main 브랜치에서만 배포합니다: $GITHUB_REF"
             exit 1
           fi
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::main에 머지되지 않은 커밋의 태그는 배포하지 않습니다."
-            exit 1
-          fi
+          echo "배포 버전: $VERSION ($GITHUB_SHA)"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
