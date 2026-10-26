@@ -106,6 +106,30 @@ NEW_CODES = {
     "CH_STRENGTH_10": "strength",
     "CH_NO_DRINK_TODAY": "no_drink",
     "CH_NO_SMOKE_TODAY": "no_smoke",
+    "CH_WALK_EVENING_20": "evening_walk",
+    "CH_HOUSEWORK_15": "housework",
+    "CH_SQUAT_15": "squat",
+    "CH_WALL_PUSHUP_10": "wall_pushup",
+    "CH_STAND_CALL": "stand_call",
+    "CH_SCREEN_BREAK": "screen_break",
+    "CH_WATER_NOT_SWEET": "sweet_drink",
+    "CH_NO_LATE_SNACK": "late_snack",
+    "CH_NO_ALCOHOL_AT_HOME": "home_alcohol",
+    "CH_ALCOHOL_FREE_DRINK": "alcohol_free",
+    "CH_POSTPONE_DRINKS": "postpone_drinks",
+    "CH_DELAY_FIRST_CIG": "first_cig",
+    "CH_SMOKE_FREE_HOME": "smoke_free_home",
+    "CH_QUIT_REASON": "quit_reason",
+}
+ACTIVITY_FIELDS = {
+    "stairs",
+    "strength",
+    "evening_walk",
+    "housework",
+    "squat",
+    "wall_pushup",
+    "stand_call",
+    "screen_break",
 }
 
 
@@ -116,13 +140,13 @@ def test_remaining_phase1_codes_are_supported_only_after_a_yes(code: str, field:
     assert SituationAnswers.model_validate({field: "yes"}).supports(code)
 
 
-def test_activity_limit_answer_exists_only_for_activity_challenges() -> None:
-    assert not SituationAnswers(stairs="limited").supports("CH_STAIRS")
-    assert not SituationAnswers(strength="limited").supports("CH_STRENGTH_10")
-    with pytest.raises(ValidationError):
-        SituationAnswers.model_validate({"no_drink": "limited"})
-    with pytest.raises(ValidationError):
-        SituationAnswers.model_validate({"no_smoke": "limited"})
+@pytest.mark.parametrize(("code", "field"), NEW_CODES.items())
+def test_activity_limit_answer_exists_only_for_activity_challenges(code: str, field: str) -> None:
+    if field in ACTIVITY_FIELDS:
+        assert not SituationAnswers.model_validate({field: "limited"}).supports(code)
+    else:
+        with pytest.raises(ValidationError):
+            SituationAnswers.model_validate({field: "limited"})
 
 
 def test_questions_follow_the_codes_in_the_current_batch() -> None:

@@ -43,6 +43,20 @@ FIXED_GOALS: dict[str, tuple[Decimal | None, int, list[str] | None, str]] = {
     "CH_STRENGTH_10": (Decimal("10"), 1, None, "timer"),
     "CH_NO_DRINK_TODAY": (None, 1, None, "manual"),
     "CH_NO_SMOKE_TODAY": (None, 1, None, "manual"),
+    "CH_WALK_EVENING_20": (Decimal("20"), 1, None, "timer"),
+    "CH_HOUSEWORK_15": (Decimal("15"), 1, None, "timer"),
+    "CH_SQUAT_15": (Decimal("15"), 1, None, "manual"),
+    "CH_WALL_PUSHUP_10": (Decimal("10"), 1, None, "manual"),
+    "CH_STAND_CALL": (None, 1, None, "manual"),
+    "CH_SCREEN_BREAK": (None, 1, None, "manual"),
+    "CH_WATER_NOT_SWEET": (None, 1, None, "manual"),
+    "CH_NO_LATE_SNACK": (None, 1, None, "manual"),
+    "CH_NO_ALCOHOL_AT_HOME": (None, 1, None, "manual"),
+    "CH_ALCOHOL_FREE_DRINK": (None, 1, None, "manual"),
+    "CH_POSTPONE_DRINKS": (None, 1, None, "manual"),
+    "CH_DELAY_FIRST_CIG": (None, 1, None, "manual"),
+    "CH_SMOKE_FREE_HOME": (None, 1, None, "manual"),
+    "CH_QUIT_REASON": (None, 1, None, "manual"),
 }
 
 

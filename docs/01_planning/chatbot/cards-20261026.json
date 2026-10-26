@@ -356,5 +356,510 @@
     "reviewed_at": "2026-10-26",
     "approved_by": "배수빈",
     "policy_note": "WHO는 상담과 약물이 금연 성공 가능성을 두 배 넘게 높인다고 안내한다. 하루 금연 목표는 팀 운영 기준이며 금연 치료를 대신하지 않는다."
+  },
+  {
+    "card_id": "C21",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_WALK_EVENING_20",
+    "tags": [
+      "저녁",
+      "퇴근 후",
+      "산책",
+      "동네"
+    ],
+    "guidance": "저녁에 20분 이어서 걸을 시간이 있다고 답한 경우에만 저녁 20분 걷기를 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 어떤 활동이든 안 하는 것보다 낫다고 안내한다. 20분이라는 시간과 하루 1회 목표는 팀 운영 기준이며 건강 개선을 보장하지 않는다."
+  },
+  {
+    "card_id": "C22",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_WALK_EVENING_20",
+    "tags": [
+      "피곤",
+      "다리",
+      "아파",
+      "숨이 차"
+    ],
+    "guidance": "걷기가 불편하거나 활동 제한이 있다고 답하면 저녁 걷기를 제안하지 않고 보류한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 어떤 활동이든 안 하는 것보다 낫다고 안내한다. 20분이라는 시간과 하루 1회 목표는 팀 운영 기준이며 건강 개선을 보장하지 않는다."
+  },
+  {
+    "card_id": "C23",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_HOUSEWORK_15",
+    "tags": [
+      "청소",
+      "빨래",
+      "집안일",
+      "주말"
+    ],
+    "guidance": "따로 운동할 시간이 없어도 청소처럼 몸을 쓰는 집안일을 15분 할 수 있다고 답하면 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "Overview",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 일이나 집안 활동 중의 움직임도 신체활동으로 본다. 15분 목표와 집안일 예시는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C24",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_HOUSEWORK_15",
+    "tags": [
+      "육아",
+      "집에 있",
+      "바빠",
+      "운동 시간 없"
+    ],
+    "guidance": "집에 머무는 시간이 길다고 답한 경우 집안일을 움직일 기회로 연결한다. 15분 목표는 줄이지 않는다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "Overview",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 일이나 집안 활동 중의 움직임도 신체활동으로 본다. 15분 목표와 집안일 예시는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C25",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_SQUAT_15",
+    "tags": [
+      "스쿼트",
+      "다리",
+      "근력",
+      "집에서"
+    ],
+    "guidance": "의자를 뒤에 두고 앉았다 일어나기를 15회 할 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 근력 운동이 모두에게 이롭다고 안내한다. 횟수 목표는 팀 운영 기준이며, 시작 전 안전 확인은 기존 시작 단계(CHLG-05)가 한다."
+  },
+  {
+    "card_id": "C26",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_SQUAT_15",
+    "tags": [
+      "무릎",
+      "허리",
+      "통증",
+      "불편"
+    ],
+    "guidance": "무릎이나 허리가 불편하다고 답하면 스쿼트를 제안하지 않고 보류한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 근력 운동이 모두에게 이롭다고 안내한다. 횟수 목표는 팀 운영 기준이며, 시작 전 안전 확인은 기존 시작 단계(CHLG-05)가 한다."
+  },
+  {
+    "card_id": "C27",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_WALL_PUSHUP_10",
+    "tags": [
+      "팔",
+      "상체",
+      "팔굽혀펴기",
+      "벽"
+    ],
+    "guidance": "벽에 손을 짚고 팔굽혀펴기를 10회 할 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 근력 운동이 모두에게 이롭다고 안내한다. 횟수 목표는 팀 운영 기준이며, 시작 전 안전 확인은 기존 시작 단계(CHLG-05)가 한다."
+  },
+  {
+    "card_id": "C28",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_WALL_PUSHUP_10",
+    "tags": [
+      "어깨",
+      "손목",
+      "아파",
+      "처음"
+    ],
+    "guidance": "어깨나 손목이 불편하다고 답하면 제안하지 않고 보류한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 근력 운동이 모두에게 이롭다고 안내한다. 횟수 목표는 팀 운영 기준이며, 시작 전 안전 확인은 기존 시작 단계(CHLG-05)가 한다."
+  },
+  {
+    "card_id": "C29",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_STAND_CALL",
+    "tags": [
+      "전화",
+      "통화",
+      "회의",
+      "업무"
+    ],
+    "guidance": "통화가 많고 서서 받을 수 있다고 답한 경우 통화는 서서 하기를 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 모든 연령이 앉아 있는 시간을 줄여야 한다고 안내한다. 서서 통화하기·30분마다 일어나기는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C30",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_STAND_CALL",
+    "tags": [
+      "운전",
+      "이동 중",
+      "서기 어려",
+      "해당 없음"
+    ],
+    "guidance": "운전 중이거나 서기 어려운 상황이 많다고 답하면 제안하지 않는다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 모든 연령이 앉아 있는 시간을 줄여야 한다고 안내한다. 서서 통화하기·30분마다 일어나기는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C31",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_SCREEN_BREAK",
+    "tags": [
+      "TV",
+      "영상",
+      "유튜브",
+      "휴대폰",
+      "드라마"
+    ],
+    "guidance": "영상을 오래 본다고 답하고 30분마다 일어날 수 있다고 한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 모든 연령이 앉아 있는 시간을 줄여야 한다고 안내한다. 서서 통화하기·30분마다 일어나기는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C32",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_SCREEN_BREAK",
+    "tags": [
+      "밤",
+      "누워서",
+      "소파",
+      "몰아보기"
+    ],
+    "guidance": "누워서 오래 보는 습관이 있다고 답한 경우 30분마다 일어나 몸을 풀도록 안내한다. 기존 하루 1회 확인 목표는 바꾸지 않는다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/physical-activity",
+    "source_section": "How much physical activity is recommended?",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 모든 연령이 앉아 있는 시간을 줄여야 한다고 안내한다. 서서 통화하기·30분마다 일어나기는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C33",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_WATER_NOT_SWEET",
+    "tags": [
+      "탄산",
+      "음료",
+      "단 커피",
+      "주스"
+    ],
+    "guidance": "단 음료를 자주 마신다고 답하고 물로 바꿀 수 있다고 한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+    "source_section": "WHO guidance on healthy diets; Sugars",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 유리당을 하루 에너지의 10% 미만으로 제한하라고 안내한다. 단 음료를 물로 바꾸는 하루 목표와 체중 변화는 팀 운영 기준이며 효과를 약속하지 않는다."
+  },
+  {
+    "card_id": "C34",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_WATER_NOT_SWEET",
+    "tags": [
+      "회사",
+      "자판기",
+      "편의점",
+      "카페"
+    ],
+    "guidance": "밖에서 음료를 사 마시는 경우가 많다고 답하면 물이나 단맛 없는 차를 고르도록 안내한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+    "source_section": "WHO guidance on healthy diets; Sugars",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 유리당을 하루 에너지의 10% 미만으로 제한하라고 안내한다. 단 음료를 물로 바꾸는 하루 목표와 체중 변화는 팀 운영 기준이며 효과를 약속하지 않는다."
+  },
+  {
+    "card_id": "C35",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_NO_LATE_SNACK",
+    "tags": [
+      "야식",
+      "밤",
+      "배달",
+      "늦게"
+    ],
+    "guidance": "저녁 식사 뒤로 야식을 먹지 않을 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+    "source_section": "Overview",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 건강한 식사가 비감염성 질환 예방을 돕는다고 안내한다. 식사 시간이나 야식은 이 페이지에 나오지 않으며, 야식 줄이기는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C36",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_NO_LATE_SNACK",
+    "tags": [
+      "야근",
+      "교대",
+      "밤 근무",
+      "해당 없음"
+    ],
+    "guidance": "밤에 일해서 식사 시간이 늦다고 답하면 야식 금지를 제안하지 않는다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+    "source_section": "Overview",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 건강한 식사가 비감염성 질환 예방을 돕는다고 안내한다. 식사 시간이나 야식은 이 페이지에 나오지 않으며, 야식 줄이기는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C37",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_NO_ALCOHOL_AT_HOME",
+    "tags": [
+      "집에서",
+      "냉장고",
+      "장보기",
+      "편의점"
+    ],
+    "guidance": "집에 술을 사두지 않을 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/alcohol",
+    "source_section": "Overview; Health risks of alcohol use",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 위험이 전혀 없는 음주는 없다고 안내한다. 술을 줄이는 방법과 하루 목표는 팀 운영 기준이며 음주량 평가나 질환 위험 감소를 약속하지 않는다."
+  },
+  {
+    "card_id": "C38",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_NO_ALCOHOL_AT_HOME",
+    "tags": [
+      "가족",
+      "선물",
+      "손님",
+      "해당 없음"
+    ],
+    "guidance": "가족이 마시거나 받은 술이 있다고 답하면 본인이 새로 사지 않는 것으로 안내한다. 하루 1회 확인 목표는 바꾸지 않는다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/alcohol",
+    "source_section": "Overview; Health risks of alcohol use",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 위험이 전혀 없는 음주는 없다고 안내한다. 술을 줄이는 방법과 하루 목표는 팀 운영 기준이며 음주량 평가나 질환 위험 감소를 약속하지 않는다."
+  },
+  {
+    "card_id": "C39",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_ALCOHOL_FREE_DRINK",
+    "tags": [
+      "반주",
+      "저녁",
+      "식사",
+      "무알코올"
+    ],
+    "guidance": "저녁 식사 때 술 대신 다른 음료를 마실 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/alcohol",
+    "source_section": "Overview; Health risks of alcohol use",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 위험이 전혀 없는 음주는 없다고 안내한다. 술을 줄이는 방법과 하루 목표는 팀 운영 기준이며 음주량 평가나 질환 위험 감소를 약속하지 않는다."
+  },
+  {
+    "card_id": "C40",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_ALCOHOL_FREE_DRINK",
+    "tags": [
+      "습관",
+      "맥주",
+      "소주",
+      "고기"
+    ],
+    "guidance": "식사에 습관처럼 술을 곁들인다고 답하면 물, 차, 무알코올 음료로 바꾸도록 안내한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/alcohol",
+    "source_section": "Overview; Health risks of alcohol use",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 위험이 전혀 없는 음주는 없다고 안내한다. 술을 줄이는 방법과 하루 목표는 팀 운영 기준이며 음주량 평가나 질환 위험 감소를 약속하지 않는다."
+  },
+  {
+    "card_id": "C41",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_POSTPONE_DRINKS",
+    "tags": [
+      "약속",
+      "회식",
+      "친구",
+      "모임"
+    ],
+    "guidance": "오늘 술 약속을 미루거나 술 없는 만남으로 바꿀 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/alcohol",
+    "source_section": "Overview; Health risks of alcohol use",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 위험이 전혀 없는 음주는 없다고 안내한다. 술을 줄이는 방법과 하루 목표는 팀 운영 기준이며 음주량 평가나 질환 위험 감소를 약속하지 않는다."
+  },
+  {
+    "card_id": "C42",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_POSTPONE_DRINKS",
+    "tags": [
+      "거절",
+      "눈치",
+      "직장",
+      "어려"
+    ],
+    "guidance": "약속을 거절하기 어렵다고 답하면 무리하게 제안하지 않고, 술 없는 만남을 제안해 보도록 안내한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/alcohol",
+    "source_section": "Overview; Health risks of alcohol use",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 위험이 전혀 없는 음주는 없다고 안내한다. 술을 줄이는 방법과 하루 목표는 팀 운영 기준이며 음주량 평가나 질환 위험 감소를 약속하지 않는다."
+  },
+  {
+    "card_id": "C43",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_DELAY_FIRST_CIG",
+    "tags": [
+      "아침",
+      "일어나",
+      "첫 담배",
+      "출근 전"
+    ],
+    "guidance": "아침 첫 담배를 30분 미룰 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+    "source_section": "Tobacco users need help to quit",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 상담과 약물이 금연 성공 가능성을 두 배 넘게 높인다고 안내한다. 첫 담배 미루기·이유 적기는 팀 운영 기준이며 금연 치료를 대신하지 않는다."
+  },
+  {
+    "card_id": "C44",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_DELAY_FIRST_CIG",
+    "tags": [
+      "커피",
+      "습관",
+      "참기 어려",
+      "금단"
+    ],
+    "guidance": "아침에 참기 어렵다고 답하면 상담이나 치료 같은 금연 도움을 받을 수 있다고 함께 안내한다. 의료 판단이나 약을 권하지 않는다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+    "source_section": "Tobacco users need help to quit",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 상담과 약물이 금연 성공 가능성을 두 배 넘게 높인다고 안내한다. 첫 담배 미루기·이유 적기는 팀 운영 기준이며 금연 치료를 대신하지 않는다."
+  },
+  {
+    "card_id": "C45",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_SMOKE_FREE_HOME",
+    "tags": [
+      "집",
+      "차",
+      "가족",
+      "아이"
+    ],
+    "guidance": "집 안과 차 안에서 피우지 않을 수 있다고 답한 경우에만 제안한다. 함께 지내는 사람이 간접흡연을 피할 수 있다고 안내한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+    "source_section": "Second-hand smoke kills",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 간접흡연에는 안전한 노출 수준이 없다고 안내한다. 집·차 안 금연 목표는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C46",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_SMOKE_FREE_HOME",
+    "tags": [
+      "베란다",
+      "창문",
+      "환기",
+      "혼자 살"
+    ],
+    "guidance": "창문을 열고 피우면 괜찮다고 여기는 경우에도 집 안 금연을 안내한다. 간접흡연에는 안전한 노출 수준이 없다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+    "source_section": "Second-hand smoke kills",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 간접흡연에는 안전한 노출 수준이 없다고 안내한다. 집·차 안 금연 목표는 팀 운영 기준이다."
+  },
+  {
+    "card_id": "C47",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_QUIT_REASON",
+    "tags": [
+      "이유",
+      "결심",
+      "건강",
+      "가족"
+    ],
+    "guidance": "담배를 끊고 싶은 이유를 적어 볼 수 있다고 답한 경우에만 제안한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+    "source_section": "Tobacco users need help to quit",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 상담과 약물이 금연 성공 가능성을 두 배 넘게 높인다고 안내한다. 첫 담배 미루기·이유 적기는 팀 운영 기준이며 금연 치료를 대신하지 않는다."
+  },
+  {
+    "card_id": "C48",
+    "version": "20261026-v1",
+    "status": "approved",
+    "challenge_code": "CH_QUIT_REASON",
+    "tags": [
+      "여러 번",
+      "실패",
+      "다시",
+      "도움"
+    ],
+    "guidance": "여러 번 끊으려다 실패했다고 답하면 상담이나 치료 같은 금연 도움을 받을 수 있다고 함께 안내한다.",
+    "source_url": "https://www.who.int/news-room/fact-sheets/detail/tobacco",
+    "source_section": "Tobacco users need help to quit",
+    "reviewed_at": "2026-10-26",
+    "approved_by": "배수빈",
+    "policy_note": "WHO는 상담과 약물이 금연 성공 가능성을 두 배 넘게 높인다고 안내한다. 첫 담배 미루기·이유 적기는 팀 운영 기준이며 금연 치료를 대신하지 않는다."
   }
 ]
