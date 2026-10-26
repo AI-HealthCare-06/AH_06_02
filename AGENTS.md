@@ -142,24 +142,25 @@ touching `users`. Level recalculation and level-up detection happen in A only.
 
 ## Changing the schema
 
-The source of truth for the DB schema is the **Google Sheet 테이블 명세서
-(table specification)**. Do not hand-edit the copies in this repository.
+The database is what the Tortoise models and the migrations in
+`app/core/db/migrations` say it is. With two people on the team the Google Sheet
+테이블 명세서 (table specification) is a record, not a gate: there is no
+approval step before coding.
 
-The order is: edit the sheet → tell the team → regenerate the ERD and DDL →
-write the migration → change the code.
+The order is: change the model → write the migration → change the code →
+bring the sheet up to date → regenerate the copies with
+`uv run scripts/sync_specs.py`.
 
 The copies live in [`docs/01_planning`](docs/01_planning).
 [`erd.md`](docs/01_planning/erd.md) is the diagram and
-[`erd.sql`](docs/01_planning/erd.sql) is the DDL reference. When a copy and the
-sheet disagree, the sheet wins. Regenerate the copies with
-`uv run scripts/sync_specs.py`.
+[`erd.sql`](docs/01_planning/erd.sql) is the DDL reference. Do not hand-edit
+them; the next sync overwrites them. When a copy and the migrations disagree,
+the migrations describe the database.
 
 One person runs migrations. Duplicate numbers conflict at merge time, so check
 the last number on `main` before creating a new one.
 
-The current baseline is 14 tables, 223 columns, 23 FKs. Only some of those FKs
-exist in the database today; the rest go in at once after `health_records`,
-`user_attack_cycles` and `user_challenge_occurrences` have landed.
+The sheet currently lists 17 tables and 252 columns.
 
 ---
 
@@ -354,9 +355,11 @@ returns 202 with a `job_id`.
 
 ## Error responses
 
-Use the 27 error codes from the `에러 코드` (error codes) tab of the API
-specification sheet. If you need a new one, register it in the sheet and tell
-the team before using it. Never invent a code.
+Use the error codes in `ErrorCode` (`app/core/errors.py`), 27 today, mirrored in
+the `에러 코드` (error codes) tab of the API specification sheet. Reuse an
+existing code whenever one fits. If none does, add the new code to `ErrorCode`
+in the same change, mention it in the PR, and update the sheet tab afterwards.
+Never return an error code that is not in `ErrorCode`.
 
 ---
 
