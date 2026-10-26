@@ -92,7 +92,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "conversation"
@@ -107,7 +107,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert again.mode == "conversation" and again.recommendations.items[0].id == row.id
@@ -116,7 +116,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both_indoor", transit="no"),
+            answers=SituationAnswers(meal_walk="both_indoor", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert changed.mode == "hold"
@@ -138,7 +138,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "hold" and result.recommendations.items == []
@@ -156,7 +156,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "hold"
@@ -181,7 +181,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "rules"
@@ -191,7 +191,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert provider.calls == 0

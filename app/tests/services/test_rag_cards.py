@@ -91,3 +91,36 @@ def test_unapproved_evidence_and_duplicate_codes_are_rejected() -> None:
         validate_selection({"selections": [item, item]}, approved_cards(), {"CH_WALK_AFTER_MEAL"}, answers)
     with pytest.raises(ValidationError):
         EvidenceCard.model_validate(approved_cards()[0].model_dump() | {"approved_by": None})
+
+
+NEW_CODES = {
+    "CH_STAIRS": "stairs",
+    "CH_STRENGTH_10": "strength",
+    "CH_NO_DRINK_TODAY": "no_drink",
+    "CH_NO_SMOKE_TODAY": "no_smoke",
+}
+
+
+@pytest.mark.parametrize(("code", "field"), NEW_CODES.items())
+def test_remaining_phase1_codes_are_supported_only_after_a_yes(code: str, field: str) -> None:
+    assert not SituationAnswers().supports(code)
+    assert not SituationAnswers.model_validate({field: "no"}).supports(code)
+    assert SituationAnswers.model_validate({field: "yes"}).supports(code)
+
+
+def test_activity_limit_answer_exists_only_for_activity_challenges() -> None:
+    assert not SituationAnswers(stairs="limited").supports("CH_STAIRS")
+    assert not SituationAnswers(strength="limited").supports("CH_STRENGTH_10")
+    with pytest.raises(ValidationError):
+        SituationAnswers.model_validate({"no_drink": "limited"})
+    with pytest.raises(ValidationError):
+        SituationAnswers.model_validate({"no_smoke": "limited"})
+
+
+def test_questions_follow_the_codes_in_the_current_batch() -> None:
+    assert [q["key"] for q in questions_for({"CH_STAIRS", "CH_STRENGTH_10"}, SituationAnswers(), [])] == [
+        "stairs",
+        "strength",
+    ]
+    assert [q["key"] for q in questions_for({"CH_NO_DRINK_TODAY"}, SituationAnswers(), [])] == ["no_drink"]
+    assert [q["key"] for q in questions_for({"CH_NO_SMOKE_TODAY"}, SituationAnswers(), [])] == ["no_smoke"]

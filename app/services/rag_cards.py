@@ -8,16 +8,35 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SUPPORTED_CODES = frozenset({"CH_WALK_AFTER_MEAL", "CH_WALK_ONE_STOP", "CH_STAND_HOURLY"})
+#: 1단계 추천 대상 7개 전부. 한 주기는 캐릭터 하나만 공략하므로 한 묶음에 활동형과 음주·흡연이 섞이지 않는다
+SUPPORTED_CODES = frozenset(
+    {
+        "CH_WALK_AFTER_MEAL",
+        "CH_WALK_ONE_STOP",
+        "CH_STAND_HOURLY",
+        "CH_STAIRS",
+        "CH_STRENGTH_10",
+        "CH_NO_DRINK_TODAY",
+        "CH_NO_SMOKE_TODAY",
+    }
+)
 ANSWER_FIELDS = {
     "CH_WALK_AFTER_MEAL": "meal_walk",
     "CH_WALK_ONE_STOP": "transit",
     "CH_STAND_HOURLY": "movement_breaks",
+    "CH_STAIRS": "stairs",
+    "CH_STRENGTH_10": "strength",
+    "CH_NO_DRINK_TODAY": "no_drink",
+    "CH_NO_SMOKE_TODAY": "no_smoke",
 }
 QUESTION_TEXT = {
     "meal_walk": "점심과 저녁 식후에 각각 10분씩 걷는 것이 가능한가요?",
     "transit": "대중교통 이용일에 한 정거장 먼저 내려 걷는 것이 가능한가요?",
     "movement_breaks": "앉아서 지내는 중간에 3분씩 하루 세 번 움직일 수 있나요?",
+    "stairs": "평소 다니는 곳에 계단이 있고, 하루 한 번 계단으로 올라갈 수 있나요?",
+    "strength": "하루 10분 맨몸 근력 운동을 할 시간과 공간이 있나요?",
+    "no_drink": "술을 마시지 않는 날을 정해서 그날 하루 지킬 수 있나요?",
+    "no_smoke": "피우지 않는 날을 정해서 그날 하루 시도해 볼 수 있나요?",
 }
 
 
@@ -26,6 +45,11 @@ class SituationAnswers(BaseModel):
     meal_walk: Literal["both", "both_indoor", "lunch_only", "dinner_only", "none", "unknown", "limited"] = "unknown"
     transit: Literal["yes", "no", "unknown", "limited"] = "unknown"
     movement_breaks: Literal["three", "less", "none", "unknown", "limited"] = "unknown"
+    stairs: Literal["yes", "no", "unknown", "limited"] = "unknown"
+    strength: Literal["yes", "no", "unknown", "limited"] = "unknown"
+    # 음주·흡연은 몸을 쓰는 활동이 아니라 "활동 제한" 선택지가 없다
+    no_drink: Literal["yes", "no", "unknown"] = "unknown"
+    no_smoke: Literal["yes", "no", "unknown"] = "unknown"
 
     @property
     def activity_limited(self) -> bool:
@@ -38,6 +62,10 @@ class SituationAnswers(BaseModel):
             "CH_WALK_AFTER_MEAL": self.meal_walk in {"both", "both_indoor"},
             "CH_WALK_ONE_STOP": self.transit == "yes",
             "CH_STAND_HOURLY": self.movement_breaks == "three",
+            "CH_STAIRS": self.stairs == "yes",
+            "CH_STRENGTH_10": self.strength == "yes",
+            "CH_NO_DRINK_TODAY": self.no_drink == "yes",
+            "CH_NO_SMOKE_TODAY": self.no_smoke == "yes",
         }.get(code, False)
 
 

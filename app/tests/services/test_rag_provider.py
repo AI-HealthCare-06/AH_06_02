@@ -19,7 +19,15 @@ async def test_provider_sends_only_closed_answers_and_cards() -> None:
         assert payload["text"]["format"]["strict"] is True
         context = json.loads(payload["input"][1]["content"])
         assert set(context) == {"answers", "cards"}
-        assert set(context["answers"]) == {"meal_walk", "transit", "movement_breaks"}
+        assert set(context["answers"]) == {
+            "meal_walk",
+            "transit",
+            "movement_breaks",
+            "stairs",
+            "strength",
+            "no_drink",
+            "no_smoke",
+        }
         return httpx.Response(
             200,
             json={
