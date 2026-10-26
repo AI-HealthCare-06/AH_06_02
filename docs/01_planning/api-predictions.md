@@ -1,10 +1,10 @@
 # B 예측 API 명세
 
-지정 API 시트의 공통 규칙 및 B · 예측·모델 탭 6~8행에 확정한 3개 API를 정리했다. 시트 셀은 2026-10-01에 갱신했다. 아래 내용은 서비스 구현 완료가 아닌 API 계약이다.
+지정 API 시트의 공통 규칙 및 B · 예측·모델 탭 6\~8행에 확정한 3개 API를 정리했다. 시트 셀은 2026-10-01에 갱신했다. 아래 내용은 서비스 구현 완료가 아닌 API 계약이다.
 
 ## 공통 계약
 
-Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 토큰에서만 얻는다. body/query/path에 user_id를 받지 않는다. 원본 공통 규칙에 따라 성공은 `{"success":true,"data":{...}}`, 실패는 `{"success":false,"error":{"code":"...","message":"..."}}`로 반환한다. 반대쪽 data/error의 null 키는 추가하지 않는다. 모든 응답 헤더에 `X-Request-Id`를 넣는다. 시각은 KST(Asia/Seoul) ISO 8601로 +09:00 오프셋을 붙인다, JSON 키는 snake_case, 확률은 0~1, 결과 변화량은 percentage points다. 잘못된 JSON·요청 형식·필수값·범위 검증은 공통 규칙의 `VALIDATION_ERROR` 400을 사용한다.
+Base path `/api/v1`. `Authorization: Bearer <access_token>` 필수. user_id는 토큰에서만 얻는다. body/query/path에 user_id를 받지 않는다. 원본 공통 규칙에 따라 성공은 `{"success":true,"data":{...}}`, 실패는 `{"success":false,"error":{"code":"...","message":"..."}}`로 반환한다. 반대쪽 data/error의 null 키는 추가하지 않는다. 모든 응답 헤더에 `X-Request-Id`를 넣는다. 시각은 KST(Asia/Seoul) ISO 8601로 +09:00 오프셋을 붙인다, JSON 키는 snake_case, 확률은 0\~1, 결과 변화량은 percentage points다. 잘못된 JSON·요청 형식·필수값·범위 검증은 공통 규칙의 `VALIDATION_ERROR` 400을 사용한다.
 
 | ID | Method | Endpoint | 목적 | 성공 |
 |---|---|---|---|---|
@@ -86,7 +86,7 @@ failed:
 
 ## PRED-03 기여도 조회
 
-query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1~100. 응답은 언제나 `diseases` 배열이다. disease를 생략하면 예측에 포함된 모든 미진단 질환을 담고, 지정하면 길이 1 배열로 같은 모양을 쓴다. `limit`은 질환마다 따로 적용한다. `rank`도 질환 안에서 매긴다. 진단·복약 이력이 있어 예측에서 빠진 질환을 disease로 지정하면 404 PRED_NOT_FOUND다. 빈 배열을 주면 아직 끝나지 않은 것과 구분되지 않는다. 요청한 prediction이 pending 또는 failed이면 200으로 현재 상태를 반환하고 diseases를 생략한다. done이면 저장된 결과를 반환한다.
+query: `disease=diabetes|hypertension` 선택, `limit` 기본 100, 1\~100. 응답은 언제나 `diseases` 배열이다. disease를 생략하면 예측에 포함된 모든 미진단 질환을 담고, 지정하면 길이 1 배열로 같은 모양을 쓴다. `limit`은 질환마다 따로 적용한다. `rank`도 질환 안에서 매긴다. 진단·복약 이력이 있어 예측에서 빠진 질환을 disease로 지정하면 404 PRED_NOT_FOUND다. 빈 배열을 주면 아직 끝나지 않은 것과 구분되지 않는다. 요청한 prediction이 pending 또는 failed이면 200으로 현재 상태를 반환하고 diseases를 생략한다. done이면 저장된 결과를 반환한다.
 
 ```json
 {"success":true,"data":{"prediction_id":501,"status":"done","model_version":"MODEL_VERSION","model_experimental":true,"factor_dictionary_version":"v0.1-sedentary","contribution_unit":"probability","diseases":[{"disease":"diabetes","items":[{"factor_key":"age","contribution":0.05,"direction":"increase","rank":1,"modifiable":false},{"factor_key":"bmi_high","contribution":0.03,"direction":"increase","rank":2,"modifiable":true},{"factor_key":"sedentary_time_high","contribution":0.02,"direction":"increase","rank":3,"modifiable":true}]}]}}

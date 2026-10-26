@@ -1,0 +1,407 @@
+{
+  "scope": "승인 테스트 fixture의 결정적 태그 검색·출력 검증·주기 계약. 실제 LLM 호출 없음.",
+  "production_card_status": "48/48개 승인",
+  "cases": [
+    {
+      "case_id": "E01",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C01"
+      ]
+    },
+    {
+      "case_id": "E02",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E03",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C03"
+      ]
+    },
+    {
+      "case_id": "E04",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E05",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C05"
+      ]
+    },
+    {
+      "case_id": "E06",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "meal_walk",
+        "movement_breaks"
+      ]
+    },
+    {
+      "case_id": "E07",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C07"
+      ]
+    },
+    {
+      "case_id": "E08",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E09",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C09"
+      ]
+    },
+    {
+      "case_id": "E10",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C10"
+      ]
+    },
+    {
+      "case_id": "E11",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E12",
+      "kind": "questions",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E13",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E14",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E15",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E16",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E17",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E18",
+      "kind": "cycle_end",
+      "passed": true,
+      "observed": {
+        "end_date": "2026-11-08",
+        "added_duration": 21
+      }
+    },
+    {
+      "case_id": "E19",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E20",
+      "kind": "draft_excluded",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E21",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C13"
+      ]
+    },
+    {
+      "case_id": "E22",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E23",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C15"
+      ]
+    },
+    {
+      "case_id": "E24",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C16"
+      ]
+    },
+    {
+      "case_id": "E25",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E26",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "meal_walk",
+        "transit",
+        "stairs"
+      ]
+    },
+    {
+      "case_id": "E27",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C17"
+      ]
+    },
+    {
+      "case_id": "E28",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C18",
+        "C17"
+      ]
+    },
+    {
+      "case_id": "E29",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E30",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "no_drink"
+      ]
+    },
+    {
+      "case_id": "E31",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C19"
+      ]
+    },
+    {
+      "case_id": "E32",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C20"
+      ]
+    },
+    {
+      "case_id": "E33",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E34",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    },
+    {
+      "case_id": "E35",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C21"
+      ]
+    },
+    {
+      "case_id": "E36",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C23"
+      ]
+    },
+    {
+      "case_id": "E37",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C25"
+      ]
+    },
+    {
+      "case_id": "E38",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C27"
+      ]
+    },
+    {
+      "case_id": "E39",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C29"
+      ]
+    },
+    {
+      "case_id": "E40",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C31"
+      ]
+    },
+    {
+      "case_id": "E41",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C33"
+      ]
+    },
+    {
+      "case_id": "E42",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C35"
+      ]
+    },
+    {
+      "case_id": "E43",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C37"
+      ]
+    },
+    {
+      "case_id": "E44",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C39"
+      ]
+    },
+    {
+      "case_id": "E45",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C41"
+      ]
+    },
+    {
+      "case_id": "E46",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C43"
+      ]
+    },
+    {
+      "case_id": "E47",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C45"
+      ]
+    },
+    {
+      "case_id": "E48",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C47"
+      ]
+    },
+    {
+      "case_id": "E49",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E50",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E51",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E52",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "no_drink",
+        "home_alcohol",
+        "alcohol_free"
+      ]
+    },
+    {
+      "case_id": "E53",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "no_smoke",
+        "first_cig",
+        "smoke_free_home"
+      ]
+    },
+    {
+      "case_id": "E54",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
+    }
+  ],
+  "passed": 54,
+  "total": 54
+}

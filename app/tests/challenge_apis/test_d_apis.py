@@ -50,10 +50,11 @@ class TestDChallengeAPIs(TestCase):
 
         assert generated.status_code == status.HTTP_200_OK
         data = generated.json()["data"]
-        assert data["total"] == 1
+        # 흡연 챌린지는 4개이고 한 번에 최대 3장을 낸다
+        assert data["total"] == 3
         assert data["model_version"] == "test-model"
+        assert {item["factor_score"] for item in data["items"]} == {40.0}
         card = data["items"][0]
-        assert card["factor_score"] == 40.0
         assert card["target_monster"]["code"].startswith("t-")
         assert listed.json()["data"]["items"][0]["recommendation_id"] == card["recommendation_id"]
 

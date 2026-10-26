@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-20 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-26 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -71,13 +71,13 @@
 | 8 | smoking_current | BOOLEAN | NULL |  |  | 현재 흡연 여부 | 확정 |
 | 9 | alcohol_frequency | TINYINT | NULL |  |  | 1년간 음주 빈도 코드 | 확정 |
 | 10 | alcohol_amount | TINYINT | NULL |  |  | 1회 음주량 코드 | 확정 |
-| 11 | walking_days | TINYINT | NULL |  |  | 주당 걷기 일수 0~7 | 확정 |
+| 11 | walking_days | TINYINT | NULL |  |  | 주당 걷기 일수 0\~7 | 확정 |
 | 12 | walking_minutes | SMALLINT | NULL |  |  | 1회 걷기 시간(분) | 확정 |
-| 13 | strength_days | TINYINT | NULL |  |  | 주당 근력운동 일수 0~7 | 확정 |
+| 13 | strength_days | TINYINT | NULL |  |  | 주당 근력운동 일수 0\~7 | 확정 |
 | 14 | sitting_minutes | SMALLINT | NULL |  |  | 하루 앉아 있는 시간(분) | 확정 |
 | 15 | family_history_dm | BOOLEAN | NULL |  |  | 당뇨 가족력 | 확정 |
 | 16 | family_history_htn | BOOLEAN | NULL |  |  | 고혈압 가족력 | 확정 |
-| 17 | dining_out_freq | TINYINT | NULL |  |  | 외식 빈도 1~7 (1 거의 매일 2회+ ~ 7 거의 안 함). 소디 위협도 산출 (REQ-CHLG-009) | 신규 — 9/25 간편모드 10문항 |
+| 17 | dining_out_freq | TINYINT | NULL |  |  | 외식 빈도 1\~7 (1 거의 매일 2회+ \~ 7 거의 안 함). 소디 위협도 산출 (REQ-CHLG-009) | 신규 — 9/25 간편모드 10문항 |
 | 18 | sbp | SMALLINT | NULL |  |  | 수축기 혈압 — 정밀 모드 | 확정 |
 | 19 | dbp | SMALLINT | NULL |  |  | 이완기 혈압 — 정밀 모드 | 확정 |
 | 20 | fasting_glucose | SMALLINT | NULL |  |  | 공복혈당 — 정밀 모드. 스파이크 위협도 산출에 사용 | 확정 |
@@ -98,11 +98,11 @@
 | 3 | health_record_id | BIGINT | NN | FK |  | → health_records.id · 어떤 입력으로 예측했는지 | 확정 |
 | 4 | job_id | VARCHAR(64) | NN | UQ |  | 비동기 작업 식별자 (REQ-PRED-002) | 확정 |
 | 5 | status | ENUM('pending','done','failed') | NN |  | 'pending' | 추론 상태 (NFR-REL-001) | 확정 |
-| 6 | dm_probability | DECIMAL(5,4) | NULL |  |  | 당뇨 위험 확률 0~1 | 확정 |
+| 6 | dm_probability | DECIMAL(5,4) | NULL |  |  | 당뇨 위험 확률 0\~1 | 확정 |
 | 7 | dm_grade | ENUM('low','caution','high') | NULL |  |  | 3단계 등급 (REQ-PRED-004) | 확정 |
 | 8 | htn_probability | DECIMAL(5,4) | NULL |  |  | 고혈압 위험 확률 | 확정 |
 | 9 | htn_grade | ENUM('low','caution','high') | NULL |  |  |  | 개정 — 10/4. 실제 모델 버전 knhanes-ix-hypertension-base_sodium-s42 가 39자라 32로는 저장 불가 |
-| 10 | metabolic_count | TINYINT | NULL |  |  | 대사증후군 해당 지표 수 0~5 (REQ-PRED-009) | 확정 |
+| 10 | metabolic_count | TINYINT | NULL |  |  | 대사증후군 해당 지표 수 0\~5 (REQ-PRED-009) | 확정 |
 | 11 | model_version | VARCHAR(64) | NN |  |  | 모델 버전 고정 (NFR-MODL-002) | 확정 |
 | 12 | input_snapshot | JSON | NULL |  |  | 예측 당시 모델 입력 스냅샷. 전처리 전 canonical 값·단위와 결측 여부를 보존하며 model_version에 연결된 전처리·모델 아티팩트로 과거 결과를 검증한다. 혈압·혈당·진단·약물은 모델 X에서 제외 (REQ-PRED-003) | 확정 — 홍서윤 9/30 |
 | 13 | predicted_at | DATETIME | NULL |  |  | 추론 완료 시각 | 확정 |
@@ -131,7 +131,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | id | BIGINT | NN | PK | AUTO_INCREMENT |  | 확정 |
 | 2 | code | VARCHAR(20) | NN | UQ |  | spike / alde / cotinine / viscera / sodi | 확정 |
-| 3 | no | TINYINT | NN | UQ |  | 도감 번호 1~5 | 확정 |
+| 3 | no | TINYINT | NN | UQ |  | 도감 번호 1\~5 | 확정 |
 | 4 | name | VARCHAR(30) | NN |  |  | 스파이크 · 알데 · 코티니 · 비세라 · 소디 | 확정 |
 | 5 | title | VARCHAR(60) | NULL |  |  | 식후 한 시간의 폭군 등 | 확정 |
 | 6 | factor_keys | JSON | NN |  |  | 연결된 factor_key 배열 (REQ-CHLG-007) | 확정 — 9/28 Mapping v1 |
@@ -149,7 +149,7 @@
 | 1 | id | BIGINT | NN | PK | AUTO_INCREMENT |  | 확정 |
 | 2 | user_id | BIGINT | NN | FK |  | → users.id | 확정 |
 | 3 | monster_id | BIGINT | NN | FK |  | → monsters.id · (user_id, monster_id) 유니크 | 확정 |
-| 4 | impact_score | TINYINT | NULL |  |  | 위협도 0~100. 그 요인이 내 위험도를 얼마나 밀어올렸는지. NULL이면 미측정 (스파이크 정밀모드 미입력) | 변경 — 9/28 용어 치환 |
+| 4 | impact_score | TINYINT | NULL |  |  | 위협도 0\~100. 그 요인이 내 위험도를 얼마나 밀어올렸는지. NULL이면 미측정 (스파이크 정밀모드 미입력) | 변경 — 9/28 용어 치환 |
 | 5 | state | ENUM('rage','caution','stable','not_contributing','resolved','sealed','unmeasured') | NN |  | 'unmeasured' | 분노·경계·안정·현재 위험 기여 없음·요인 해소됨·봉인·미측정. 공략 대상은 rage/caution/stable만. score=0이면 resolved_at 및 직전 state 기준으로 resolved/not_contributing 분기 | 변경 — 9/29 SHAP 음수·해소 상태 확정 |
 | 6 | sealed_at | DATETIME | NULL |  |  | 봉인 시각. 최근 28일 중 해당 factor 챌린지 성공일 20일 이상 + 위협도 40 미만 달성 시 기록 | 변경 — 9/29 봉인 기준 최신화 |
 | 7 | resolved_at | DATETIME | NULL |  |  | 위협이었던 요인이 처음 score=0이 된 시각. 한 번 기록되면 이후 unmeasured를 거쳐도 유지하며 지우지 않는다. 한 번도 위협이 아니었던 요인은 NULL | 신규 — 9/29 해소 이력 보존 |
@@ -218,7 +218,7 @@
 | 13 | stopped_at | DATETIME | NULL |  |  |  | 검토 필요 — 10/2 공략 사이클 제안. 팀 확정 전 (REQ-RECO-006) |
 | 14 | stop_reason | VARCHAR(100) | NULL |  |  | 중단 사유 (REQ-CHLG-005) | 확정 |
 | 15 | cycle_id | BIGINT | NULL | FK |  | → user_attack_cycles.id · 1단계 공략 미션이 속한 주기. 사용자 소유권·active 기간·챌린지 factor_key가 대상 monsters.factor_keys에 포함되는지 서버 검증. NULL은 레거시/주기 밖 미션만 허용. | 수용안 — 단일 공략·주기 분리. 팀 확정 전·DB 미반영 |
-|  | cycle_week | TINYINT | NN |  | 1 | 제거안: 주기는 cycle_id로 연결하고 상대 주차는 주기 start_date와 KST 기준일로 계산해 API에 제공한다. D0~D6=1주차, D7~D13=2주차. D28 이후에는 진행 중 주차를 표시하지 않음. 월요일 주간 점수와 별개. | 제거안 — 주차 중복 저장 대신 계산. 검토 이력 행·집계 제외 |
+|  | cycle_week | TINYINT | NN |  | 1 | 제거안: 주기는 cycle_id로 연결하고 상대 주차는 주기 start_date와 KST 기준일로 계산해 API에 제공한다. D0\~D6=1주차, D7\~D13=2주차. D28 이후에는 진행 중 주차를 표시하지 않음. 월요일 주간 점수와 별개. | 제거안 — 주차 중복 저장 대신 계산. 검토 이력 행·집계 제외 |
 | 16 | habit_established | BOOLEAN | NULL |  | NULL | 1단계에는 수행률만 기록하고 습관 판정은 유예한다. NULL=미평가, TRUE/FALSE를 산출하지 않는다. 미래 판정용 자리는 보존하되 NULL 허용/기본 NULL로 변경하는 D안. | 수정 제안 — 10/2 판정 유예 반영. migration 검토 필요 |
 | 17 | goal_config_snapshot | JSON | NULL |  |  | 시작 당시 개인 슬롯·난이도·단위·행동/인증 방식·승인 정책 버전. 예정 기회 목록은 담지 않고 user_challenge_occurrences 행으로 분리한다. 공략 시작일·공략 대상은 중복 저장하지 않고 cycle_id로 주기 참조. 숫자 목표는 기존 두 snapshot이 기준 | 추가 제안 — 10/2 D 정의, 10/3 A·D 합의로 예정 기회 분리 반영. DB 미반영 |
 | 18 | completion_summary_snapshot | JSON | NULL |  |  | 종료 시 인정 완료 기회 수·예정 기회 수·기록 기준 수행률·집계 시각·정책 버전. 분모 0은 rate=NULL. 1단계 습관 판정 없음. 원시 수행 로그를 대체하지 않는다. | 제거 — 10/3. 아래 집계 컬럼 5개로 대체 |
@@ -264,7 +264,7 @@
 | 4 | source_type | ENUM('prediction_personal','diagnosis_global','conversation') | NN |  |  | 미진단자 개인 기여도 / 진단자 전역 중요도 / 대화형 추천 결과 (REQ-CHLG-001, REQ-CHLG-012) | 변경 — 10/2 conversation 추가 |
 | 5 | factor_key | VARCHAR(50) | NN |  |  | MVP 추천 근거 요인. factor 기반 추천만 생성하므로 NOT NULL. challenges.factor_key=NULL인 일반/보너스 챌린지는 현재 factor 기반 추천 흐름에서 제외한다. | 확정 — 9/29 D 추천 규칙 정합성 수정 |
 | 6 | factor_score | DECIMAL(8,5) | NULL |  |  | 추천 점수 | 확정 |
-| 7 | rank | TINYINT | NN |  |  | 카드 순위 1~3 | 확정 |
+| 7 | rank | TINYINT | NN |  |  | 카드 순위 1\~3 | 확정 |
 | 8 | recommended_at | DATETIME | NN |  |  |  | 확정 |
 | 9 | action | ENUM('accepted','rejected','ignored','not_applicable') | NULL |  |  | not_applicable은 '이건 저한테 해당 없어요'. 연속 거절 횟수에 포함하지 않고 바로 숨긴다 | 변경 — 9/28 김이경 제외조건 합의 |
 | 10 | acted_at | DATETIME | NULL |  |  |  | 확정 |
@@ -274,7 +274,7 @@
 | 14 | suppressed_until_manual | BOOLEAN | NN |  | FALSE | 직접 해제할 때까지 숨김. 3회 연속 거절 또는 not_applicable 선택 시 TRUE | 변경 — 9/28 김이경 제외조건 합의 |
 | 15 | conversation_snapshot | JSON | NULL |  |  | 대화형 추천에서 주고받은 질문과 답변 기록. 저장 키는 policy_version · fingerprint · answers · asked · card_versions · model_version(예측 모델 식별자. 선택에 쓴 LLM 식별자인 llm_model_version 과 다르다) · health_record_id 다. 자유 입력 원문·이름·연락처는 저장하지 않는다. 탈퇴 +30일 식별정보 삭제 시 이 컬럼 전체를 NULL 로 지운다 (REQ-CHLG-012) | 신규 — 10/2 대화형 추천 도입. 저장 범위·삭제 규칙 10/13 A 확정. 삭제 구현·검증 완료 — 10/13 #52 |
 | 16 | llm_model_version | VARCHAR(32) | NULL |  |  | 대화 개인화에서 후보 선택에 사용한 LLM 식별자. conversation_snapshot 의 model_version(예측 모델)과 다르다. 재현과 검증에 사용한다. 기존 규칙·예측 후보를 대화로 선택한 경우 source_type 은 원래 값을 유지하므로, source_type 과 무관하게 채운다. 32자 이내 | 변경 — 10/13 source_type 조건 제거. 구현과 정합화 |
-| 17 | evidence_card_ids | JSON | NULL |  |  | 제안 근거로 전달된 승인 카드 ID 배열. 검증과 사후 검토용. ID 는 C01~C12 고정값으로 문서 순서와 무관하며 삭제한 ID 는 재사용하지 않는다. 수정 이력은 카드의 version 으로 관리한다 (형식 20261012-v1) | 신규 — 10/2 대화형 추천 도입. ID 체계 10/13 A 확정. 카드 12개는 전부 draft 이며 운영 승인은 별건 |
+| 17 | evidence_card_ids | JSON | NULL |  |  | 제안 근거로 전달된 승인 카드 ID 배열. 검증과 사후 검토용. ID 는 C01\~C12 고정값으로 문서 순서와 무관하며 삭제한 ID 는 재사용하지 않는다. 수정 이력은 카드의 version 으로 관리한다 (형식 20261012-v1) | 신규 — 10/2 대화형 추천 도입. ID 체계 10/13 A 확정. 카드 12개는 전부 draft 이며 운영 승인은 별건 |
 | 18 | proposed_goal | JSON | NULL |  |  | 서버 검증한 개인 목표(시간·횟수·슬롯·난이도·예정 기회·정책 버전). cycle_id FK로 대상·주기 연결하고 시작일/대상은 JSON에 중복 저장하지 않음. 사용자 확인 후 동일 목표를 snapshot에 전달. 미검증 LLM 원문 사용 금지. | 추가 제안 — 10/2 D 정의 완료·A 구조 검토 필요. DB 미반영 |
 | 19 | cycle_id | BIGINT | NULL | FK |  | → user_attack_cycles.id · 추천 생성 당시 주기. 시작 시 소유권·active 주기·대상 일치·남은 슬롯 재검증. 종료되거나 다른 주기의 추천은 시작 불가. 레거시/주기 밖 추천만 NULL. | 수용안 — 오래된 추천의 새 주기 사용 방지. 팀 확정 전·DB 미반영 |
 | 20 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
@@ -366,7 +366,7 @@
 | 2 | user_id | BIGINT | NN | FK |  | → users.id | v5 API 연결 — 2026.10.18 사용자 요청 |
 | 3 | challenge_log_id | BIGINT | NN | FK, UNIQUE |  | → challenge_logs.id. 인정 완료 1건당 1회 | v5 API 연결 — 2026.10.18 사용자 요청 |
 | 4 | cards | JSON | NN |  |  | 서버가 정한 카드 5장. 수령 전 보상 코드는 응답에 노출하지 않음 | v5 API 연결 — 2026.10.18 사용자 요청 |
-| 5 | selected_positions | JSON | Y |  |  | 선택 위치 3개(0~4, 중복 불가) | v5 API 연결 — 2026.10.18 사용자 요청 |
+| 5 | selected_positions | JSON | Y |  |  | 선택 위치 3개(0\~4, 중복 불가) | v5 API 연결 — 2026.10.18 사용자 요청 |
 | 6 | results | JSON | Y |  |  | 획득·중복 재료 전환 영수증. 같은 선택 재요청은 동일 응답 | v5 API 연결 — 2026.10.18 사용자 요청 |
 | 7 | claimed_at | DATETIME | Y |  |  | 수령 시각. 다른 선택으로 재수령 불가 | v5 API 연결 — 2026.10.18 사용자 요청 |
 | 8 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP | 생성 시각 | v5 API 연결 — 2026.10.18 사용자 요청 |
@@ -434,7 +434,7 @@
 | 시각 | KST(Asia/Seoul) naive DATETIME으로 저장. use_tz를 켜지 않는다 |
 | 날짜 | 공략 주기의 start_date·end_date처럼 KST 달력 날짜를 뜻하는 필드는 DATE로 저장한다. UTC 변환으로 하루를 밀지 않는다 |
 | 불리언 | BOOLEAN. is_ 접두사는 마스터 테이블의 is_enabled에만 사용 |
-| 금액·비율 | 확률은 DECIMAL(5,4) 0~1로 저장. 화면에서 %로 변환 |
+| 금액·비율 | 확률은 DECIMAL(5,4) 0\~1로 저장. 화면에서 %로 변환 |
 | ENUM · 정수 타입 | 명세서에 ENUM으로 적은 컬럼은 Tortoise가 VARCHAR로 만들고 값 검증은 애플리케이션에서 한다. TINYINT는 SMALLINT로 생성된다. 시트는 허용되는 값을 적는 문서이고, 실제 DDL은 ERD.sql을 본다 |
 | ■ 이 파일 보는 법 |  |
 | 노란 칸 | 아직 확정되지 않았거나 담당자 확인이 필요한 부분입니다. 여기만 봐주세요 |

@@ -34,14 +34,36 @@ class ConversationResult:
     reasons: dict[int, str]
 
 
+#: 질문 문구가 전제하는 마스터 목표(목표값·하루 횟수·슬롯·인증 방식). 마스터가 바뀌면 질문과 함께 고친다
+FIXED_GOALS: dict[str, tuple[Decimal | None, int, list[str] | None, str]] = {
+    "CH_WALK_AFTER_MEAL": (Decimal("10"), 2, ["lunch", "dinner"], "timer"),
+    "CH_WALK_ONE_STOP": (None, 1, None, "manual"),
+    "CH_STAND_HOURLY": (Decimal("3"), 3, None, "timer"),
+    "CH_STAIRS": (None, 1, None, "manual"),
+    "CH_STRENGTH_10": (Decimal("10"), 1, None, "timer"),
+    "CH_NO_DRINK_TODAY": (None, 1, None, "manual"),
+    "CH_NO_SMOKE_TODAY": (None, 1, None, "manual"),
+    "CH_WALK_EVENING_20": (Decimal("20"), 1, None, "timer"),
+    "CH_HOUSEWORK_15": (Decimal("15"), 1, None, "timer"),
+    "CH_SQUAT_15": (Decimal("15"), 1, None, "manual"),
+    "CH_WALL_PUSHUP_10": (Decimal("10"), 1, None, "manual"),
+    "CH_STAND_CALL": (None, 1, None, "manual"),
+    "CH_SCREEN_BREAK": (None, 1, None, "manual"),
+    "CH_WATER_NOT_SWEET": (None, 1, None, "manual"),
+    "CH_NO_LATE_SNACK": (None, 1, None, "manual"),
+    "CH_NO_ALCOHOL_AT_HOME": (None, 1, None, "manual"),
+    "CH_ALCOHOL_FREE_DRINK": (None, 1, None, "manual"),
+    "CH_POSTPONE_DRINKS": (None, 1, None, "manual"),
+    "CH_DELAY_FIRST_CIG": (None, 1, None, "manual"),
+    "CH_SMOKE_FREE_HOME": (None, 1, None, "manual"),
+    "CH_QUIT_REASON": (None, 1, None, "manual"),
+}
+
+
 class ConversationRecommendationService:
     @staticmethod
     def _matches_fixed_contract(challenge: Challenge) -> bool:
-        expected = {
-            "CH_WALK_AFTER_MEAL": (Decimal("10"), 2, ["lunch", "dinner"], "timer"),
-            "CH_WALK_ONE_STOP": (None, 1, None, "manual"),
-            "CH_STAND_HOURLY": (Decimal("3"), 3, None, "timer"),
-        }.get(challenge.code)
+        expected = FIXED_GOALS.get(challenge.code)
         return (
             expected is None
             or (

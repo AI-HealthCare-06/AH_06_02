@@ -26,7 +26,7 @@ D 소유 `user_monsters`에 nullable JSON 컬럼 `impact_explanation_snapshot`�
 | calculated_at | KST 시각 문자열 | 해당 위협도를 저장한 시각 |
 | health_record_id | 정수 | 산정 건강기록. 기존 참조와 일치 |
 | prediction_id | 정수 또는 null | 사용한 개인 기여도 예측. 전역·실측은 null |
-| impact_score | 0~100 정수 | snapshot이 설명하는 저장 점수 |
+| impact_score | 0\~100 정수 | snapshot이 설명하는 저장 점수 |
 | candidates | 배열 | 당시 산정한 질환·요인·정수 점수·출처 목록 |
 | winners | 배열 | 저장 최댓값과 같은 모든 후보. 동점을 임의로 하나만 선택하지 않음 |
 

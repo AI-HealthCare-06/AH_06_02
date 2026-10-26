@@ -2,7 +2,7 @@
 
 작성 기준: 2026-10-01 KST까지 확인한 Slack 합의와 지정 API 명세서의 공통 규칙·모듈 간 호출 규약. 담당: 홍서윤(B).
 
-이 문서는 모델 입력·라벨 정의, 기여도 의미, 위협도 기준과 내부 호출 계약을 정리한다. **계약 확정과 실제 학습 검증은 별개다.** KNHANES 2022~2024 자료와 제9기 코드북을 대조해 전처리 및 탐색용 1회전을 실행했다. 결과와 검증 한계는 `experiment.md` 및 `submission-status.md`에 기록한다.
+이 문서는 모델 입력·라벨 정의, 기여도 의미, 위협도 기준과 내부 호출 계약을 정리한다. **계약 확정과 실제 학습 검증은 별개다.** KNHANES 2022\~2024 자료와 제9기 코드북을 대조해 전처리 및 탐색용 1회전을 실행했다. 결과와 검증 한계는 `experiment.md` 및 `submission-status.md`에 기록한다.
 
 ## 1. 최신 팀 결정 반영
 
@@ -22,9 +22,9 @@
 
 ## 2. y 정의
 
-대상은 KNHANES 2022~2024의 만 19세 이상이다. 당뇨·고혈압을 **서로 독립적인 두 이진 분류기**로 학습한다.
+대상은 KNHANES 2022\~2024의 만 19세 이상이다. 당뇨·고혈압을 **서로 독립적인 두 이진 분류기**로 학습한다.
 
-학습은 2022+2023, 평가는 2024 와 2019 다. 2019 는 평가 전용으로만 쓰고 학습·입력 선택·운영 임계값·P95 에는 넣지 않는다. 지금까지 한 번도 쓰지 않은 자료를 그 상태로 남겨 두어야 선택 과정까지 포함한 독립 평가로 쓸 수 있기 때문이다. 2019 는 제8기 자료이고 같은 전처리(`knhanes-ix-v3`)를 적용했다. 제8기 원시 파일과 변수·코드를 대조한 결과는 [실험 기록](experiment.md#제8기2019-변수-대조)에 있다. 입력 변수는 코드 체계가 같고, 고혈압 라벨 `HE_HP` 만 제8기가 3단계라 제9기 4단계 정의로 옮겨서 쓴다. 2016~2018 은 당뇨 라벨 변수가 `HE_DM` 으로 달라 현재 파이프라인(`HE_DM_HbA1c`)이 읽지 못한다.
+학습은 2022+2023, 평가는 2024 와 2019 다. 2019 는 평가 전용으로만 쓰고 학습·입력 선택·운영 임계값·P95 에는 넣지 않는다. 지금까지 한 번도 쓰지 않은 자료를 그 상태로 남겨 두어야 선택 과정까지 포함한 독립 평가로 쓸 수 있기 때문이다. 2019 는 제8기 자료이고 같은 전처리(`knhanes-ix-v3`)를 적용했다. 제8기 원시 파일과 변수·코드를 대조한 결과는 [실험 기록](experiment.md#제8기2019-변수-대조)에 있다. 입력 변수는 코드 체계가 같고, 고혈압 라벨 `HE_HP` 만 제8기가 3단계라 제9기 4단계 정의로 옮겨서 쓴다. 2016\~2018 은 당뇨 라벨 변수가 `HE_DM` 으로 달라 현재 파이프라인(`HE_DM_HbA1c`)이 읽지 못한다.
 
 | 질환 | 원시 라벨 | y=1 | y=0 | 학습 제외 |
 |---|---|---|---|---|
@@ -50,14 +50,14 @@
 | smoking_current | sm_presnt | 0/1 | smoking_current | 기본 |
 | alcohol_frequency | BD1_11 | 코드북 확인 범주 | alcohol_frequency | 기본 |
 | alcohol_amount | BD2_1 | 코드북 확인 범주 | alcohol_amount | 기본 |
-| walking_days | BE3_31 | 코드 1~8에서 1을 빼 일/주 0~7 | physical_activity_low | 기본 |
+| walking_days | BE3_31 | 코드 1\~8에서 1을 빼 일/주 0\~7 | physical_activity_low | 기본 |
 | walking_minutes | BE3_32·BE3_33 | 시간×60+분, 1회 걷기 분. 0일이면 0 | physical_activity_low | 기본 |
-| strength_days | BE5_1 | 코드 1~6에서 1을 뺀 0~5; 5는 5일 이상 하한 | strength_activity_low | 기본 |
-| family_history_dm | HE_DMfh1~3 | 가족 중 하나라도 예=1, 전부 아니오/외동=0, 그 외 결측 | family_history_dm | 기본 |
-| family_history_htn | HE_HPfh1~3 | 가족 중 하나라도 예=1, 전부 아니오/외동=0, 그 외 결측 | family_history_htn | 기본 |
-| dining_out_freq | L_OUT_FQ | 코드 1~7 순서 범주; 9 결측 | sodium_behavior | 고혈압 첫 모델에 포함; 외식 빈도 대리 지표 |
-| sitting_minutes | BE8_1·BE8_2 | 시간×60+분, 하루 0~1440분 | sedentary_time_high | 당뇨 첫 모델에 포함; 독립 factor |
-| vegetable_frequency | LS_VEG2 | 1~9 범주형; 1=하루 3회 이상, 9=월 1회 미만; 99 결측 | vegetable_intake_low | 비교 후보만 평가; 첫 모델에서는 제외 |
+| strength_days | BE5_1 | 코드 1\~6에서 1을 뺀 0\~5; 5는 5일 이상 하한 | strength_activity_low | 기본 |
+| family_history_dm | HE_DMfh1\~3 | 가족 중 하나라도 예=1, 전부 아니오/외동=0, 그 외 결측 | family_history_dm | 기본 |
+| family_history_htn | HE_HPfh1\~3 | 가족 중 하나라도 예=1, 전부 아니오/외동=0, 그 외 결측 | family_history_htn | 기본 |
+| dining_out_freq | L_OUT_FQ | 코드 1\~7 순서 범주; 9 결측 | sodium_behavior | 고혈압 첫 모델에 포함; 외식 빈도 대리 지표 |
+| sitting_minutes | BE8_1·BE8_2 | 시간×60+분, 하루 0\~1440분 | sedentary_time_high | 당뇨 첫 모델에 포함; 독립 factor |
+| vegetable_frequency | LS_VEG2 | 1\~9 범주형; 1=하루 3회 이상, 9=월 1회 미만; 99 결측 | vegetable_intake_low | 비교 후보만 평가; 첫 모델에서는 제외 |
 
 키·체중은 서비스 입력과 BMI 계산에 필요하지만 BMI와 중복 입력하지 않는다(B 모델 설계안). 나이·성별·가족력은 설명용이며 챌린지와 위협도 대상이 아니다. 질환별 첫 모델은 당뇨 core 12개+좌식, 고혈압 core 12개+외식 빈도 대리변수를 사용한다. `vegetable_intake_low`는 비교 후보로만 남기며, 외식 빈도와 합쳐 소디를 산출하지 않는다. `N_NA`, `HE_UNa`, 수면 변수는 입력에서 제외한다.
 
@@ -88,7 +88,7 @@ B 제안 기본안은 확률 공간 SHAP이다. 고정된 train background와 ex
 
 1. factor의 개인 기여도에서 `positive_shap = max(signed_group_shap, 0)`을 계산한다. 음수 SHAP은 보호 방향 설명으로 남기되 위협도를 만들지 않는다. 정확히 0인 factor는 위협도 0 / `not_contributing`이며 보호 요인으로 설명하지 않는다.
 2. 질환 × factor × `model_version`별 training reference 집단(2022+2023)의 positive SHAP 분포에서 `P95_reference`를 계산해 artifact metadata에 저장한다.
-3. `threat_score = round(100 * clip(positive_shap / P95_reference, 0, 1))`로 0~100 변환한다. 개인별 최대값이나 다른 사용자의 최신값으로 나누지 않는다.
+3. `threat_score = round(100 * clip(positive_shap / P95_reference, 0, 1))`로 0\~100 변환한다. 개인별 최대값이나 다른 사용자의 최신값으로 나누지 않는다.
 4. `positive_shap_p95 < 0.00001`이면 `DECIMAL(8,5)` contribution 저장 정밀도보다 작으므로, 또는 양수 SHAP 표본이 400개 미만이면 P95 위쪽 기대 관측치가 20개 미만이므로 `threat_eligible=false`로 둔다. 어느 하나라도 해당하면 위협도는 0이며 임의 floor를 나누지 않는다. 그렇지 않으면 true다. 저장 단위·reference 정의가 바뀌면 기준도 다시 확인한다.
 
 Mapping v1의 `risk_condition`은 위험 방향을 설명한 문구이며 확정 숫자 임계값 표가 아니다. MVP `behavior_weight` 척도는 0/1로 정리했지만, BMI·허리둘레·걷기·근력·좌식의 적용 cutoff와 알코올 사용 범위는 D가 초안·팀 검토를 마쳐야 한다. 미진단 추천은 (1) 입력이 승인된 행동 조건에 해당하고, (2) 개인 grouped SHAP이 증가 방향이며, (3) 실제 제공 가능한 챌린지가 있는 경우만 허용한다. 진단자 추천은 개인 SHAP 대신 지원 factor와 승인된 행동 조건으로 0/1 weight를 만든다. 결측·모름은 비대상과 구분해 평가 불가로 처리한다. 챌린지를 수행해도 위협도는 즉시 낮아지지 않는다. 수행은 공략 점수에 기록되고, 위협도는 건강정보 재저장·재평가 때 갱신된다.
@@ -103,7 +103,7 @@ Mapping v1의 `risk_condition`은 위험 방향을 설명한 문구이며 확정
 
 | 함수 | 제공 → 호출 | 계약 |
 |---|---|---|
-| get_top_contributions(prediction_id, disease, limit) | B → D | done 예측에 저장된 기여도만 조회. `[{factor_key, contribution, direction, rank}]` 반환. signed probability 단위. limit=1~100; 추천 필터를 위해 전체 조회 가능 |
+| get_top_contributions(prediction_id, disease, limit) | B → D | done 예측에 저장된 기여도만 조회. `[{factor_key, contribution, direction, rank}]` 반환. signed probability 단위. limit=1\~100; 추천 필터를 위해 전체 조회 가능 |
 | get_global_importance(disease, limit) | B → D | 활성 모델의 고정 artifact에서 조회. 지정 시트 반환은 `[{factor_key, importance, normalized_score, rank, model_version}]`. 원값은 `mean(|grouped SHAP|)`이고, `normalized_score = 100 × importance / disease_global_max`를 B가 계산한다. 질환별 max와 결과는 `model_version`에 고정한다. max가 0이면 score는 0 |
 | refresh_impact_from_prediction(user_id, prediction_id) | B → D | 예측+기여도 커밋 뒤 호출. 같은 prediction 재호출 멱등. 예측 버전 고정. B는 D 테이블 직접 쓰지 않음 |
 | refresh_impact_from_health_record(user_id, health_record_id) | C → D | C 저장 뒤 1회 호출. measured/global 분기는 D 내부 |

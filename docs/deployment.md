@@ -4,7 +4,7 @@
 
 ## 자동 배포
 
-평소 배포는 자동입니다. 서버에서 도는 코드(`app/` · `ai_worker/` · `frontend/` · `scripts/` · 의존성 · 마스터 CSV)가 바뀐 PR이 main에 머지되면 GitHub Actions(`.github/workflows/deploy.yml`)가 앱·워커 이미지를 `v1.1.N`(N은 실행 번호)으로 빌드해 올리고, 서버에서 마이그레이션 → 재시작 → 상태 확인 → 시드까지 진행합니다. 상태 확인에 실패하면 이전 버전으로 되돌립니다. 머지부터 반영까지 5~10분 걸립니다.
+평소 배포는 자동입니다. 서버에서 도는 코드(`app/` · `ai_worker/` · `frontend/` · `scripts/` · 의존성 · 마스터 CSV)가 바뀐 PR이 main에 머지되면 GitHub Actions(`.github/workflows/deploy.yml`)가 앱·워커 이미지를 `v1.1.N`(N은 실행 번호)으로 빌드해 올리고, 서버에서 마이그레이션 → 재시작 → 상태 확인 → 시드까지 진행합니다. 상태 확인에 실패하면 이전 버전으로 되돌립니다. 머지부터 반영까지 5\~10분 걸립니다.
 
 - 문서만 바뀐 머지는 배포하지 않습니다.
 - 다시 배포하려면 Actions 탭 → deploy → Run workflow에서 main을 고릅니다.

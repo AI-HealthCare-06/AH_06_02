@@ -109,8 +109,8 @@ This is the most frequent mistake in this project.
 
 | Term | What it is | When it changes | Where it lives |
 | --- | --- | --- | --- |
-| `위험도` (disease risk) | probability of developing the disease, 0~1, produced by the model | only on re-prediction | `predictions.dm_probability` · `htn_probability` |
-| `위협도` (factor threat) | how much that factor pushed `위험도` up, 0~100 | only on re-prediction | `user_monsters.impact_score` |
+| `위험도` (disease risk) | probability of developing the disease, 0\~1, produced by the model | only on re-prediction | `predictions.dm_probability` · `htn_probability` |
+| `위협도` (factor threat) | how much that factor pushed `위험도` up, 0\~100 | only on re-prediction | `user_monsters.impact_score` |
 | `공략 점수` (weekly attack score) | how much of this week's challenge the user has done | immediately, on each challenge log | `user_monsters.weekly_progress` |
 
 **Completing a challenge changes neither `위험도` nor `위협도`.** It raises only
@@ -297,7 +297,7 @@ protective factor.
 **Worth knowing**
 
 `위협도` for a diagnosed disease (scaled by the global max) and for an
-undiagnosed one (scaled by P95) rest on different bases. Both are 0~100 and both
+undiagnosed one (scaled by P95) rest on different bases. Both are 0\~100 and both
 use the same `state` thresholds, but 70 in one does not mean 70 in the other.
 The gap is structural: diagnosed users never run a prediction.
 

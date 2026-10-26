@@ -6,6 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.services.rag_cards import (
+    ANSWER_FIELDS,
+    QUESTION_TEXT,
+    SUPPORTED_CODES,
     EvidenceCard,
     SituationAnswers,
     load_cards,
@@ -14,14 +17,19 @@ from app.services.rag_cards import (
     validate_selection,
 )
 
-CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-draft-20261012.json"
+CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-20261026.json"
 
 
 def approved_cards() -> list[EvidenceCard]:
-    """테스트에서만 승인 fixture로 만든다. 운영 JSON의 draft는 바꾸지 않는다."""
+    """승인자 표기를 테스트용으로 바꾼 운영 카드."""
     return [
         card.model_copy(update={"status": "approved", "approved_by": "테스트 fixture"}) for card in load_cards(CORPUS)
     ]
+
+
+def draft_cards() -> list[EvidenceCard]:
+    """승인 전 상태로 되돌린 운영 카드. 승인 안 된 카드는 쓰지 않는지 확인할 때 쓴다."""
+    return [card.model_copy(update={"status": "draft", "approved_by": None}) for card in load_cards(CORPUS)]
 
 
 def test_draft_cards_are_never_retrieved() -> None:
@@ -86,8 +94,77 @@ def test_unapproved_evidence_and_duplicate_codes_are_rejected() -> None:
     item = {"challenge_code": "CH_WALK_AFTER_MEAL", "evidence_card_id": "C01"}
     answers = SituationAnswers(meal_walk="both")
     with pytest.raises(ValueError):
-        validate_selection({"selections": [item]}, load_cards(CORPUS), {"CH_WALK_AFTER_MEAL"}, answers)
+        validate_selection({"selections": [item]}, draft_cards(), {"CH_WALK_AFTER_MEAL"}, answers)
     with pytest.raises(ValueError):
         validate_selection({"selections": [item, item]}, approved_cards(), {"CH_WALK_AFTER_MEAL"}, answers)
     with pytest.raises(ValidationError):
         EvidenceCard.model_validate(approved_cards()[0].model_dump() | {"approved_by": None})
+
+
+NEW_CODES = {
+    "CH_STAIRS": "stairs",
+    "CH_STRENGTH_10": "strength",
+    "CH_NO_DRINK_TODAY": "no_drink",
+    "CH_NO_SMOKE_TODAY": "no_smoke",
+    "CH_WALK_EVENING_20": "evening_walk",
+    "CH_HOUSEWORK_15": "housework",
+    "CH_SQUAT_15": "squat",
+    "CH_WALL_PUSHUP_10": "wall_pushup",
+    "CH_STAND_CALL": "stand_call",
+    "CH_SCREEN_BREAK": "screen_break",
+    "CH_WATER_NOT_SWEET": "sweet_drink",
+    "CH_NO_LATE_SNACK": "late_snack",
+    "CH_NO_ALCOHOL_AT_HOME": "home_alcohol",
+    "CH_ALCOHOL_FREE_DRINK": "alcohol_free",
+    "CH_POSTPONE_DRINKS": "postpone_drinks",
+    "CH_DELAY_FIRST_CIG": "first_cig",
+    "CH_SMOKE_FREE_HOME": "smoke_free_home",
+    "CH_QUIT_REASON": "quit_reason",
+}
+ACTIVITY_FIELDS = {
+    "stairs",
+    "strength",
+    "evening_walk",
+    "housework",
+    "squat",
+    "wall_pushup",
+    "stand_call",
+    "screen_break",
+}
+
+
+@pytest.mark.parametrize(("code", "field"), NEW_CODES.items())
+def test_remaining_phase1_codes_are_supported_only_after_a_yes(code: str, field: str) -> None:
+    assert not SituationAnswers().supports(code)
+    assert not SituationAnswers.model_validate({field: "no"}).supports(code)
+    assert SituationAnswers.model_validate({field: "yes"}).supports(code)
+
+
+@pytest.mark.parametrize(("code", "field"), NEW_CODES.items())
+def test_activity_limit_answer_exists_only_for_activity_challenges(code: str, field: str) -> None:
+    if field in ACTIVITY_FIELDS:
+        assert not SituationAnswers.model_validate({field: "limited"}).supports(code)
+    else:
+        with pytest.raises(ValidationError):
+            SituationAnswers.model_validate({field: "limited"})
+
+
+def test_questions_follow_the_codes_in_the_current_batch() -> None:
+    assert [q["key"] for q in questions_for({"CH_STAIRS", "CH_STRENGTH_10"}, SituationAnswers(), [])] == [
+        "stairs",
+        "strength",
+    ]
+    assert [q["key"] for q in questions_for({"CH_NO_DRINK_TODAY"}, SituationAnswers(), [])] == ["no_drink"]
+    assert [q["key"] for q in questions_for({"CH_NO_SMOKE_TODAY"}, SituationAnswers(), [])] == ["no_smoke"]
+
+
+def test_every_supported_code_has_an_approved_card_in_the_corpus() -> None:
+    # 승인 카드가 없는 코드는 검색에 걸리지 않아 대화형 추천이 늘 규칙 추천으로 돌아간다
+    approved = {card.challenge_code for card in load_cards(CORPUS) if card.status == "approved" and card.approved_by}
+    assert approved == SUPPORTED_CODES
+
+
+def test_every_supported_code_has_its_own_question_and_answer_field() -> None:
+    assert set(ANSWER_FIELDS) == SUPPORTED_CODES
+    assert set(ANSWER_FIELDS.values()) == set(QUESTION_TEXT)
+    assert set(QUESTION_TEXT) <= set(SituationAnswers.model_fields)

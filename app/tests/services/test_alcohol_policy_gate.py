@@ -48,12 +48,15 @@ class TestAlcoholPolicyIntegration(TestCase):
         )
         with patch.object(config, "D_DIAGNOSED_ALCOHOL_POLICY_ENABLED", True):
             result = await RecommendationService(lambda: artifact).generate(user)
-            assert len(result.items) == 1
-            assert result.items[0].factor_score == 40
-            assert result.challenges[result.items[0].challenge_id].code == "CH_NO_DRINK_TODAY"
+            # 음주 빈도 챌린지는 4개이고 한 번에 최대 3장을 낸다. 모두 같은 전역 점수를 쓴다
+            assert len(result.items) == 3
+            assert {item.factor_score for item in result.items} == {40}
+            codes = [result.challenges[item.challenge_id].code for item in result.items]
+            assert codes[0] == "CH_NO_DRINK_TODAY"
+            assert {result.challenges[item.challenge_id].factor_key for item in result.items} == {"alcohol_frequency"}
             await ImpactService(lambda: artifact).from_health_record(user.id, record.id)
         await user.refresh_from_db()
         await target.refresh_from_db()
         assert user.total_xp == 0 and target.weekly_progress == 0 and target.seal_count == 0
         assert target.impact_score == 40
-        assert await ChallengeRecommendation.filter(user_id=user.id).count() == 1
+        assert await ChallengeRecommendation.filter(user_id=user.id).count() == 3

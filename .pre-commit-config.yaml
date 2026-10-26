@@ -35,3 +35,9 @@ repos:
         language: python
         pass_filenames: false
         always_run: true
+      # 마크다운 본문의 물결표는 \~ 로 쓴다. GitHub 이 두 물결표 사이를 취소선으로 그린다
+      - id: check-markdown-tildes
+        name: 마크다운 물결표 검사
+        entry: python scripts/ci/check_markdown_tildes.py
+        language: python
+        files: '\.md$'

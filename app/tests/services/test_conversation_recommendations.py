@@ -12,13 +12,13 @@ from app.models.health_records import HealthRecord
 from app.models.predictions import Disease, Prediction, PredictionContribution, PredictionStatus
 from app.models.users import User
 from app.services.challenges import ChallengeCoreService
-from app.services.conversation_recommendations import ConversationRecommendationService
-from app.services.rag_cards import SituationAnswers, load_cards
-from app.services.recommendations import RecommendationService
+from app.services.conversation_recommendations import FIXED_GOALS, ConversationRecommendationService
+from app.services.rag_cards import SUPPORTED_CODES, SituationAnswers, load_cards
+from app.services.recommendations import RecommendationService, phase1_candidates
 from app.tests.d_fixtures import fake_artifact, make_target
 from scripts.seed.seed_challenges import DEFAULT_CSV, parse_rows, read_csv, upsert_challenges
 
-CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-draft-20261012.json"
+CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-20261026.json"
 
 
 class FixtureProvider:
@@ -83,6 +83,18 @@ class TestConversationRecommendation(TestCase):
         ]
         return user, rules, generated, cards
 
+    async def test_ai_supports_exactly_the_phase1_candidates(self):
+        # 규칙 추천이 낼 수 있는 챌린지는 모두 대화형 추천도 다뤄야 한다
+        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
+        assert {challenge.code for challenge in await phase1_candidates()} == SUPPORTED_CODES
+
+    async def test_every_supported_code_has_a_fixed_goal_matching_the_master(self):
+        # 표에 없는 코드는 목표 검사 없이 통과하므로, 지원 코드는 전부 표에 있어야 한다
+        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
+        assert set(FIXED_GOALS) == SUPPORTED_CODES
+        for challenge in await Challenge.filter(code__in=list(SUPPORTED_CODES)):
+            assert ConversationRecommendationService._matches_fixed_contract(challenge), challenge.code
+
     async def test_conversation_stores_trace_without_creating_or_changing_missions(self):
         user, rules, generated, cards = await self.prepare()
         provider = FixtureProvider()
@@ -92,7 +104,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "conversation"
@@ -107,7 +119,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert again.mode == "conversation" and again.recommendations.items[0].id == row.id
@@ -116,7 +128,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both_indoor", transit="no"),
+            answers=SituationAnswers(meal_walk="both_indoor", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert changed.mode == "hold"
@@ -138,7 +150,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "hold" and result.recommendations.items == []
@@ -156,7 +168,7 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "hold"
@@ -181,17 +193,18 @@ class TestConversationRecommendation(TestCase):
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert result.mode == "rules"
         assert await ChallengeRecommendation.filter(conversation_snapshot__isnull=False).count() == 0
         provider = FixtureProvider()
-        await ConversationRecommendationService(rules, load_cards(CORPUS), provider, enabled=True).personalize(
+        drafts = [card.model_copy(update={"status": "draft", "approved_by": None}) for card in load_cards(CORPUS)]
+        await ConversationRecommendationService(rules, drafts, provider, enabled=True).personalize(
             user,
             generated,
             query="점심 식후",
-            answers=SituationAnswers(meal_walk="both", transit="no"),
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
             asked=["meal_walk"],
         )
         assert provider.calls == 0

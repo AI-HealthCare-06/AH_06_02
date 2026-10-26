@@ -2,6 +2,7 @@
 
 > 상태: v0 원본을 최신 계약에 대조한 검토본. 자동 추천 승인 표가 아닙니다.
 > 검토일: 2026-10-06. 실제 모델의 질환별 지원 여부·artifact metadata·사용자 적용 조건은 별도로 확인합니다.
+> 2026-10-26: 1단계 챌린지 14개를 더해 아래 표의 연결 키를 갱신했습니다. 1단계 추천 대상 전체 목록은 [`chatbot/challenge-rag-contract.md`](chatbot/challenge-rag-contract.md)에 있습니다.
 
 근거: REQ-CHLG-001·007·012, `ai_worker/model_contract.py`, `table-spec.md`.
 
@@ -13,18 +14,18 @@
 |---|---|---|
 | `age` | — | 수정 불가·추천 연결 없음 |
 | `alcohol_amount` | `CH_ONE_LESS_GLASS` · `CH_WATER_BETWEEN` | 문자열 일치 확인·운영 조건 승인 별도 |
-| `alcohol_frequency` | `CH_NO_DRINK_TODAY` | 문자열 일치 확인·운영 조건 승인 별도 |
-| `bmi_high` | — | 연결 카드 없음 |
+| `alcohol_frequency` | `CH_NO_DRINK_TODAY` · `CH_NO_ALCOHOL_AT_HOME` · `CH_ALCOHOL_FREE_DRINK` · `CH_POSTPONE_DRINKS` | 문자열 일치 확인·운영 조건 승인 별도 |
+| `bmi_high` | `CH_WATER_NOT_SWEET` | 10/26 추가 |
 | `family_history_dm` | — | 수정 불가·추천 연결 없음 |
 | `family_history_htn` | — | 수정 불가·추천 연결 없음 |
-| `physical_activity_low` | `CH_WALK_AFTER_MEAL` · `CH_STAIRS` · `CH_WALK_ONE_STOP` | 문자열 일치 확인·운영 조건 승인 별도 |
-| `sedentary_time_high` | `CH_STAND_HOURLY` | 문자열 일치 확인·운영 조건 승인 별도 |
+| `physical_activity_low` | `CH_WALK_AFTER_MEAL` · `CH_STAIRS` · `CH_WALK_ONE_STOP` · `CH_WALK_EVENING_20` · `CH_HOUSEWORK_15` | 문자열 일치 확인·운영 조건 승인 별도 |
+| `sedentary_time_high` | `CH_STAND_HOURLY` · `CH_STAND_CALL` · `CH_SCREEN_BREAK` | 문자열 일치 확인·운영 조건 승인 별도 |
 | `sex` | — | 수정 불가·추천 연결 없음 |
-| `smoking_current` | `CH_NO_SMOKE_TODAY` · `CH_DELAY_5MIN` · `CH_COUNT_DOWN` | 문자열 일치 확인·운영 조건 승인 별도 |
+| `smoking_current` | `CH_NO_SMOKE_TODAY` · `CH_DELAY_5MIN` · `CH_COUNT_DOWN` · `CH_DELAY_FIRST_CIG` · `CH_SMOKE_FREE_HOME` · `CH_QUIT_REASON` | 문자열 일치 확인·운영 조건 승인 별도 |
 | `sodium_behavior` | `CH_LEAVE_SOUP` · `CH_NO_EATING_OUT` · `CH_CHECK_LABEL` · `CH_HOME_MEAL` | 고혈압 실험 요인·외식 대리 지표·추천 조건 승인 대기 |
-| `strength_activity_low` | `CH_STRENGTH_10` | 문자열 일치 확인·운영 조건 승인 별도 |
+| `strength_activity_low` | `CH_STRENGTH_10` · `CH_SQUAT_15` · `CH_WALL_PUSHUP_10` | 문자열 일치 확인·운영 조건 승인 별도 |
 | `vegetable_intake_low` | — | 최종 X 미채택 후보·운영 연결 없음 |
-| `waist_high` | — | 연결 카드 없음 |
+| `waist_high` | `CH_NO_LATE_SNACK` | 10/26 추가 |
 
 ## 19개 키별 대조
 
