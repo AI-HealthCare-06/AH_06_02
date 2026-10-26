@@ -1,6 +1,6 @@
 {
   "scope": "승인 테스트 fixture의 결정적 태그 검색·출력 검증·주기 계약. 실제 LLM 호출 없음.",
-  "production_card_status": "12개 전부 draft; 운영 승인 완료를 뜻하지 않음",
+  "production_card_status": "20/20개 승인",
   "cases": [
     {
       "case_id": "E01",
@@ -139,8 +139,113 @@
       "kind": "draft_excluded",
       "passed": true,
       "observed": []
+    },
+    {
+      "case_id": "E21",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C13"
+      ]
+    },
+    {
+      "case_id": "E22",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E23",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C15"
+      ]
+    },
+    {
+      "case_id": "E24",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C16"
+      ]
+    },
+    {
+      "case_id": "E25",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E26",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "meal_walk",
+        "transit",
+        "stairs"
+      ]
+    },
+    {
+      "case_id": "E27",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C17"
+      ]
+    },
+    {
+      "case_id": "E28",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C18",
+        "C17"
+      ]
+    },
+    {
+      "case_id": "E29",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E30",
+      "kind": "questions",
+      "passed": true,
+      "observed": [
+        "no_drink"
+      ]
+    },
+    {
+      "case_id": "E31",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C19"
+      ]
+    },
+    {
+      "case_id": "E32",
+      "kind": "search",
+      "passed": true,
+      "observed": [
+        "C20"
+      ]
+    },
+    {
+      "case_id": "E33",
+      "kind": "empty",
+      "passed": true,
+      "observed": []
+    },
+    {
+      "case_id": "E34",
+      "kind": "reject",
+      "passed": true,
+      "observed": "rejected"
     }
   ],
-  "passed": 20,
-  "total": 20
+  "passed": 34,
+  "total": 34
 }

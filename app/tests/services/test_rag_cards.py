@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.services.rag_cards import (
+    SUPPORTED_CODES,
     EvidenceCard,
     SituationAnswers,
     load_cards,
@@ -14,14 +15,19 @@ from app.services.rag_cards import (
     validate_selection,
 )
 
-CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-draft-20261012.json"
+CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-20261026.json"
 
 
 def approved_cards() -> list[EvidenceCard]:
-    """테스트에서만 승인 fixture로 만든다. 운영 JSON의 draft는 바꾸지 않는다."""
+    """승인자 표기를 테스트용으로 바꾼 운영 카드."""
     return [
         card.model_copy(update={"status": "approved", "approved_by": "테스트 fixture"}) for card in load_cards(CORPUS)
     ]
+
+
+def draft_cards() -> list[EvidenceCard]:
+    """승인 전 상태로 되돌린 운영 카드. 승인 안 된 카드는 쓰지 않는지 확인할 때 쓴다."""
+    return [card.model_copy(update={"status": "draft", "approved_by": None}) for card in load_cards(CORPUS)]
 
 
 def test_draft_cards_are_never_retrieved() -> None:
@@ -86,7 +92,7 @@ def test_unapproved_evidence_and_duplicate_codes_are_rejected() -> None:
     item = {"challenge_code": "CH_WALK_AFTER_MEAL", "evidence_card_id": "C01"}
     answers = SituationAnswers(meal_walk="both")
     with pytest.raises(ValueError):
-        validate_selection({"selections": [item]}, load_cards(CORPUS), {"CH_WALK_AFTER_MEAL"}, answers)
+        validate_selection({"selections": [item]}, draft_cards(), {"CH_WALK_AFTER_MEAL"}, answers)
     with pytest.raises(ValueError):
         validate_selection({"selections": [item, item]}, approved_cards(), {"CH_WALK_AFTER_MEAL"}, answers)
     with pytest.raises(ValidationError):
@@ -124,3 +130,9 @@ def test_questions_follow_the_codes_in_the_current_batch() -> None:
     ]
     assert [q["key"] for q in questions_for({"CH_NO_DRINK_TODAY"}, SituationAnswers(), [])] == ["no_drink"]
     assert [q["key"] for q in questions_for({"CH_NO_SMOKE_TODAY"}, SituationAnswers(), [])] == ["no_smoke"]
+
+
+def test_every_supported_code_has_an_approved_card_in_the_corpus() -> None:
+    # 승인 카드가 없는 코드는 검색에 걸리지 않아 대화형 추천이 늘 규칙 추천으로 돌아간다
+    approved = {card.challenge_code for card in load_cards(CORPUS) if card.status == "approved" and card.approved_by}
+    assert approved == SUPPORTED_CODES

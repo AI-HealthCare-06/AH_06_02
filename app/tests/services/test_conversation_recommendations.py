@@ -18,7 +18,7 @@ from app.services.recommendations import RecommendationService
 from app.tests.d_fixtures import fake_artifact, make_target
 from scripts.seed.seed_challenges import DEFAULT_CSV, parse_rows, read_csv, upsert_challenges
 
-CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-draft-20261012.json"
+CORPUS = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-20261026.json"
 
 
 class FixtureProvider:
@@ -194,7 +194,8 @@ class TestConversationRecommendation(TestCase):
         assert result.mode == "rules"
         assert await ChallengeRecommendation.filter(conversation_snapshot__isnull=False).count() == 0
         provider = FixtureProvider()
-        await ConversationRecommendationService(rules, load_cards(CORPUS), provider, enabled=True).personalize(
+        drafts = [card.model_copy(update={"status": "draft", "approved_by": None}) for card in load_cards(CORPUS)]
+        await ConversationRecommendationService(rules, drafts, provider, enabled=True).personalize(
             user,
             generated,
             query="점심 식후",

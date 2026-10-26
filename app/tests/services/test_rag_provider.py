@@ -37,7 +37,7 @@ async def test_provider_sends_only_closed_answers_and_cards() -> None:
         )
 
     provider = OpenAISelectionProvider("test-key", "fixture-model", httpx.MockTransport(handle))
-    path = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-draft-20261012.json"
+    path = Path(__file__).resolve().parents[3] / "docs/01_planning/chatbot/cards-20261026.json"
     assert await provider.select(load_cards(path)[:1], SituationAnswers(meal_walk="both")) == {"selections": []}
 
 

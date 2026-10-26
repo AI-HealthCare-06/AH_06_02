@@ -8,7 +8,6 @@ from typing import Any
 
 from app.services.attack_cycles import cycle_end_for
 from app.services.rag_cards import (
-    EvidenceCard,
     SituationAnswers,
     load_cards,
     questions_for,
@@ -21,13 +20,10 @@ FOLDER = ROOT / "docs/01_planning/chatbot"
 
 
 def evaluate() -> dict[str, Any]:
-    draft = load_cards(FOLDER / "cards-draft-20261012.json")
-    # 운영 파일은 그대로 두고 평가 인스턴스에만 승인 상태를 부여한다.
-    cards = [
-        EvidenceCard.model_validate(card.model_dump() | {"status": "approved", "approved_by": "평가 fixture"})
-        for card in draft
-    ]
-    cases = json.loads((FOLDER / "golden-cases-20261012.json").read_text(encoding="utf-8"))
+    cards = load_cards(FOLDER / "cards-20261026.json")
+    # 승인 안 된 카드를 쓰지 않는지 보려고 평가 안에서만 draft 사본을 만든다
+    draft = [card.model_copy(update={"status": "draft", "approved_by": None}) for card in cards]
+    cases = json.loads((FOLDER / "golden-cases-20261026.json").read_text(encoding="utf-8"))
     results = []
     for case in cases:
         answers = SituationAnswers.model_validate(case["answers"])
@@ -55,7 +51,7 @@ def evaluate() -> dict[str, Any]:
         results.append({"case_id": case["case_id"], "kind": kind, "passed": passed, "observed": observed})
     return {
         "scope": "승인 테스트 fixture의 결정적 태그 검색·출력 검증·주기 계약. 실제 LLM 호출 없음.",
-        "production_card_status": "12개 전부 draft; 운영 승인 완료를 뜻하지 않음",
+        "production_card_status": f"{sum(card.status == 'approved' for card in cards)}/{len(cards)}개 승인",
         "cases": results,
         "passed": sum(item["passed"] for item in results),
         "total": len(results),
@@ -64,11 +60,11 @@ def evaluate() -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="RAG 준비 기능의 고정 평가 사례를 실행한다.")
-    parser.add_argument("--output", type=Path, default=FOLDER / "evaluation-fixture-20261012.json")
+    parser.add_argument("--output", type=Path, default=FOLDER / "evaluation-20261026.json")
     args = parser.parse_args()
     report = evaluate()
     args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"평가 fixture: {report['passed']}/{report['total']} 통과. 실제 LLM·운영 승인 평가는 별도입니다.")
+    print(f"평가 fixture: {report['passed']}/{report['total']} 통과. 실제 LLM 응답 평가는 별도입니다.")
     if report["passed"] != report["total"]:
         raise SystemExit(1)
 

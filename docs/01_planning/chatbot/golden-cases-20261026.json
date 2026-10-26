@@ -362,5 +362,222 @@
     "expected": null,
     "output": null,
     "asked": []
+  },
+  {
+    "case_id": "E21",
+    "kind": "search",
+    "query": "회사 계단 엘리베이터 대신",
+    "answers": {
+      "stairs": "yes"
+    },
+    "allowed_codes": [
+      "CH_WALK_AFTER_MEAL",
+      "CH_STAIRS",
+      "CH_STRENGTH_10"
+    ],
+    "expected": "C13",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E22",
+    "kind": "empty",
+    "query": "무릎이 불편해 계단",
+    "answers": {
+      "stairs": "limited"
+    },
+    "allowed_codes": [
+      "CH_WALK_AFTER_MEAL",
+      "CH_STAIRS",
+      "CH_STRENGTH_10"
+    ],
+    "expected": null,
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E23",
+    "kind": "search",
+    "query": "집에서 맨몸 스쿼트",
+    "answers": {
+      "strength": "yes"
+    },
+    "allowed_codes": [
+      "CH_WALK_AFTER_MEAL",
+      "CH_STAIRS",
+      "CH_STRENGTH_10"
+    ],
+    "expected": "C15",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E24",
+    "kind": "search",
+    "query": "퇴근 후 저녁 짧은 운동",
+    "answers": {
+      "strength": "yes"
+    },
+    "allowed_codes": [
+      "CH_WALK_AFTER_MEAL",
+      "CH_STAIRS",
+      "CH_STRENGTH_10"
+    ],
+    "expected": "C16",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E25",
+    "kind": "empty",
+    "query": "집에서 근력",
+    "answers": {
+      "strength": "no"
+    },
+    "allowed_codes": [
+      "CH_WALK_AFTER_MEAL",
+      "CH_STAIRS",
+      "CH_STRENGTH_10"
+    ],
+    "expected": null,
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E26",
+    "kind": "questions",
+    "query": "",
+    "answers": {},
+    "allowed_codes": [
+      "CH_WALK_AFTER_MEAL",
+      "CH_WALK_ONE_STOP",
+      "CH_STAIRS"
+    ],
+    "expected": [
+      "meal_walk",
+      "transit",
+      "stairs"
+    ],
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E27",
+    "kind": "search",
+    "query": "회식 약속이 많아요",
+    "answers": {
+      "no_drink": "yes"
+    },
+    "allowed_codes": [
+      "CH_NO_DRINK_TODAY"
+    ],
+    "expected": "C17",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E28",
+    "kind": "search",
+    "query": "집에서 혼술 맥주",
+    "answers": {
+      "no_drink": "yes"
+    },
+    "allowed_codes": [
+      "CH_NO_DRINK_TODAY"
+    ],
+    "expected": "C18",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E29",
+    "kind": "empty",
+    "query": "회식 술",
+    "answers": {
+      "no_drink": "no"
+    },
+    "allowed_codes": [
+      "CH_NO_DRINK_TODAY"
+    ],
+    "expected": null,
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E30",
+    "kind": "questions",
+    "query": "",
+    "answers": {},
+    "allowed_codes": [
+      "CH_NO_DRINK_TODAY"
+    ],
+    "expected": [
+      "no_drink"
+    ],
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E31",
+    "kind": "search",
+    "query": "출근길 담배",
+    "answers": {
+      "no_smoke": "yes"
+    },
+    "allowed_codes": [
+      "CH_NO_SMOKE_TODAY"
+    ],
+    "expected": "C19",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E32",
+    "kind": "search",
+    "query": "식후 커피 스트레스",
+    "answers": {
+      "no_smoke": "yes"
+    },
+    "allowed_codes": [
+      "CH_NO_SMOKE_TODAY"
+    ],
+    "expected": "C20",
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E33",
+    "kind": "empty",
+    "query": "담배 흡연",
+    "answers": {
+      "no_smoke": "no"
+    },
+    "allowed_codes": [
+      "CH_NO_SMOKE_TODAY"
+    ],
+    "expected": null,
+    "output": null,
+    "asked": []
+  },
+  {
+    "case_id": "E34",
+    "kind": "reject",
+    "query": "",
+    "answers": {
+      "stairs": "yes"
+    },
+    "allowed_codes": [
+      "CH_NO_DRINK_TODAY"
+    ],
+    "expected": null,
+    "output": {
+      "selections": [
+        {
+          "challenge_code": "CH_STAIRS",
+          "evidence_card_id": "C13"
+        }
+      ]
+    },
+    "asked": []
   }
 ]
