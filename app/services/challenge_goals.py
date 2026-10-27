@@ -185,12 +185,34 @@ def mission_title(mission: UserChallenge, challenge: Challenge) -> str:
     return title if isinstance(title, str) and title else challenge.title
 
 
-def mission_level(mission: UserChallenge, policy: GoalPolicy) -> int:
-    """미션이 쓴 단계. 단계 기록이 없거나 지금 단계표에 없는 미션은 기본 단계로 본다."""
+def mission_goal_key(mission: UserChallenge, challenge: Challenge) -> tuple[Any, ...]:
+    """미션이 실제로 쓴 목표. 단계 번호를 믿을 수 없을 때 단계와 맞춰 본다."""
+    return (
+        mission_title(mission, challenge),
+        mission.daily_target_count_snapshot,
+        mission.target_value_snapshot,
+        mission_slots(mission, challenge),
+    )
+
+
+def goal_key(goal: Goal, challenge: Challenge) -> tuple[Any, ...]:
+    return (goal.title or challenge.title, goal.daily_target_count, goal.target_value, goal.context_slots)
+
+
+def mission_level(mission: UserChallenge, challenge: Challenge, policy: GoalPolicy) -> int:
+    """미션이 쓴 단계.
+
+    지금 버전으로 시작한 미션은 기록된 단계를 쓴다. 단계표 적용 전이나 옛 버전 미션은
+    목표가 같은 단계를 찾고, 없으면 기본 단계로 본다.
+    """
     snapshot = mission.goal_config_snapshot or {}
     level = snapshot.get("level")
     if snapshot.get("policy_version") == policy.version and isinstance(level, int) and policy.step(level):
         return level
+    actual = mission_goal_key(mission, challenge)
+    for step in policy.steps:
+        if goal_key(step_goal(policy, step), challenge) == actual:
+            return step.level
     return policy.base_level
 
 

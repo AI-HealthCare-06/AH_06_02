@@ -294,7 +294,7 @@ class RecommendationService:
             missions = UserChallenge.filter(user_id=user_id, challenge_id=challenge.id)
             earlier = await missions.filter(cycle_id=cycle.id).order_by("-id").first()
             if earlier is not None:
-                level = mission_level(earlier, policy)
+                level = mission_level(earlier, challenge, policy)
                 basis = (earlier.goal_config_snapshot or {}).get("basis")
                 if level != policy.base_level or basis is not None:
                     goals[challenge.id] = {"policy_version": policy.version, "level": level, "basis": basis}
@@ -307,7 +307,7 @@ class RecommendationService:
             )
             if previous is None or previous.completion_rate is None:
                 continue
-            previous_level = mission_level(previous, policy)
+            previous_level = mission_level(previous, challenge, policy)
             step = next_step(policy, previous_level, previous.completion_rate)
             if step.defer:
                 deferred.add(challenge.id)

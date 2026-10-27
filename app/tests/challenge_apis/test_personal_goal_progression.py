@@ -223,3 +223,16 @@ class TestPersonalGoalProgression(TestCase):
         assert item["goal_basis"]["direction"] == "up"
         # 한 단계 올린 목표라 화면이 시작 전 안전 확인을 띄우게 한다
         assert item["safety_check_required"] is True
+
+    async def test_mission_from_an_older_policy_version_continues_from_the_step_with_the_same_goal(self) -> None:
+        user, target = await self._ready("p-oldver@example.com")
+        mission = await self._finished(user, target, "0.6000", level=1)
+        # 옛 버전 3단계였지만 목표(하루 1회, 슬롯 없음, 1시간 미루기)는 지금 3단계와 같다
+        await UserChallenge.filter(id=mission.id).update(
+            goal_config_snapshot={"level": 3, "policy_version": "P1-STEPS-OLD", "title": "아침 첫 담배 1시간 미루기"}
+        )
+
+        goal = await self._goal_for(user)
+
+        assert goal is not None
+        assert (goal["level"], goal["basis"]["previous_level"]) == (3, 3)

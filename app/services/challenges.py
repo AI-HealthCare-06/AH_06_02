@@ -43,7 +43,15 @@ from app.services.attack_cycles import (
     lock_user,
     today_kst,
 )
-from app.services.challenge_goals import Goal, goal_snapshot, mission_slots, mission_title, start_goal
+from app.services.challenge_goals import (
+    Goal,
+    goal_key,
+    goal_snapshot,
+    mission_goal_key,
+    mission_slots,
+    mission_title,
+    start_goal,
+)
 from app.services.challenge_timers import ChallengeTimerService
 from app.services.evidence import EvidenceService
 from app.services.recommendations import target_monster_body
@@ -252,8 +260,15 @@ class ChallengeCoreService:
         return created
 
     @staticmethod
+    def _same_step(mission: UserChallenge, challenge: Challenge, goal: Goal) -> bool:
+        snapshot = mission.goal_config_snapshot or {}
+        if snapshot.get("level") is not None and snapshot.get("policy_version") == goal.policy_version:
+            return snapshot.get("level") == goal.level
+        # 단계표 적용 전이나 옛 단계표 버전으로 시작한 미션은 단계 번호를 믿지 않고 실제 목표가 같은지 본다
+        return mission_goal_key(mission, challenge) == goal_key(goal, challenge)
+
     async def _check_same_cycle_level(
-        user_id: int, cycle: UserAttackCycle, challenges: list[Challenge], goals: list[Goal]
+        self, user_id: int, cycle: UserAttackCycle, challenges: list[Challenge], goals: list[Goal]
     ) -> None:
         """같은 주기 안 재시작은 처음 시작한 단계를 유지한다.
 
@@ -264,8 +279,7 @@ class ChallengeCoreService:
                 continue
             earlier = await UserChallenge.filter(user_id=user_id, challenge_id=challenge.id, cycle_id=cycle.id)
             for mission in earlier:
-                snapshot = mission.goal_config_snapshot or {}
-                if (snapshot.get("policy_version"), snapshot.get("level")) != (goal.policy_version, goal.level):
+                if not self._same_step(mission, challenge, goal):
                     raise AppError(
                         ErrorCode.VALIDATION_ERROR, message="같은 주기에는 처음 시작한 단계로만 다시 시작할 수 있어요."
                     )

@@ -18,10 +18,11 @@ from app.models.challenges import (
     UserAttackCycle,
     UserChallenge,
     UserChallengeOccurrence,
+    UserChallengeStatus,
     UserMonster,
 )
 from app.models.users import User
-from app.services.attack_cycles import AttackCycleService, today_kst
+from app.services.attack_cycles import AttackCycleService, cycle_end_for, today_kst
 from app.services.challenges import ChallengeCoreService
 from app.tests.auth_apis.test_signup_api import signup_body
 from app.tests.d_fixtures import make_card, make_cycle, make_target
@@ -64,6 +65,36 @@ class TestDStartContracts(TestCase):
         assert cycle.status == AttackCycleStatus.DRAFT and cycle.start_date is None
         await card.refresh_from_db()
         assert card.action is None and card.acted_at is None
+
+    async def test_mission_stopped_before_the_step_table_restarts_in_the_same_cycle(self) -> None:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            user, headers, cycle = await self.prepare(client)
+            walk = await Challenge.get(code="CH_WALK_AFTER_MEAL")
+            today = today_kst()
+            await UserAttackCycle.filter(id=cycle.id).update(
+                status=AttackCycleStatus.ACTIVE, start_date=today, end_date=cycle_end_for(today)
+            )
+            # 단계표 적용 전에 시작했다가 중단한 미션. 스냅샷에 단계 정보가 없다
+            await UserChallenge.create(
+                user_id=user.id,
+                challenge_id=walk.id,
+                cycle_id=cycle.id,
+                status=UserChallengeStatus.ABANDONED,
+                start_date=today,
+                end_date=cycle_end_for(today),
+                daily_target_count_snapshot=2,
+                target_value_snapshot=walk.target_value,
+                duration_days_snapshot=28,
+                goal_config_snapshot={"difficulty": "challenge", "daily_xp": 36, "unit": "분"},
+            )
+            card = await make_card(user.id, walk, cycle)
+
+            response = await client.post(
+                "/api/v1/user-challenges", headers=headers, json={"recommendation_ids": [card.id]}
+            )
+
+        assert response.status_code == 201, response.text
+        assert response.json()["data"]["items"][0]["daily_target_count"] == 2
 
     async def test_event_starts_only_on_confirmed_usage_dates(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

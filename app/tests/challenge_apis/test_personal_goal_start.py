@@ -207,3 +207,79 @@ class TestPersonalGoalStart(TestCase):
 
         assert (item["title"], item["daily_target_count"], item["context_slots"]) == ("식후 걷기", 1, [])
         assert (item["goal_level"], item["intensity"]) == (1, None)
+
+    async def _legacy_stopped(self, user_id: int, challenge: Challenge) -> UserAttackCycle:
+        """단계표 적용 전에 시작했다가 중단한 미션. 스냅샷에 단계 정보가 없다."""
+        cycle = await make_cycle(user_id, [challenge.factor_key or "physical_activity_low"], start=TODAY)
+        await UserChallenge.create(
+            user_id=user_id,
+            challenge_id=challenge.id,
+            cycle_id=cycle.id,
+            status=UserChallengeStatus.ABANDONED,
+            start_date=TODAY,
+            end_date=cycle.end_date,
+            daily_target_count_snapshot=challenge.daily_target_count,
+            target_value_snapshot=challenge.target_value,
+            duration_days_snapshot=28,
+            goal_config_snapshot={
+                "difficulty": str(challenge.difficulty),
+                "daily_xp": challenge.reward_xp,
+                "unit": "분",
+            },
+        )
+        return cycle
+
+    async def test_mission_started_before_the_step_table_restarts_on_the_same_goal(self) -> None:
+        challenges = await _seed()
+        walk = challenges["CH_WALK_AFTER_MEAL"]
+        cycle = await self._legacy_stopped(5011, walk)
+        card = await make_card(5011, walk, cycle)
+
+        # 단계 정보가 없는 미션은 기본 단계로 본다. 목표가 같으니 다시 시작할 수 있다
+        [mission] = await ChallengeCoreService().start_from_recommendations(
+            user_id=5011, recommendation_ids=[card.id], now=NOW
+        )
+        assert mission.daily_target_count_snapshot == 2
+
+    async def test_mission_started_before_the_step_table_cannot_restart_on_another_step(self) -> None:
+        challenges = await _seed()
+        walk = challenges["CH_WALK_AFTER_MEAL"]
+        cycle = await self._legacy_stopped(5012, walk)
+        card = await make_card(5012, walk, cycle)
+        await ChallengeRecommendation.filter(id=card.id).update(proposed_goal=_proposal(walk, 1))
+
+        await _expect(
+            ErrorCode.VALIDATION_ERROR,
+            ChallengeCoreService().start_from_recommendations(user_id=5012, recommendation_ids=[card.id], now=NOW),
+        )
+
+    async def test_mission_whose_old_goal_differs_from_the_base_step_cannot_restart(self) -> None:
+        challenges = await _seed()
+        walk = challenges["CH_WALK_AFTER_MEAL"]
+        cycle = await self._legacy_stopped(5013, walk)
+        # 단계표 적용 전 마스터가 지금 기본 단계와 다른 목표였던 경우
+        await UserChallenge.filter(user_id=5013).update(target_value_snapshot=Decimal("15"))
+        card = await make_card(5013, walk, cycle)
+
+        await _expect(
+            ErrorCode.VALIDATION_ERROR,
+            ChallengeCoreService().start_from_recommendations(user_id=5013, recommendation_ids=[card.id], now=NOW),
+        )
+
+    async def test_mission_from_an_older_policy_version_restarts_on_the_same_goal(self) -> None:
+        challenges = await _seed()
+        walk = challenges["CH_WALK_AFTER_MEAL"]
+        cycle = await self._legacy_stopped(5014, walk)
+        # 옛 단계표 버전의 1단계로 시작했던 미션. 목표는 지금 1단계와 같다(10분, 하루 1회, 슬롯 없음)
+        await UserChallenge.filter(user_id=5014).update(
+            daily_target_count_snapshot=1,
+            target_value_snapshot=Decimal("10"),
+            goal_config_snapshot={"level": 1, "policy_version": "P1-STEPS-OLD", "context_slots": []},
+        )
+        card = await make_card(5014, walk, cycle)
+        await ChallengeRecommendation.filter(id=card.id).update(proposed_goal=_proposal(walk, 1))
+
+        [mission] = await ChallengeCoreService().start_from_recommendations(
+            user_id=5014, recommendation_ids=[card.id], now=NOW
+        )
+        assert (mission.goal_config_snapshot or {})["level"] == 1
