@@ -74,7 +74,7 @@ async def generate_recommendations(
             "rank": item.rank,
             "difficulty": result.challenges[item.challenge_id].difficulty,
             "verification_type": result.challenges[item.challenge_id].verification_type,
-            **challenge_goal_body(result.challenges[item.challenge_id]),
+            **challenge_goal_body(result.challenges[item.challenge_id], item.proposed_goal),
             "context_label": result.challenges[item.challenge_id].context_label,
             "cycle_id": item.cycle_id,
             "target_monster": target,

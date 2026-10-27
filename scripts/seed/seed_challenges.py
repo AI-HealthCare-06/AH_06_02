@@ -21,6 +21,7 @@ from tortoise import Tortoise, fields, models
 from tortoise.transactions import in_transaction
 
 from app.models.challenges import Challenge
+from app.services.challenge_goals import PolicyError, validate_policy
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_CSV = REPO_ROOT / "docs" / "01_planning" / "challenge-master.csv"
@@ -76,6 +77,14 @@ def _convert(field: fields.Field[Any], column: str, raw: str) -> Any:
     return raw
 
 
+def _check_policy(values: dict[str, Any], line: int) -> None:
+    """개인 목표 단계표가 마스터 고정 원형과 어긋나면 쓰기 전에 멈춘다."""
+    try:
+        validate_policy(Challenge(**values))
+    except PolicyError as exc:
+        raise SeedError(f"{line}행 personalization_policy: {exc}") from exc
+
+
 def parse_rows(rows: list[dict[str, str]], model: type[models.Model] = Challenge) -> list[dict[str, Any]]:
     """CSV 행을 모델 필드 값으로 바꾼다. DB 에 쓰기 전에 전 행을 먼저 검사한다."""
     fields_map = model._meta.fields_map
@@ -100,6 +109,8 @@ def parse_rows(rows: list[dict[str, str]], model: type[models.Model] = Challenge
             # NOT NULL 이고 기본값이 있는 컬럼은 빼서 모델·DB 기본값에 맡긴다
 
         code = str(values["code"])
+        if model is Challenge:
+            _check_policy(values, line)
         if code in seen:
             raise SeedError(f"{line}행 code {code} 가 중복입니다.")
         seen.add(code)

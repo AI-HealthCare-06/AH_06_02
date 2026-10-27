@@ -29,6 +29,7 @@ from app.models.predictions import Disease, Prediction, PredictionContribution, 
 from app.models.users import User
 from app.repositories.health_record_repository import HealthRecordRepository
 from app.services.attack_cycles import AttackCycleService, today_kst
+from app.services.challenge_goals import display_goal, goal_policy, mission_level, next_step
 from app.services.model_artifact import ArtifactLoader, ArtifactSource, ModelArtifact, personal_threat_score
 
 MAX_CARDS = 3
@@ -241,7 +242,15 @@ class RecommendationService:
                 extra={"reason": "no_positive_factors"},
             )
 
-        scored.sort(key=lambda pair: (-pair[1].score, pair[0].context_priority or 255, pair[0].id))
+        goals, deferred = await self._personal_goals(user.id, cycle, [challenge for challenge, _ in scored])
+        scored.sort(
+            key=lambda pair: (
+                pair[0].id in deferred,
+                -pair[1].score,
+                pair[0].context_priority or 255,
+                pair[0].id,
+            )
+        )
         items: list[ChallengeRecommendation] = []
         for rank, (challenge, factor) in enumerate(scored[:MAX_CARDS], start=1):
             items.append(
@@ -254,6 +263,7 @@ class RecommendationService:
                     factor_score=Decimal(str(round(factor.score, 5))),
                     rank=rank,
                     recommended_at=current,
+                    proposed_goal=goals.get(challenge.id),
                 )
             )
         return GeneratedRecommendations(
@@ -265,6 +275,53 @@ class RecommendationService:
             model_experimental=artifact.experimental,
             remaining_slots=slots,
         )
+
+    @staticmethod
+    async def _personal_goals(
+        user_id: int, cycle: UserAttackCycle, challenges: list[Challenge]
+    ) -> tuple[dict[int, dict[str, Any]], set[int]]:
+        """단계표가 있는 챌린지의 개인 목표와, 뒤로 미룰 챌린지.
+
+        같은 주기에 이미 시작한 적이 있으면 그 단계를 그대로 제안한다.
+        아니면 지난 주기에 기간 종료로 끝난 가장 최근 미션의 수행률로 다음 단계를 정한다.
+        """
+        goals: dict[int, dict[str, Any]] = {}
+        deferred: set[int] = set()
+        for challenge in challenges:
+            policy = goal_policy(challenge)
+            if policy is None:
+                continue
+            missions = UserChallenge.filter(user_id=user_id, challenge_id=challenge.id)
+            earlier = await missions.filter(cycle_id=cycle.id).order_by("-id").first()
+            if earlier is not None:
+                level = mission_level(earlier, challenge, policy)
+                basis = (earlier.goal_config_snapshot or {}).get("basis")
+                if level != policy.base_level or basis is not None:
+                    goals[challenge.id] = {"policy_version": policy.version, "level": level, "basis": basis}
+                continue
+            previous = (
+                await missions.filter(status=UserChallengeStatus.GRADUATED, completion_rate__isnull=False)
+                .exclude(cycle_id=cycle.id)
+                .order_by("-end_date", "-id")
+                .first()
+            )
+            if previous is None or previous.completion_rate is None:
+                continue
+            previous_level = mission_level(previous, challenge, policy)
+            step = next_step(policy, previous_level, previous.completion_rate)
+            if step.defer:
+                deferred.add(challenge.id)
+            goals[challenge.id] = {
+                "policy_version": policy.version,
+                "level": step.level,
+                "basis": {
+                    "user_challenge_id": previous.id,
+                    "completion_rate": str(previous.completion_rate),
+                    "previous_level": previous_level,
+                    "direction": step.direction,
+                },
+            }
+        return goals, deferred
 
     async def _factor_scores(
         self, user: User, monster: Monster, artifact: ModelArtifact
@@ -375,7 +432,7 @@ class RecommendationService:
                     "rank": row.rank,
                     "difficulty": challenge.difficulty,
                     "verification_type": challenge.verification_type,
-                    **challenge_goal_body(challenge),
+                    **challenge_goal_body(challenge, row.proposed_goal),
                     "context_label": challenge.context_label,
                     "cycle_id": row.cycle_id,
                     "target_monster": targets.get(row.cycle_id) if row.cycle_id is not None else None,
@@ -458,14 +515,28 @@ def target_monster_body(monster: Monster) -> dict[str, Any]:
     return {"monster_id": monster.id, "code": monster.code, "name": monster.name}
 
 
-def challenge_goal_body(challenge: Challenge) -> dict[str, Any]:
-    """추천 화면의 선택 전 목표 안내. 시작 이후에는 미션 스냅샷을 사용한다."""
-    return {
+def challenge_goal_body(challenge: Challenge, proposed_goal: Any = None) -> dict[str, Any]:
+    """추천 화면의 선택 전 목표 안내. 시작 이후에는 미션 스냅샷을 사용한다.
+
+    개인 목표 단계가 있으면 제목·난이도·목표를 그 단계로 덮어쓴다. 호출하는 쪽은 이 값을 뒤에 펼친다.
+    """
+    goal = display_goal(challenge, proposed_goal)
+    body: dict[str, Any] = {
         "context_type": challenge.context_type,
-        "daily_target_count": challenge.daily_target_count,
-        "target_value": float(challenge.target_value) if challenge.target_value is not None else None,
+        "daily_target_count": goal.daily_target_count,
+        "target_value": float(goal.target_value) if goal.target_value is not None else None,
         "unit": challenge.unit,
-        "daily_xp": challenge.reward_xp,
-        "safety_check_required": challenge.safety_check_required,
+        "daily_xp": goal.daily_xp,
+        # 지난 단계보다 올린 목표는 마스터와 관계없이 시작 전에 안전 확인을 받는다
+        "safety_check_required": challenge.safety_check_required or goal.raised,
         "manual_fallback_allowed": challenge.manual_fallback_allowed,
     }
+    if goal.level is not None:
+        body.update(
+            title=goal.title,
+            difficulty=goal.difficulty,
+            intensity=goal.intensity,
+            goal_level=goal.level,
+            goal_basis=goal.basis,
+        )
+    return body

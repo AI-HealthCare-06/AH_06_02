@@ -56,11 +56,22 @@ def test_blank_cells_are_not_filled_with_invented_values() -> None:
     first = parsed[0]
     # NULL 허용 컬럼은 None
     assert first["description"] is None
-    assert first["personalization_policy"] is None
+    stairs = next(row for row in parsed if row["code"] == "CH_STAIRS")
+    assert stairs["personalization_policy"] is None
 
     blank_xp = parse_rows([{**row, "reward_xp": ""} for row in read_csv(DEFAULT_CSV)])[0]
     # NOT NULL 컬럼은 값을 넣지 않고 기본값에 맡긴다
     assert "reward_xp" not in blank_xp
+
+
+def test_policy_that_changes_the_fixed_goal_is_refused() -> None:
+    rows = read_csv(DEFAULT_CSV)
+    walk = next(row for row in rows if row["code"] == "CH_WALK_AFTER_MEAL")
+    # 기본 단계를 마스터와 다른 하루 1회로 바꾼 정책
+    broken = walk["personalization_policy"].replace('"base_level":3', '"base_level":2')
+
+    with pytest.raises(SeedError):
+        parse_rows([{**walk, "personalization_policy": broken}])
 
 
 def test_unknown_column_is_rejected(tmp_path: Path) -> None:

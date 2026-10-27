@@ -343,7 +343,17 @@ class TestStartInCycle(TestCase):
         assert mission.cycle_id == cycle.id
         assert mission.end_date == cycle.end_date
         assert mission.duration_days_snapshot == 28
-        assert mission.goal_config_snapshot == {"difficulty": "challenge", "daily_xp": 36, "unit": "분"}
+        # 단계표가 있는 챌린지라 고정 원형으로 시작해도 기본 단계(3)를 남긴다
+        assert mission.goal_config_snapshot == {
+            "difficulty": "challenge",
+            "daily_xp": 36,
+            "unit": "분",
+            "level": 3,
+            "policy_version": "P1-STEPS-20261027",
+            "title": "식후 걷기",
+            "intensity": None,
+            "context_slots": ["lunch", "dinner"],
+        }
         # 점심·저녁 두 슬롯 × 28일
         occurrences = await UserChallengeOccurrence.filter(user_challenge_id=mission.id)
         assert len(occurrences) == 56
@@ -704,13 +714,13 @@ class TestStartGuards(TestCase):
             service.start_from_recommendations(user_id=4002, recommendation_ids=[card.id], now=NOW),
         )
 
-    async def test_card_with_personal_goal_is_refused(self) -> None:
+    async def test_card_with_a_goal_outside_the_step_table_is_refused(self) -> None:
         challenges = await _seed()
         cycle = await make_cycle(4003, ["physical_activity_low"])
         card = await make_card(4003, challenges["CH_WALK_AFTER_MEAL"], cycle)
         await ChallengeRecommendation.filter(id=card.id).update(proposed_goal={"target_value": 5, "slots": ["lunch"]})
 
-        # 개인화는 후속 범위다. 마스터 목표로 바꿔 시작하지 않는다
+        # 단계표에서 찾을 수 없는 목표다. 마스터 목표로 바꿔 시작하지 않는다
         await _expect(
             ErrorCode.VALIDATION_ERROR,
             ChallengeCoreService().start_from_recommendations(user_id=4003, recommendation_ids=[card.id], now=NOW),

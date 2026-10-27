@@ -243,8 +243,7 @@ class ConversationRecommendationService:
                 }
                 row.llm_model_version = model_version
                 row.evidence_card_ids = [evidence.card_id]
-                # 현재 시작 계약은 고정 원형만 지원한다. 개인 목표로 저장하지 않는다.
-                row.proposed_goal = None
+                # 개인 목표 단계는 규칙 추천이 정한 값을 그대로 둔다. 대화는 단계를 바꾸지 않는다
                 await row.save(
                     update_fields=[
                         "rank",
@@ -252,7 +251,6 @@ class ConversationRecommendationService:
                         "conversation_snapshot",
                         "llm_model_version",
                         "evidence_card_ids",
-                        "proposed_goal",
                     ]
                 )
             return ConversationResult("conversation", replace(generated, items=output), [], reasons)
