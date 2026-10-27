@@ -1,6 +1,6 @@
 # 당고킬러 테이블 명세서
 
-> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-26 기준 사본입니다.
+> 원본은 구글 시트 `당고킬러_테이블명세서`입니다. 이 파일은 2026-10-27 기준 사본입니다.
 > 스키마를 바꿀 때는 시트를 먼저 고치고 팀에 알린 뒤 이 파일을 다시 뽑습니다.
 > `uv run scripts/sync_specs.py` 로 만듭니다. 손으로 고치지 마세요.
 
@@ -14,10 +14,10 @@
 | 4 | prediction_contributions | 기여요인 | 최병주 (C) | /predictions | 8 | 신규 — 기여요인을 별도 테이블로 분리 (배수빈 확인 — 10/3, PR #9 머지) |
 | 5 | monsters | 캐릭터 마스터 | 김이경 (D) | /monsters | 11 | 신규 — 도감 상태 저장이 기존 8개 안에 없었음 |
 | 6 | user_monsters | 사용자 캐릭터 상태 | 김이경 (D) | /monsters | 17 | is_target 제거안. 공략 중 여부는 active 주기와 대상 조인에서 계산. 제거안 행 제외 집계. |
-| 7 | challenges | 챌린지 마스터 | 김이경 (D) | /challenges | 27 | personalization_policy 추가 제안(10/2). 기존 context_priority는 조건부 후보 순위로 정합화. 새 JSON은 구조 검토 전. |
+| 7 | challenges | 챌린지 마스터 | 김이경 (D) | /challenges | 27 | personalization_policy에 개인 목표 단계표 반영(10/27, 9개 챌린지). context_priority는 조건부 후보 순위. |
 | 8 | user_challenges | 사용자 챌린지 | 김이경 (D) | /challenges | 24 | target_user_monster_id→cycle_id FK, cycle_week 저장 제거안. 개인 목표 snapshot 유지·공통 날짜는 주기에서 계산. 제거안 제외. |
 | 9 | challenge_logs | 수행 기록 | 김이경 (D) | /challenges | 17 |  |
-| 10 | challenge_recommendations | 추천·거절 이력 | 김이경 (D) | /challenges | 20 | cycle_id FK 추가 수용안. 지난 주기 추천으로 시작 금지. proposed_goal은 개인 목표만 저장. |
+| 10 | challenge_recommendations | 추천·거절 이력 | 김이경 (D) | /challenges | 20 | cycle_id FK. 지난 주기 추천으로 시작 금지. proposed_goal은 개인 목표 단계 번호와 근거만 저장(10/27). |
 | 11 | rewards | 보상 마스터 | 김이경 (D) | /rewards | 11 |  |
 | 12 | user_rewards | 보상 획득 이력 | 김이경 (D) | /rewards | 6 |  |
 | 13 | user_attack_cycles | 사용자 공략 주기 | 김이경 (D) | /challenges | 10 | 집중 공략 수용 구조안. 사용자당 active1개·대상1개·공통D28. 팀 확정 전·DB 미반영. |
@@ -177,24 +177,24 @@
 | 5 | category | ENUM('activity','diet','smoking','alcohol','body','sleep') | NN |  |  | sleep은 모델 요인이 아닌 보너스 챌린지용 | 변경 — 9/25 김이경 요청 |
 | 6 | factor_key | VARCHAR(50) | NULL |  |  | 연결 요인. 추천과 공략 점수 반영의 기준. NULL이면 모델과 무관한 보너스 챌린지 — XP·보상만 주고 공략 점수는 쌓이지 않음 | 변경 — 9/25 김이경 요청 |
 | 7 | goal_type | ENUM('boolean','count','duration','quantity') | NN |  |  |  | 확정 |
-| 8 | target_value | DECIMAL(6,1) | NULL |  |  | 고정 원형의 1회 기본값. 개인화는 승인 personalization_policy의 허용 조합에서 선택하고 사용자 target_value_snapshot에 저장한다. 사용자별 마스터 덮어쓰기 금지. | 개정안 — 10/2 D 세 키 개인화 정의. 운영 승인 전 |
+| 8 | target_value | DECIMAL(6,1) | NULL |  |  | 고정 원형의 1회 기본값이며 personalization_policy 기본 단계의 값과 같다. 개인 목표는 승인된 단계표에서 고르고 user_challenges.target_value_snapshot에 저장한다. 사용자별로 마스터를 덮어쓰지 않는다. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 9 | unit | VARCHAR(20) | NULL |  |  | 분 · 회 · 잔 등 | 확정 |
-| 10 | daily_target_count | TINYINT | NN |  | 1 | 고정 원형의 기본 하루 횟수. 개인화된 횟수는 승인 조합을 검증해 daily_target_count_snapshot에 보존하며 식사 슬롯 수와 일치해야 한다. | 개정안 — 10/2 D 개인 목표 snapshot |
+| 10 | daily_target_count | TINYINT | NN |  | 1 | 고정 원형의 기본 하루 횟수이며 기본 단계의 값과 같다. 개인 목표 횟수는 단계표에서 고르고 daily_target_count_snapshot에 저장한다. 슬롯이 있는 단계는 슬롯 수와 하루 횟수가 같다. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 11 | duration_days | SMALLINT | NN |  | 7 | 레거시 고정 미션의 기본 기간(기본값 7 유지). 공략 주기 미션은 이 값으로 개별 28일을 만들지 않고 공통 D28 경계에 종료한다. 실제 남은 기간은 사용자 duration_days_snapshot에 저장한다. | 정합화 — 10/2 공통 주기 종료 합의. 구현 별도 |
 | 12 | verification_type | ENUM('manual','photo','timer','value','time','system') | NN |  | 'timer' | 인증 수단 1개. Mapping v0의 PHOTO·TIMER·VALUE·TIME·SYSTEM에 대응 (REQ-CHLG-008 개정 필요) | 변경 — 9/28 김이경 Mapping v0 |
-| 13 | difficulty | ENUM('easy','normal','challenge') | NN |  | 'easy' | 고정 원형의 기본 등급. 개인화 등급은 키별 허용 조합의 실제 목표와 일치해야 한다. 식후 걷기 하루 합계 5/10/20분 = easy/normal/challenge. 움직임 휴식은 회당 3분 고정·하루 1/2/3회 = easy/normal/challenge(10/2 D·A 동의). 키 간 동일 효과를 뜻하지 않으며 보상 차등은 별도 검토. | 개정안 — 10/2 D·A 난이도 기준 동의. 운영 승인·DB 적용 별도 |
+| 13 | difficulty | ENUM('easy','normal','challenge') | NN |  | 'easy' | 고정 원형의 기본 등급이며 기본 단계의 난이도와 같다. 단계표의 단계마다 난이도가 있고, 단계가 오를수록 난이도가 낮아지지 않는다. 움직임 휴식은 회당 3분·하루 1/2/3회 = easy/normal/challenge(10/2 D·A 동의). 키 사이에 같은 효과를 뜻하지 않는다. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 14 | relation_type | ENUM('direct','supporting','general') | NN |  | 'supporting' | direct=서비스 입력값을 직접 바꿈 · supporting=관련 행동 · general=모델 비연계 | 신규 — 9/28 김이경 Mapping v0 |
 | 15 | exclude_condition | VARCHAR(200) | NULL |  |  | 추천 제외 조건 설명. 시스템 판정이 가능한 것만 코드로 구현 | 신규 — 9/28 김이경 Mapping v0 |
 | 16 | context_label | VARCHAR(40) | NULL |  |  | 화면 표시용 맥락 문구. 기상 후 · 음주 이벤트 · 좌식 중 등 | 신규 — 9/28 김이경 Mapping v0 |
 | 17 | manual_fallback_allowed | BOOLEAN | NN |  | TRUE | 1단계 마스터는 verification_type='photo'인 경우만 TRUE, 나머지는 FALSE를 명시한다. 기존 manual 인증은 그대로 manual을 사용하며 timer·value 등의 수동 대체는 1단계에서 허용하지 않는다. DB 기본값 TRUE에 의존하지 않는다. | 정합화 — 10/6 A·D photo만 수동 대체 허용 합의 |
 | 18 | context_type | ENUM('none','meal','event') | NN |  | 'none' | 시각이 아닌 맥락. event는 음주·흡연처럼 기회가 생긴 날에만 수행 가능 | 변경 — 9/28 김이경 Mapping v0 |
 | 19 | context_slots | JSON | NULL |  |  | ['lunch','dinner'] | 확정 |
-| 20 | reward_xp | SMALLINT | NN |  | 0 | 해당 챌린지의 기본 난이도로 하루 목표를 모두 완료했을 때 받는 총 경험치. easy 12·normal 24·challenge 36. 수행 1회마다 하루 총 XP를 개인 목표 횟수로 나누어 지급한다 (REQ-RECO-003). 개인화 시 선택 난이도의 하루 XP를 적용하며 시작 시 보존 방식은 A·D 확인 후 구현한다. | 개정 — 10/6 A·D 하루 총 XP 12·24·36 합의 |
+| 20 | reward_xp | SMALLINT | NN |  | 0 | 해당 챌린지의 기본 난이도로 하루 목표를 모두 완료했을 때 받는 총 경험치. easy 12·normal 24·challenge 36. 수행 1회마다 하루 총 XP를 개인 목표 횟수로 나누어 지급한다(REQ-RECO-003). 개인 목표는 단계 난이도의 하루 XP를 쓰고, 시작할 때 goal_config_snapshot.daily_xp에 고정한다. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 21 | progress_value | SMALLINT | NN |  | 10 | 인정된 수행 1회당 쌓이는 공략 점수. MVP는 전 챌린지 동일 값. factor_key가 NULL이면 반드시 0 (마스터 데이터 규칙, REQ-PRED-011) | 변경 — 9/28 용어 치환 |
 | 22 | is_enabled | BOOLEAN | NN |  | TRUE | 운영 중인 정의인지 | 확정 |
 | 23 | safety_check_required | BOOLEAN | NN |  | False | 운동 전 안전 확인이 필요한 챌린지 여부. TRUE이면 챌린지 시작 요청에서 safety_confirmed=true를 서버가 검증한다. safety_confirmed 응답값 자체는 저장하지 않는다. category='activity' 전체가 아니라 마스터 데이터에서 필요한 챌린지만 TRUE로 지정한다. (REQ-CHLG-010) | 신규 — 9/30 REQ-CHLG-010 안전확인 판정 |
 | 24 | context_priority | TINYINT | NULL |  |  | 같은 factor 안의 후보 방향 검토 순위. 매주 강제 투입·앞 3개 고정 배정 규칙이 아니다. 초기 최대 2개, 2주차부터 적합 후보와 사용자 희망이 있을 때 주기당 하나 추가, 진행 포함 최대 3개. | 정합화 — 10/2 조건부 추가 합의 |
-| 25 | personalization_policy | JSON | NULL |  |  | 버전·승인 상태·키별 허용 목표 조합·행동/맥락 범위·적용 조건·완료 기준. 시간의 최소/최대만으로 중간값을 허용하지 않는다. 세 키 D-PERSONAL-20261002-v3-rest 반영안, 운영 승인 전 자동 추천 금지. NULL은 기존 고정 원형. | 추가 제안 — 10/2 D 정의 갱신·A 저장 구조 검토 필요. DB 미반영 |
+| 25 | personalization_policy | JSON | NULL |  |  | 개인 목표 단계표. {version, status, base_level, steps:[{level, title, target_value, daily_target_count, context_slots?, intensity?, difficulty}]}. status가 approved인 단계표만 쓴다. 단계 번호는 1부터 빠짐없이 이어지고, base_level 단계는 마스터 목표(제목·목표값·하루 횟수·슬롯·난이도)와 같아야 하며 시드가 쓰기 전에 검사한다. 슬롯은 마스터 슬롯 안에서만 고른다. intensity는 강도 문구이며 앱이 재지 않는다. 원본은 저장소 docs/01_planning/challenge-master.csv. NULL은 고정 원형만 쓴다. 현재 9개 챌린지, 버전 P1-STEPS-20261027. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 26 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
 | 27 | updated_at | DATETIME | NN |  | ON UPDATE |  | 확정 |
 
@@ -211,8 +211,8 @@
 | 6 | status | ENUM('active','completed','graduated','abandoned') | NN |  | 'active' | graduated는 공통 공략 주기의 D28 경계에 종료된 레거시 상태명. 1단계 화면에는 기간 종료로 표시하고 습관 졸업을 뜻하지 않는다. 개인 시작 후 28일이 아니며 다음 주기 이월 없음. | 정합화 — 10/2 공통 종료. 습관 판정 유예 |
 | 7 | start_date | DATE | NN |  |  |  | 확정 |
 | 8 | end_date | DATE | NN |  |  | 주기 공통 마지막 수행 가능 날짜(포함), user_attack_cycles.end_date에서 시작 시 snapshot으로 계산. 종료 경계는 다음날 00:00 KST. D7 추가도 같은 종료일. 자동 변경 금지. | D 정의안 — 10/2 날짜 경계. API/DDL 검토 필요 |
-| 9 | daily_target_count_snapshot | TINYINT | NN |  |  | 시작 시 승인·검증된 개인 하루 목표 횟수. 마스터 기본값을 그대로 복사하지 않으며 선택 식사 슬롯 수와 일치한다. 수행 중 자동 변경 금지. | 정합화 — 10/2 개인 목표 합의 |
-| 10 | target_value_snapshot | DECIMAL(6,1) | NULL |  |  | 시작 시 승인·검증된 개인 1회 목표값. 식후 걷기 5/10분, 움직임 휴식 3분. 선택된 목표로 완료 판정하며 마스터 변경과 분리한다. | 정합화 — 10/2 개인 목표 합의 |
+| 9 | daily_target_count_snapshot | TINYINT | NN |  |  | 시작할 때 확정한 하루 목표 횟수. 개인 목표면 단계 값, 아니면 마스터 값을 복사한다. 슬롯이 있으면 슬롯 수와 같다. 수행 중 자동으로 바꾸지 않는다. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
+| 10 | target_value_snapshot | DECIMAL(6,1) | NULL |  |  | 시작할 때 확정한 1회 목표값(단계 값 또는 마스터 값). 타이머 완료 판정의 기준이며 마스터 변경과 분리한다. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 11 | duration_days_snapshot | SMALLINT | NN |  |  | 주기 공통 end_date와 미션 실제 start_date로 계산한 계획 일수. 초기 28일·D7 추가 21일. 수행률 분모는 해당 기간의 예정 기회. 개인 목표와 기간은 시작 snapshot으로 보존. | 정합화 — 10/2 공통 종료·예정 기회 |
 | 12 | completed_at | DATETIME | NULL |  |  |  | 확정 |
 | 13 | stopped_at | DATETIME | NULL |  |  |  | 검토 필요 — 10/2 공략 사이클 제안. 팀 확정 전 (REQ-RECO-006) |
@@ -220,7 +220,7 @@
 | 15 | cycle_id | BIGINT | NULL | FK |  | → user_attack_cycles.id · 1단계 공략 미션이 속한 주기. 사용자 소유권·active 기간·챌린지 factor_key가 대상 monsters.factor_keys에 포함되는지 서버 검증. NULL은 레거시/주기 밖 미션만 허용. | 수용안 — 단일 공략·주기 분리. 팀 확정 전·DB 미반영 |
 |  | cycle_week | TINYINT | NN |  | 1 | 제거안: 주기는 cycle_id로 연결하고 상대 주차는 주기 start_date와 KST 기준일로 계산해 API에 제공한다. D0\~D6=1주차, D7\~D13=2주차. D28 이후에는 진행 중 주차를 표시하지 않음. 월요일 주간 점수와 별개. | 제거안 — 주차 중복 저장 대신 계산. 검토 이력 행·집계 제외 |
 | 16 | habit_established | BOOLEAN | NULL |  | NULL | 1단계에는 수행률만 기록하고 습관 판정은 유예한다. NULL=미평가, TRUE/FALSE를 산출하지 않는다. 미래 판정용 자리는 보존하되 NULL 허용/기본 NULL로 변경하는 D안. | 수정 제안 — 10/2 판정 유예 반영. migration 검토 필요 |
-| 17 | goal_config_snapshot | JSON | NULL |  |  | 시작 당시 개인 슬롯·난이도·단위·행동/인증 방식·승인 정책 버전. 예정 기회 목록은 담지 않고 user_challenge_occurrences 행으로 분리한다. 공략 시작일·공략 대상은 중복 저장하지 않고 cycle_id로 주기 참조. 숫자 목표는 기존 두 snapshot이 기준 | 추가 제안 — 10/2 D 정의, 10/3 A·D 합의로 예정 기회 분리 반영. DB 미반영 |
+| 17 | goal_config_snapshot | JSON | NULL |  |  | 시작 당시 difficulty·daily_xp·unit. 단계표가 있는 챌린지는 level·policy_version·title·intensity·context_slots·basis도 남기고, 기본 단계로 시작해도 남긴다. 이용일 확인형은 scheduled_dates. 시작 뒤 기록·타이머·슬롯 검사는 이 값을 따른다. 예정 기회 목록은 담지 않고 user_challenge_occurrences 행으로 분리한다. 숫자 목표는 기존 두 snapshot이 기준이다. 단계 정보가 없는 기존 미션은 마스터 목표·기본 단계로 읽는다. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 18 | completion_summary_snapshot | JSON | NULL |  |  | 종료 시 인정 완료 기회 수·예정 기회 수·기록 기준 수행률·집계 시각·정책 버전. 분모 0은 rate=NULL. 1단계 습관 판정 없음. 원시 수행 로그를 대체하지 않는다. | 제거 — 10/3. 아래 집계 컬럼 5개로 대체 |
 |  | completed_occurrence_count | SMALLINT | NULL |  |  | 종료 시점 인정 완료 기회 수. 미집계면 NULL | 신규 — 10/3 A 결정. completion_summary_snapshot 대체 |
 |  | planned_occurrence_count | SMALLINT | NULL |  |  | 종료 시점 예정 기회 수. 수행률 분모 | 신규 — 10/3 A 결정 |
@@ -275,7 +275,7 @@
 | 15 | conversation_snapshot | JSON | NULL |  |  | 대화형 추천에서 주고받은 질문과 답변 기록. 저장 키는 policy_version · fingerprint · answers · asked · card_versions · model_version(예측 모델 식별자. 선택에 쓴 LLM 식별자인 llm_model_version 과 다르다) · health_record_id 다. 자유 입력 원문·이름·연락처는 저장하지 않는다. 탈퇴 +30일 식별정보 삭제 시 이 컬럼 전체를 NULL 로 지운다 (REQ-CHLG-012) | 신규 — 10/2 대화형 추천 도입. 저장 범위·삭제 규칙 10/13 A 확정. 삭제 구현·검증 완료 — 10/13 #52 |
 | 16 | llm_model_version | VARCHAR(32) | NULL |  |  | 대화 개인화에서 후보 선택에 사용한 LLM 식별자. conversation_snapshot 의 model_version(예측 모델)과 다르다. 재현과 검증에 사용한다. 기존 규칙·예측 후보를 대화로 선택한 경우 source_type 은 원래 값을 유지하므로, source_type 과 무관하게 채운다. 32자 이내 | 변경 — 10/13 source_type 조건 제거. 구현과 정합화 |
 | 17 | evidence_card_ids | JSON | NULL |  |  | 제안 근거로 전달된 승인 카드 ID 배열. 검증과 사후 검토용. ID 는 C01\~C12 고정값으로 문서 순서와 무관하며 삭제한 ID 는 재사용하지 않는다. 수정 이력은 카드의 version 으로 관리한다 (형식 20261012-v1) | 신규 — 10/2 대화형 추천 도입. ID 체계 10/13 A 확정. 카드 12개는 전부 draft 이며 운영 승인은 별건 |
-| 18 | proposed_goal | JSON | NULL |  |  | 서버 검증한 개인 목표(시간·횟수·슬롯·난이도·예정 기회·정책 버전). cycle_id FK로 대상·주기 연결하고 시작일/대상은 JSON에 중복 저장하지 않음. 사용자 확인 후 동일 목표를 snapshot에 전달. 미검증 LLM 원문 사용 금지. | 추가 제안 — 10/2 D 정의 완료·A 구조 검토 필요. DB 미반영 |
+| 18 | proposed_goal | JSON | NULL |  |  | 규칙 추천이 정한 개인 목표 단계. {policy_version, level, basis}. basis는 근거가 된 지난 미션 user_challenge_id·completion_rate·previous_level·direction(up/keep/down). 단계 값은 넣지 않고 시작할 때 단계표에서 다시 꺼낸다. 버전이 다르거나 없는 단계면 시작을 거절한다. 다음 주기 단계는 지난 주기 수행률 80% 이상 위, 50% 이상 유지, 50% 미만 아래. 대화형 추천은 이 값을 바꾸지 않는다. 미검증 LLM 원문 사용 금지. NULL은 고정 원형. | 반영 2026.10.27, 개인 목표 단계표 운영(PR #77) |
 | 19 | cycle_id | BIGINT | NULL | FK |  | → user_attack_cycles.id · 추천 생성 당시 주기. 시작 시 소유권·active 주기·대상 일치·남은 슬롯 재검증. 종료되거나 다른 주기의 추천은 시작 불가. 레거시/주기 밖 추천만 NULL. | 수용안 — 오래된 추천의 새 주기 사용 방지. 팀 확정 전·DB 미반영 |
 | 20 | created_at | DATETIME | NN |  | CURRENT_TIMESTAMP |  | 확정 |
 
