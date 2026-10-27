@@ -62,7 +62,14 @@ def cell(value: Any) -> str:
 
 
 def rows_of(ws: Worksheet) -> list[list[str]]:
-    return [[cell(c) for c in row] for row in ws.iter_rows(values_only=True)]
+    rows = []
+    for values in ws.iter_rows(values_only=True):
+        row = [cell(c) for c in values]
+        # 시트로 가져온 xlsx 는 서식만 남은 빈 칸이 Z열까지 따라와 표 열로 잡힌다
+        while row and not row[-1]:
+            row.pop()
+        rows.append(row)
+    return rows
 
 
 def is_blank(row: list[str]) -> bool:
