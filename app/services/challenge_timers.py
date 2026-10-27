@@ -22,6 +22,7 @@ from app.models.challenges import (
     VerificationType,
 )
 from app.services.attack_cycles import lock_user
+from app.services.challenge_goals import mission_slots
 
 
 def kst(value: datetime) -> datetime:
@@ -72,7 +73,7 @@ class ChallengeTimerService:
             challenge = await Challenge.get(id=mission.challenge_id)
             if challenge.verification_type != VerificationType.TIMER or mission.target_value_snapshot is None:
                 raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
-            slots = challenge.context_slots or []
+            slots = mission_slots(mission, challenge)
             if (slots and slot not in slots) or (not slots and slot is not None):
                 raise AppError(ErrorCode.VALIDATION_ERROR)
             occurrence = (

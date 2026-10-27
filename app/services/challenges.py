@@ -43,6 +43,7 @@ from app.services.attack_cycles import (
     lock_user,
     today_kst,
 )
+from app.services.challenge_goals import Goal, master_goal, mission_slots
 from app.services.challenge_timers import ChallengeTimerService
 from app.services.evidence import EvidenceService
 from app.services.recommendations import target_monster_body
@@ -86,14 +87,14 @@ def xp_for_completion(daily_xp: int, daily_target: int, completed_today: int) ->
 
 
 def plan_occurrences(
-    challenge: Challenge, start: date, end: date, scheduled_dates: list[date] | None = None
+    challenge: Challenge, goal: Goal, start: date, end: date, scheduled_dates: list[date] | None = None
 ) -> list[tuple[date, str, int]]:
     """예정 기회 (날짜, slot_code, sequence_no). 수행률 분모가 된다.
 
-    식사 슬롯이 정해진 챌린지는 슬롯마다, 아니면 하루 목표 횟수만큼 독립 회차로 만든다.
+    식사 슬롯이 정해진 목표는 슬롯마다, 아니면 하루 목표 횟수만큼 독립 회차로 만든다.
     """
-    slots = list(challenge.context_slots or [])
-    if slots and len(slots) != challenge.daily_target_count:
+    slots = goal.context_slots
+    if slots and len(slots) != goal.daily_target_count:
         raise AppError(ErrorCode.VALIDATION_ERROR, message="하루 목표 횟수와 식사 슬롯 수가 맞지 않습니다.")
     if challenge.context_type == ContextType.EVENT:
         if not scheduled_dates:
@@ -106,9 +107,7 @@ def plan_occurrences(
             (day, slot, seq)
             for day in sorted(scheduled_dates)
             for slot, seq in (
-                [(slot, 1) for slot in slots]
-                if slots
-                else [("", seq) for seq in range(1, challenge.daily_target_count + 1)]
+                [(slot, 1) for slot in slots] if slots else [("", seq) for seq in range(1, goal.daily_target_count + 1)]
             )
         ]
     planned: list[tuple[date, str, int]] = []
@@ -117,7 +116,7 @@ def plan_occurrences(
         if slots:
             planned.extend((day, slot, 1) for slot in slots)
         else:
-            planned.extend((day, "", seq) for seq in range(1, challenge.daily_target_count + 1))
+            planned.extend((day, "", seq) for seq in range(1, goal.daily_target_count + 1))
         day += timedelta(days=1)
     return planned
 
@@ -199,6 +198,7 @@ class ChallengeCoreService:
             if end_date is None:
                 raise AppError(ErrorCode.INTERNAL_ERROR)
             for recommendation, challenge in zip(ordered_recommendations, ordered_challenges, strict=True):
+                goal = master_goal(challenge)
                 mission = await UserChallenge.create(
                     user_id=user_id,
                     challenge_id=challenge.id,
@@ -209,13 +209,13 @@ class ChallengeCoreService:
                     start_date=today,
                     # 투입 시점과 관계없이 주기 공통 종료일. 초기 28일, D7 추가 21일
                     end_date=end_date,
-                    daily_target_count_snapshot=challenge.daily_target_count,
-                    target_value_snapshot=challenge.target_value,
+                    daily_target_count_snapshot=goal.daily_target_count,
+                    target_value_snapshot=goal.target_value,
                     duration_days_snapshot=(end_date - today).days + 1,
                     # 시작 시 하루 XP 를 고정한다. 진행 중 마스터가 바뀌어도 다시 계산하지 않는다
                     goal_config_snapshot={
-                        "difficulty": str(challenge.difficulty),
-                        "daily_xp": challenge.reward_xp,
+                        "difficulty": goal.difficulty,
+                        "daily_xp": goal.daily_xp,
                         "unit": challenge.unit,
                         **(
                             {"scheduled_dates": [str(day) for day in sorted(scheduled_dates or [])]}
@@ -230,7 +230,7 @@ class ChallengeCoreService:
                             user_challenge_id=mission.id, scheduled_date=day, slot_code=slot, sequence_no=seq
                         )
                         for day, slot, seq in await self._plan_new_instance(
-                            user_id, challenge, today, end_date, scheduled_dates
+                            user_id, challenge, goal, today, end_date, scheduled_dates
                         )
                     ]
                 )
@@ -251,7 +251,13 @@ class ChallengeCoreService:
         return [mission.id for mission in missions]
 
     async def _plan_new_instance(
-        self, user_id: int, challenge: Challenge, start: date, end: date, scheduled_dates: list[date] | None = None
+        self,
+        user_id: int,
+        challenge: Challenge,
+        goal: Goal,
+        start: date,
+        end: date,
+        scheduled_dates: list[date] | None = None,
     ) -> list[tuple[date, str, int]]:
         """새 인스턴스의 예정 기회. 이전 인스턴스에서 이미 인정 완료한 기회는 뺀다.
 
@@ -259,14 +265,14 @@ class ChallengeCoreService:
         회차 번호는 1 부터 다시 세지 않는다. 그날 목표를 다 채웠으면 그날은 0 개다.
         시작일 이전 날짜는 계획에 없으므로 지난 미완료 기회를 소급해 다시 배정하지 않는다.
         """
-        planned = plan_occurrences(challenge, start, end, scheduled_dates)
+        planned = plan_occurrences(challenge, goal, start, end, scheduled_dates)
         siblings = await self._sibling_mission_ids(user_id, challenge.id)
         done = await UserChallengeOccurrence.filter(
             user_challenge_id__in=siblings, status=OccurrenceStatus.COMPLETED, scheduled_date__gte=start
         ).values_list("scheduled_date", "slot_code")
         if not done:
             return planned
-        if challenge.context_slots:
+        if goal.context_slots:
             done_slots = {(day, slot) for day, slot in done}
             return [item for item in planned if (item[0], item[1]) not in done_slots]
         done_counts = Counter(day for day, _ in done)
@@ -360,7 +366,7 @@ class ChallengeCoreService:
             ):
                 raise AppError(ErrorCode.CHLG_VERIFICATION_FAILED)
             status = self._verify(challenge, mission, verification_method, value, evidence_url)
-            self._check_slot(challenge, context_slot)
+            self._check_slot(mission_slots(mission, challenge), context_slot)
 
             siblings = await self._sibling_mission_ids(user_id, mission.challenge_id)
             # 인스턴스를 넘는 중복 기준은 로그 존재가 아니라 인정 완료한 예정 기회다.
@@ -491,8 +497,7 @@ class ChallengeCoreService:
         return occurred
 
     @staticmethod
-    def _check_slot(challenge: Challenge, context_slot: str | None) -> None:
-        slots = list(challenge.context_slots or [])
+    def _check_slot(slots: list[str], context_slot: str | None) -> None:
         if slots and context_slot not in slots:
             raise AppError(ErrorCode.VALIDATION_ERROR, message="선택한 식사 슬롯이 아닙니다.")
         if not slots and context_slot is not None:
