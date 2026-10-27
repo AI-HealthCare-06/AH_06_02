@@ -1256,7 +1256,7 @@ async function renderGrowth(ticket) {
   );
   const content = $("#growth-content");
   if (growth === "character") {
-    content.innerHTML = `<div class="live-avatar-layout"><div class="growth-avatar">${avatar()}</div><section><h1>Lv. ${level.level} ${escape(user.nickname)}</h1><p>경험치 ${level.current_level_xp} / ${level.next_level_xp ?? "최고 레벨"}</p><p>공략 점수 ${currentMonster()?.weekly_progress ?? 0} / 100</p><p>성장의 조각 ${adventurer.materials}개 · 아이템 ${adventurer.item_stage}단계</p>${button("모험가 꾸미기", 'data-live-bag="adventurer"')}${button("방 꾸미기", 'data-live-bag="room"')}${button("보상 카드 열기", 'data-live-bag="draw"')}</section></div>`;
+    content.innerHTML = `<div class="live-avatar-layout"><div class="growth-avatar">${avatar()}</div><section><h2>Lv. ${level.level} ${escape(user.nickname)}</h2><p>경험치 ${level.current_level_xp} / ${level.next_level_xp ?? "최고 레벨"}</p><p>공략 점수 ${currentMonster()?.weekly_progress ?? 0} / 100</p><p>성장의 조각 ${adventurer.materials}개 · 아이템 ${adventurer.item_stage}단계</p>${button("모험가 꾸미기", 'data-live-bag="adventurer"')}${button("방 꾸미기", 'data-live-bag="room"')}${button("보상 카드 열기", 'data-live-bag="draw"')}</section></div>`;
     return;
   }
   if (growth === "health") {

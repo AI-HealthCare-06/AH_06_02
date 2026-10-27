@@ -1698,3 +1698,83 @@ test("서버의 성장 단계에 맞는 결정 이름과 외형을 표시하고 
       }
     }
   }));
+
+// docs/02_team/design.md 2절. 화면 제목 28px · 섹션 제목 18px · 소제목 15px, 굵기 700, 글꼴 Adventure.
+// 예외는 같은 절에 이유와 함께 적은 곳만 둔다.
+const HEADING_SIZE = { H1: "28px", H2: "18px", H3: "15px" };
+const HEADING_EXCEPTIONS = [".hero-copy", ".signup-copy", ".waiting-copy", ".growth-level", ".reward-tile", ".draw-result", ".room-prop", "#app-menu"];
+
+async function headingReport(page, root = ".scene:not([hidden])") {
+  return page.evaluate(
+    ([sizes, exceptions, rootSelector]) => {
+      const scope = document.querySelector(rootSelector);
+      const headings = [...scope.querySelectorAll("h1,h2,h3")].filter((h) => h.getClientRects().length > 0);
+      const bad = headings
+        .filter((h) => !exceptions.some((selector) => h.closest(selector)))
+        .map((h) => {
+          const style = getComputedStyle(h);
+          return { tag: h.tagName, size: style.fontSize, weight: style.fontWeight, family: style.fontFamily.split(",")[0].trim(), text: h.textContent.trim().slice(0, 16) };
+        })
+        .filter((h) => h.size !== sizes[h.tag] || h.weight !== "700" || h.family !== "Adventure");
+      return { h1: headings.filter((h) => h.tagName === "H1").length, bad };
+    },
+    [HEADING_SIZE, HEADING_EXCEPTIONS, root],
+  );
+}
+
+// 고정 시간 대신 화면이 다 그려진 상태를 기다린다. 실제 연결 화면은 불러오는 동안 live-loading 이 붙는다
+async function settled(page, id) {
+  await page.waitForLoadState("networkidle");
+  await page.locator(`.scene[data-page="${id}"]:not([hidden]):not(.live-loading)`).waitFor();
+}
+
+test("모든 화면의 제목은 디자인 규칙의 크기·굵기·글꼴을 따르고 화면 제목은 하나다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { materials: 0, stage: 1 });
+    const problems = [];
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const id of ["risk", "monsters", "reco", "today", "evolution", "health", "health2", "health3", "progress", "rewards"]) {
+        await page.goto(new URL(path + "#" + id, base).href);
+        await settled(page, id);
+        const tab = id === "progress" ? "data-growth-tab" : id === "rewards" ? "data-live-bag" : null;
+        const names = tab ? await page.locator(`[${tab}]`).evaluateAll((els, key) => els.map((el) => el.getAttribute(key)), tab) : [null];
+        for (const name of names) {
+          if (tab) {
+            await page.locator(`[${tab}="${name}"]`).click();
+            await page.locator(`[${tab}="${name}"][aria-pressed="true"]`).waitFor();
+            await settled(page, id);
+          }
+          const report = await headingReport(page);
+          const where = `${width}px ${id}${tab ? ` ${name}` : ""}`;
+          if (report.h1 !== 1) problems.push(`${where}: 화면 제목 ${report.h1}개`);
+          for (const h of report.bad) problems.push(`${where}: ${h.tag} ${h.size} ${h.weight} ${h.family} "${h.text}"`);
+        }
+      }
+    }
+    assert.deepEqual(problems, []);
+  }));
+
+test("화면 위에 뜨는 창의 제목도 디자인 규칙을 따른다", async () =>
+  withPage(async (page, base) => {
+    const problems = [];
+    const check = async (where, selector) => {
+      for (const h of (await headingReport(page, selector)).bad) problems.push(`${where}: ${h.tag} ${h.size} ${h.weight} ${h.family} "${h.text}"`);
+    };
+    // 의료 고지
+    await mock(page, {});
+    await page.goto(new URL(path + "#risk", base).href);
+    await settled(page, "risk");
+    await page.locator("[data-medical-open]").first().click();
+    await page.locator("#medical-dialog[open]").waitFor();
+    await check("의료 고지", "#medical-dialog");
+    await page.locator("#medical-close").click();
+    await page.locator("#medical-dialog:not([open])").waitFor({ state: "attached" });
+    // 추천을 넘길 때 뜨는 선택 창
+    await openRecoCard(page, base, { cards: [card()], cooldownRequired: true });
+    page.once("dialog", (dialog) => dialog.accept());
+    await page.getByRole("button", { name: "나중에 할게요" }).click();
+    await page.locator("#live-choice[open]").waitFor();
+    await check("다시 추천 시점 선택", "#live-choice");
+    assert.deepEqual(problems, []);
+  }));
