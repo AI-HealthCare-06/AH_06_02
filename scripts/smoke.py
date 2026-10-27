@@ -381,8 +381,8 @@ class Smoke:
         listed = self.client.get("/api/v1/user-challenges", headers=self._headers())
         for item in listed.json().get("data", {}).get("items", []):
             if item.get("user_challenge_id") == self.ctx.user_challenge_id:
-                if item.get("context_type") == "meal":
-                    self.ctx.context_slots = ["lunch", "dinner"]
+                # 개인 목표 단계에 따라 슬롯이 없거나 하나일 수 있어 서버가 준 슬롯을 쓴다
+                self.ctx.context_slots = list(item.get("context_slots") or [])
                 return dict(item)
         return None
 

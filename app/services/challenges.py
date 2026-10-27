@@ -43,7 +43,7 @@ from app.services.attack_cycles import (
     lock_user,
     today_kst,
 )
-from app.services.challenge_goals import Goal, master_goal, mission_slots
+from app.services.challenge_goals import Goal, goal_snapshot, mission_slots, mission_title, start_goal
 from app.services.challenge_timers import ChallengeTimerService
 from app.services.evidence import EvidenceService
 from app.services.recommendations import target_monster_body
@@ -166,7 +166,17 @@ class ChallengeCoreService:
             await lock_user(user_id)
             cycle, ordered_recommendations = await self._lock_start_recommendations(user_id, recommendation_ids)
             ordered_challenges = await self._load_start_challenges(user_id, cycle, ordered_recommendations)
-            if any(ch.safety_check_required for ch in ordered_challenges) and safety_confirmed is not True:
+            # 개인 목표는 승인된 단계표에서 다시 찾는다. 단계표 밖이면 마스터 목표로 바꾸지 않고 거부한다
+            goals = [
+                start_goal(challenge, recommendation.proposed_goal)
+                for recommendation, challenge in zip(ordered_recommendations, ordered_challenges, strict=True)
+            ]
+            await self._check_same_cycle_level(user_id, cycle, ordered_challenges, goals)
+            needs_safety = any(
+                challenge.safety_check_required or goal.raised
+                for challenge, goal in zip(ordered_challenges, goals, strict=True)
+            )
+            if needs_safety and safety_confirmed is not True:
                 raise AppError(ErrorCode.CHLG_SAFETY_CONFIRMATION_REQUIRED)
             if scheduled_dates is not None and not any(
                 ch.context_type == ContextType.EVENT for ch in ordered_challenges
@@ -197,8 +207,7 @@ class ChallengeCoreService:
             end_date = cycle.end_date
             if end_date is None:
                 raise AppError(ErrorCode.INTERNAL_ERROR)
-            for recommendation, challenge in zip(ordered_recommendations, ordered_challenges, strict=True):
-                goal = master_goal(challenge)
+            for recommendation, challenge, goal in zip(ordered_recommendations, ordered_challenges, goals, strict=True):
                 mission = await UserChallenge.create(
                     user_id=user_id,
                     challenge_id=challenge.id,
@@ -217,6 +226,7 @@ class ChallengeCoreService:
                         "difficulty": goal.difficulty,
                         "daily_xp": goal.daily_xp,
                         "unit": challenge.unit,
+                        **goal_snapshot(goal),
                         **(
                             {"scheduled_dates": [str(day) for day in sorted(scheduled_dates or [])]}
                             if challenge.context_type == ContextType.EVENT
@@ -240,6 +250,25 @@ class ChallengeCoreService:
                 recommendation.consecutive_reject_count = 0
                 await recommendation.save(update_fields=["action", "acted_at", "consecutive_reject_count"])
         return created
+
+    @staticmethod
+    async def _check_same_cycle_level(
+        user_id: int, cycle: UserAttackCycle, challenges: list[Challenge], goals: list[Goal]
+    ) -> None:
+        """같은 주기 안 재시작은 처음 시작한 단계를 유지한다.
+
+        하루 횟수나 슬롯이 바뀌면 그날 이미 받은 XP·인정 완료와 새 목표가 섞인다.
+        """
+        for challenge, goal in zip(challenges, goals, strict=True):
+            if goal.level is None:
+                continue
+            earlier = await UserChallenge.filter(user_id=user_id, challenge_id=challenge.id, cycle_id=cycle.id)
+            for mission in earlier:
+                snapshot = mission.goal_config_snapshot or {}
+                if (snapshot.get("policy_version"), snapshot.get("level")) != (goal.policy_version, goal.level):
+                    raise AppError(
+                        ErrorCode.VALIDATION_ERROR, message="같은 주기에는 처음 시작한 단계로만 다시 시작할 수 있어요."
+                    )
 
     @staticmethod
     async def _sibling_mission_ids(user_id: int, challenge_id: int) -> list[int]:
@@ -303,10 +332,6 @@ class ChallengeCoreService:
         # 거절·해당없음·이미 시작한 카드로는 시작하지 않는다. 응답을 accepted 로 덮어쓰지 않는다
         if any(item.action not in STARTABLE_ACTIONS for item in ordered):
             raise AppError(ErrorCode.VALIDATION_ERROR, message="이미 응답한 추천 카드로는 시작할 수 없습니다.")
-        # 1단계는 고정 원형만 시작한다. 개인 목표(proposed_goal) 반영은 후속 범위라
-        # 개인 목표가 있는 카드를 마스터 목표로 바꿔 시작하지 않고 거부한다
-        if any(item.proposed_goal is not None for item in ordered):
-            raise AppError(ErrorCode.VALIDATION_ERROR, message="개인 목표가 있는 추천은 아직 시작할 수 없습니다.")
         return cycle, ordered
 
     async def _load_start_challenges(
@@ -622,9 +647,12 @@ class ChallengeCoreService:
                 {
                     "user_challenge_id": mission.id,
                     "challenge_id": challenge.id,
-                    "title": challenge.title,
+                    "title": mission_title(mission, challenge),
                     "factor_key": challenge.factor_key,
                     "difficulty": snapshot.get("difficulty", str(challenge.difficulty)),
+                    "intensity": snapshot.get("intensity"),
+                    "goal_level": snapshot.get("level"),
+                    "context_slots": mission_slots(mission, challenge),
                     "verification_type": challenge.verification_type,
                     "context_type": challenge.context_type,
                     "context_label": challenge.context_label,

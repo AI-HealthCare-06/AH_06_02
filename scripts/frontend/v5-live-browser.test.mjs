@@ -976,6 +976,32 @@ test("챌린지 상세는 빈 값 없이 목표·XP·난이도와 안전 안내�
     );
   }));
 
+test("단계를 바꾼 추천은 강도와 바꾼 이유를 보여주고 올린 단계면 안전 확인을 받는다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, {
+      cards: [
+        card({
+          challenge_id: 3,
+          title: "저녁 30분 빠르게 걷기",
+          verification_type: "timer",
+          target_value: 30,
+          unit: "분",
+          intensity: "빠른 걸음",
+          goal_level: 4,
+          goal_basis: { completion_rate: "0.8500", direction: "up" },
+        }),
+      ],
+    });
+    await page.goto(new URL(path + "#reco", base).href);
+    await page.locator(".reco-card").first().click();
+    const details = page.locator(".live-details");
+    await details.waitFor();
+    const text = (await details.textContent()).replace(/\s+/g, " ");
+    assert.match(text, /강도: 빠른 걸음/);
+    assert.match(text, /지난 주기 수행률 85%라 한 단계 올렸어요/);
+    assert.equal(await page.locator("#live-safety").count(), 1);
+  }));
+
 test("가족력은 해당 없을 때 비워두라는 안내를 바로 아래에 둔다", async () =>
   withPage(async (page, base) => {
     await mock(page);

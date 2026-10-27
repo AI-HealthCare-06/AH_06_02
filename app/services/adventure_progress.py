@@ -8,6 +8,7 @@ from typing import Any
 from app.core import config
 from app.core.errors import AppError, ErrorCode
 from app.models.challenges import Challenge, ChallengeLog, Monster, UserAttackCycle, UserChallenge, UserMonster
+from app.services.challenge_goals import mission_title
 
 
 class AdventureProgressService:
@@ -50,7 +51,7 @@ class AdventureProgressService:
                 {
                     "user_challenge_id": m.id,
                     "cycle_id": m.cycle_id,
-                    "title": masters[m.challenge_id].title,
+                    "title": mission_title(m, masters[m.challenge_id]),
                     "factor_key": masters[m.challenge_id].factor_key,
                     "start_date": m.start_date,
                     "end_date": m.end_date,

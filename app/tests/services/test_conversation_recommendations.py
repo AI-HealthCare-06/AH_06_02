@@ -95,6 +95,27 @@ class TestConversationRecommendation(TestCase):
         for challenge in await Challenge.filter(code__in=list(SUPPORTED_CODES)):
             assert ConversationRecommendationService._matches_fixed_contract(challenge), challenge.code
 
+    async def test_conversation_keeps_the_step_goal_from_the_rule_path(self):
+        user, rules, generated, cards = await self.prepare()
+        walk = await Challenge.get(code="CH_WALK_AFTER_MEAL")
+        [card] = [row for row in generated.items if row.challenge_id == walk.id]
+        # 지난 주기 수행률로 규칙 추천이 정한 단계
+        goal = {"policy_version": "P1-STEPS-20261027", "level": 2, "basis": {"direction": "down"}}
+        await ChallengeRecommendation.filter(id=card.id).update(proposed_goal=goal)
+        service = ConversationRecommendationService(rules, cards, FixtureProvider(), enabled=True)
+
+        result = await service.personalize(
+            user,
+            generated,
+            query="점심 식후",
+            answers=SituationAnswers(meal_walk="both", transit="no", stairs="no"),
+            asked=["meal_walk"],
+        )
+
+        assert result.mode == "conversation"
+        await card.refresh_from_db()
+        assert card.proposed_goal == goal
+
     async def test_conversation_stores_trace_without_creating_or_changing_missions(self):
         user, rules, generated, cards = await self.prepare()
         provider = FixtureProvider()
