@@ -1535,6 +1535,8 @@ test("새로고침 뒤 예측이 실패해도 가장 최근 건강기록으로 �
     await fillSignup(page);
     await page.locator('.health3 button[type="submit"]').click();
     await page.locator('.scene[data-page="waiting"]:not([hidden])').waitFor();
+    // 대기 화면은 접수보다 먼저 뜬다. 접수 번호가 저장된 뒤에 새로고침해야 같은 예측을 이어서 확인한다
+    await page.waitForFunction(() => sessionStorage.getItem("dangokiller.v5.prediction"));
     Object.assign(state, {
       signedOut: false,
       predicting: false,
