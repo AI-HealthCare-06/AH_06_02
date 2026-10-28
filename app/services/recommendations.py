@@ -172,6 +172,31 @@ class GeneratedRecommendations:
     remaining_slots: int = 0
 
 
+@dataclass
+class EligibleChallenges:
+    """추천 가능한 후보. scored 는 규칙 추천 순서(미룬 후보 뒤, 점수 높은 순)로 정렬돼 있다."""
+
+    scored: list[tuple[Challenge, FactorScore]]
+    #: challenge_id → proposed_goal. 단계표가 없거나 기본 단계면 없다
+    goals: dict[int, dict[str, Any]]
+    cycle: UserAttackCycle
+    monster: Monster
+    model_version: str
+    model_experimental: bool
+    remaining_slots: int
+
+    def batch(self, items: list[ChallengeRecommendation]) -> GeneratedRecommendations:
+        return GeneratedRecommendations(
+            items=items,
+            challenges={challenge.id: challenge for challenge, _ in self.scored},
+            cycle=self.cycle,
+            monster=self.monster,
+            model_version=self.model_version,
+            model_experimental=self.model_experimental,
+            remaining_slots=self.remaining_slots,
+        )
+
+
 class RecommendationService:
     def __init__(self, artifact_source: ArtifactSource | None = None) -> None:
         self.artifact_source = artifact_source or ArtifactLoader().load
@@ -180,6 +205,30 @@ class RecommendationService:
 
     async def generate(self, user: User, now: datetime | None = None) -> GeneratedRecommendations:
         """CHLG-01. 현재 주기의 공략 대상 factor 에 맞는 후보만 제시한다."""
+        current = now or datetime.now(config.TIMEZONE)
+        found = await self.eligible(user, current)
+        items: list[ChallengeRecommendation] = []
+        for rank, (challenge, factor) in enumerate(found.scored[:MAX_CARDS], start=1):
+            items.append(
+                await ChallengeRecommendation.create(
+                    user_id=user.id,
+                    challenge_id=challenge.id,
+                    cycle_id=found.cycle.id,
+                    source_type=factor.source_type,
+                    factor_key=challenge.factor_key,
+                    factor_score=Decimal(str(round(factor.score, 5))),
+                    rank=rank,
+                    recommended_at=current,
+                    proposed_goal=found.goals.get(challenge.id),
+                )
+            )
+        return found.batch(items)
+
+    async def eligible(self, user: User, now: datetime | None = None) -> EligibleChallenges:
+        """지금 추천할 수 있는 후보 전체와 각 후보의 개인 목표. 추천 행은 만들지 않는다.
+
+        규칙 추천(generate)은 이 중 위 MAX_CARDS 개를 저장하고, 질의 챗봇 선택 단계는 이 안에서만 고른다.
+        """
         current = now or datetime.now(config.TIMEZONE)
         today = today_kst(current)
         artifact = self.artifact_source()
@@ -251,24 +300,9 @@ class RecommendationService:
                 pair[0].id,
             )
         )
-        items: list[ChallengeRecommendation] = []
-        for rank, (challenge, factor) in enumerate(scored[:MAX_CARDS], start=1):
-            items.append(
-                await ChallengeRecommendation.create(
-                    user_id=user.id,
-                    challenge_id=challenge.id,
-                    cycle_id=cycle.id,
-                    source_type=factor.source_type,
-                    factor_key=challenge.factor_key,
-                    factor_score=Decimal(str(round(factor.score, 5))),
-                    rank=rank,
-                    recommended_at=current,
-                    proposed_goal=goals.get(challenge.id),
-                )
-            )
-        return GeneratedRecommendations(
-            items=items,
-            challenges={challenge.id: challenge for challenge, _ in scored},
+        return EligibleChallenges(
+            scored=scored,
+            goals=goals,
             cycle=cycle,
             monster=monster,
             model_version=artifact.model_version,
