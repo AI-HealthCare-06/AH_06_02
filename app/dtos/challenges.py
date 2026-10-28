@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.challenges import ContextSlot, VerificationMethod
+from app.services.rag_cards import SituationAnswers
 
 
 class ChallengeStartRequest(BaseModel):
@@ -49,3 +50,33 @@ class ChallengeLogRequest(BaseModel):
     verification_method: VerificationMethod
     evidence_url: str | None = Field(default=None, max_length=255)
     timer_session_id: int | None = Field(default=None, gt=0, strict=True)
+
+
+class ChatMessage(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=400)
+
+
+#: 대화 길이 상한. 클라이언트가 대화를 들고 있고 서버는 저장하지 않는다
+MAX_CHAT_MESSAGES = 12
+
+
+class ChallengeChatRequest(BaseModel):
+    """질의 챗봇 1단계(대화). 마지막 메시지는 사용자 질문이다."""
+
+    messages: list[ChatMessage] = Field(min_length=1, max_length=MAX_CHAT_MESSAGES)
+
+    @field_validator("messages")
+    @classmethod
+    def ends_with_user(cls, messages: list[ChatMessage]) -> list[ChatMessage]:
+        if messages[-1].role != "user":
+            raise ValueError("마지막 메시지는 사용자 질문이어야 합니다.")
+        return messages
+
+
+class ChallengeSelectRequest(BaseModel):
+    """질의 챗봇 2단계(선택). messages 는 1단계 대화, answers 는 선택형 질문의 답, asked 는 이미 물은 질문 키다."""
+
+    messages: list[ChatMessage] = Field(default_factory=list, max_length=MAX_CHAT_MESSAGES)
+    answers: SituationAnswers = Field(default_factory=SituationAnswers)
+    asked: list[str] = Field(default_factory=list, max_length=3)
