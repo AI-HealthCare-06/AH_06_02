@@ -5,6 +5,7 @@ from dataclasses import field
 from enum import StrEnum
 from pathlib import Path
 
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -50,3 +51,13 @@ class Config(BaseSettings):
     # 예측 큐. PRED-01 이 {prediction_id, job_id} 를 LPUSH 하고 ai_worker 가 BRPOP 한다
     VALKEY_URL: str = "redis://localhost:6379/0"
     PREDICTION_QUEUE_KEY: str = "pred:queue"
+
+    # 질의 챗봇(대화형 추천). 꺼져 있거나 키가 없으면 규칙 추천을 그대로 돌려준다
+    CHALLENGE_CHAT_ENABLED: bool = False
+    # 키는 저장소 루트 .env(로컬·docker compose) 또는 envs/.prod.env(배포)에만 넣는다.
+    # SecretStr 이라 설정 객체를 출력하거나 로그에 남겨도 값이 ********** 로 가려진다
+    OPENAI_API_KEY: SecretStr = SecretStr("")
+    # challenge_recommendations.llm_model_version 에 저장하므로 32자 이내
+    OPENAI_MODEL: str = Field(default="gpt-4o", min_length=1, max_length=32)
+    # Responses API 주소. 로컬 E2E 에서 가짜 서버를 붙일 때만 바꾼다
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
