@@ -511,15 +511,18 @@ async function refreshRecommendations() {
   }
 }
 async function renderBattle(ticket) {
-  const m = currentMonster();
-  if (!m) {
+  if (!currentMonster()) {
     message("건강정보를 입력하면 공략할 마을을 준비해요.");
     return;
   }
-  village = m.code;
+  // 첫 추천 전에는 공략 대상이 없어 첫 캐릭터로 그리게 된다. 추천(CHLG-01)이 대상을 정하므로 그 뒤에 다시 읽는다
+  const hadTarget = monsters.some((row) => row.is_target);
   const notice = keepRecommendations ? "" : await refreshRecommendations();
   keepRecommendations = false;
+  if (!hadTarget) monsters = (await api("/monsters/me")).items;
   if (ticket !== navigation) return;
+  const m = currentMonster();
+  village = m.code;
   // 추천 이력 전체(최신순). 제외한 챌린지 목록도 여기서 모은다
   const history = await allPages("/challenge-recommendations");
   if (ticket !== navigation) return;

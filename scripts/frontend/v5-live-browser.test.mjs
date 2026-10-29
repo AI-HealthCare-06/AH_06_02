@@ -114,7 +114,7 @@ async function mock(page, state = {}) {
           { disease: "hypertension", probability: 0.12, delta: null },
         ],
       };
-    else if (p === "/monsters/me")
+    else if (p === "/monsters/me") {
       data = {
         items: [
           {
@@ -122,7 +122,7 @@ async function mock(page, state = {}) {
             name: "비세라",
             title: "체격·활동 관련 요인",
             user_monster_id: 11,
-            is_target: true,
+            is_target: !state.noTarget,
             state: "caution",
             impact_score: 41,
             weekly_progress: state.completed ? 10 : 0,
@@ -145,7 +145,9 @@ async function mock(page, state = {}) {
           },
         ],
       };
-    else if (p === "/user-challenges" && req.method() === "POST") {
+      // 첫 추천 전 새 사용자: 공략 대상이 없고 목록 첫 캐릭터는 대상이 될 캐릭터가 아니다
+      if (state.noTarget) data.items.reverse();
+    } else if (p === "/user-challenges" && req.method() === "POST") {
       state.mission = true;
       data = { items: [] };
     } else if (p === "/user-challenges")
@@ -330,6 +332,8 @@ async function mock(page, state = {}) {
             },
           },
         });
+      // 첫 추천(CHLG-01)이 공략 대상을 정한다
+      state.noTarget = false;
       // 실제 서버처럼 생성할 때마다 새 추천 행을 만든다. 쿨다운·제외가 없는 거절은 다시 추천된다
       if (state.cards) {
         const latest = state.cards.filter(
@@ -919,6 +923,25 @@ const card = (overrides) => ({
   action: null,
   ...overrides,
 });
+
+test("공략 대상이 정해지기 전에 전투 화면으로 바로 들어와도 첫 추천이 정한 대상의 카드를 보여 준다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, {
+      noTarget: true,
+      cards: [
+        card({}),
+        card({ recommendation_id: 32, challenge_id: 10, title: "식후 걷기" }),
+      ],
+    });
+    await page.goto(new URL(path + "#reco", base).href);
+    const cards = page.locator('.scene[data-page="reco"] [data-live-card]');
+    await cards.first().waitFor({ timeout: 5000 });
+    assert.equal(
+      await page.locator("#battle-monster-name").textContent(),
+      "비세라",
+    );
+    assert.equal(await cards.count(), 2);
+  }));
 
 test("전투 카드 이름은 시안의 요인별 공격 이름을 쓴다", async () =>
   withPage(async (page, base) => {
