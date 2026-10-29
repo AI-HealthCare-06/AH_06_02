@@ -89,6 +89,8 @@ async def select_challenges_from_chat(
                 "challenge_id": row.challenge_id,
                 "challenge_code": challenge.code,
                 "title": challenge.title,
+                # 추천 카드 상세(CHLG-02 와 같은 화면)가 쓰는 설명. 대화 결과도 같은 카드로 그린다
+                "description": challenge.description,
                 "factor_key": row.factor_key,
                 "rank": row.rank,
                 "difficulty": challenge.difficulty,

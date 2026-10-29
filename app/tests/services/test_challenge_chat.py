@@ -13,6 +13,7 @@ from tortoise.contrib.test import TestCase
 
 from app.apis.v1.challenge_chat_routers import chat_setup_issue, get_challenge_chat_service
 from app.core import config
+from app.dependencies.security import get_request_user
 from app.main import app
 from app.models.challenges import (
     AttackCycleStatus,
@@ -383,6 +384,33 @@ class TestChallengeChat(TestCase):
         [row] = result.recommendations.items
         assert result.reasons[row.id] == FALLBACK_REASON
         assert (row.conversation_snapshot or {})["reason_replaced"] is True
+
+    async def test_selected_challenge_shows_up_as_a_normal_recommendation_card(self) -> None:
+        """대화로 고른 추천은 CHLG-02 목록(전투 화면 카드)에 같은 값으로 나타나고 CHLG-05 로 시작할 수 있다."""
+        user, _ = await self._ready("chat-card@example.com")
+        service = await self._service(FixtureProvider(delay_pick()))
+        app.dependency_overrides[get_challenge_chat_service] = lambda: service
+        app.dependency_overrides[get_request_user] = lambda: user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                body = {"messages": CONVERSATION, "answers": YES.model_dump(), "asked": ["first_cig", "no_smoke"]}
+                selected = (await client.post("/api/v1/challenge-chat/select", json=body)).json()["data"]
+                listed = (await client.get("/api/v1/challenge-recommendations")).json()["data"]["items"]
+                started = await client.post(
+                    "/api/v1/user-challenges",
+                    json={"recommendation_ids": [selected["items"][0]["recommendation_id"]], "safety_confirmed": True},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+        assert selected["mode"] == "conversation"
+        [item] = selected["items"]
+        card = next(row for row in listed if row["recommendation_id"] == item["recommendation_id"])
+        # 전투 화면이 카드를 그릴 때 읽는 값은 대화 결과에도 모두 같은 값으로 있다
+        shared = set(card) - {"proposed_goal", "action", "cooldown_choice", "exclude_until", "suppressed_until_manual"}
+        assert {key: item[key] for key in shared} == {key: card[key] for key in shared}
+        assert item["reason"] and item["evidence_card_ids"] == ["C43"]
+        assert started.status_code == 201
 
 
 class TestChallengeChatApi(TestCase):
