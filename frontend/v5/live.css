@@ -823,3 +823,81 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
     height: 345px;
   }
 }
+
+/* 입력·선택 칸 16px(design.md 2절). iOS Safari 는 16px 보다 작은 칸에 초점이 가면 화면을 확대한다 */
+.diagnoses select {
+  font-size: 16px;
+  min-height: 44px;
+  padding: 8px 13px;
+}
+.number-field input,
+.stack-field input,
+.input-shell input {
+  font-size: 16px;
+}
+#app-menu nav button {
+  font-size: 14px;
+}
+.menu-section {
+  font-size: 12px;
+}
+
+/* 모바일 최소 글자 크기(design.md 2절): 본문·버튼 12px 이상, 보조·배지 11px 이상 */
+@media (max-width: 760px), (max-height: 610px) {
+  .risk-summary-label b,
+  .home-risk-summary .risk-tile > span,
+  .quest-card-subtitle,
+  .quest-map-return,
+  .battle-caption,
+  .reco .battle-caption {
+    font-size: 12px;
+  }
+  .risk-summary-label small,
+  .home-risk-summary .risk-tile > span:after,
+  .home-risk-summary .risk-tile strong small,
+  .home-risk-summary .risk-tile.diagnosed strong,
+  .risk #map-xp-text,
+  .compact-score small,
+  .village-status,
+  .village-plaque > span,
+  .village-plaque small,
+  .map-core,
+  .risk .village-status,
+  .risk .village-plaque > span,
+  .risk .village-plaque small,
+  .risk .map-core,
+  .fighter-label,
+  .fighter-panel small,
+  .reco .fighter-label,
+  .reco .fighter-panel small,
+  .threat-note,
+  .battle-round {
+    font-size: 11px;
+  }
+  .risk .map-reselect,
+  .risk .map-continue {
+    font-size: 14px;
+  }
+  .home-medical,
+  .risk .home-medical {
+    font-size: 11px;
+    white-space: normal;
+    text-align: center;
+  }
+}
+/* 마을 지도 버튼을 점수판 아래로(글자가 커져 공략 점수 줄과 겹치지 않게) */
+@media (max-width: 760px) {
+  .quest-map-return {
+    top: 135px;
+  }
+}
+@media (max-width: 360px) {
+  .quest-map-return {
+    top: 129px;
+  }
+}
+@media (max-height: 610px) {
+  .quest-map-return {
+    top: 106px;
+  }
+}
