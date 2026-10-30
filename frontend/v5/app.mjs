@@ -362,8 +362,11 @@ async function go(id, push = true) {
   $("#phone").classList.toggle("home-map", id === "risk");
   $("#adventure-nav").hidden = !group;
   $$(".scene[data-page]").forEach((p) => (p.hidden = p.dataset.page !== id));
+  // 시안 CSS 는 [aria-current=page] 로 지금 화면 항목을 칠한다. "false" 로 남기면 모두 지금 항목처럼 읽히므로 지운다
   $$("[data-main-target]").forEach((b) =>
-    b.setAttribute("aria-current", String(b.dataset.mainTarget === group)),
+    b.dataset.mainTarget === group
+      ? b.setAttribute("aria-current", "page")
+      : b.removeAttribute("aria-current"),
   );
   $("#screen-name").textContent = names[id];
   $("#chapter-title").textContent = names[id];
@@ -1862,6 +1865,19 @@ function closeChoice(trigger) {
   trigger.closest(".choice-field").querySelector(".choice-list").hidden = true;
 }
 $$(".diagnoses select").forEach(enhanceChoice);
+// 로그인·가입 배경 영상 안에도 캐릭터가 있어, 영상이 실제로 재생되는 동안에는 대체 그림(스프라이트·탐험가)을
+// 숨긴다(.video-ready). 둘 다 보이면 같은 캐릭터가 이중으로 겹쳐 보인다. 자동 재생이 막히면 대체 그림이 남는다
+$$(".hero-video").forEach((video) => {
+  const art = video.closest(".art") || video.parentElement;
+  const sync = () =>
+    art.classList.toggle(
+      "video-ready",
+      !video.paused && !video.ended && video.readyState > 2,
+    );
+  for (const type of ["playing", "pause", "ended", "emptied", "error"])
+    video.addEventListener(type, sync);
+  sync();
+});
 $$("input,select").forEach((el) =>
   el.addEventListener("input", () => {
     message("");
