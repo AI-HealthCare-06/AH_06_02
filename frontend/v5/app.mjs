@@ -177,12 +177,20 @@ function showFieldError(target, text) {
   // 두 칸이 나란한 묶음 안에 끼우면 칸 배치가 깨져서 묶음 아래에 둔다
   const box =
     target.closest(".two-columns") ||
-    target.closest("label, [role=group]") ||
+    target.closest("label, .choice-field, [role=group]") ||
     target;
   box.insertAdjacentElement("afterend", note);
-  const focusable = target.matches("input, select, button")
+  let focusable = target.matches("input, select, button")
     ? target
     : target.querySelector("button, input, select");
+  // 모바일은 select 를 숨기고 펼침 목록을 보인다(enhanceChoice). 오류는 그 질문의 트리거에 알리고 목록을 연다
+  const trigger = focusable?.matches("select")
+    ? focusable.closest(".choice-field")?.querySelector(".choice-trigger")
+    : null;
+  if (trigger?.getClientRects().length) {
+    target = focusable = trigger;
+    openChoice(trigger, { focusList: false });
+  }
   for (const el of new Set([target, focusable].filter(Boolean))) {
     el.setAttribute("aria-invalid", "true");
     el.setAttribute("aria-describedby", id);
@@ -829,8 +837,8 @@ function validateHealth() {
     ["weight_kg", "체중", "체중을 입력해주세요."],
     ["waist_cm", "허리둘레", "허리둘레를 입력해주세요."],
     ["smoking", "현재 흡연 여부", "흡연 여부를 선택해주세요."],
-    ["alcohol_frequency", "음주 빈도", "마시는 빈도를 선택해주세요."],
-    ["alcohol_amount", "1회 음주량", "한 번에 마시는 양을 선택해주세요."],
+    ["alcohol_frequency", "음주 빈도", "마시는 빈도를 선택해 주세요."],
+    ["alcohol_amount", "1회 음주량", "한 번에 마시는 양을 선택해 주세요."],
     ["walking_days", "주당 걷기 일수", "주당 걷기 일수를 입력해주세요."],
     ["walking_minutes", "1회 걷기 시간", "1회 걷기 시간을 입력해주세요."],
     [
@@ -843,7 +851,7 @@ function validateHealth() {
       "하루 앉아 있는 시간",
       "하루 앉아 있는 시간을 입력해주세요.",
     ],
-    ["dining_out_freq", "외식 빈도", "외식 빈도를 선택해주세요."],
+    ["dining_out_freq", "외식 빈도", "외식 빈도를 선택해 주세요."],
   ];
   for (const [key, label, text] of required) {
     if (key === "alcohol_amount" && body.alcohol_frequency === 1) continue;
@@ -1717,9 +1725,143 @@ document.addEventListener("submit", (event) => {
 });
 $("#alcohol-frequency").addEventListener("change", (event) => {
   const zero = event.target.value === "1";
-  $("#alcohol-amount").closest("label").hidden = zero;
+  $("#alcohol-amount").closest("label, .choice-field").hidden = zero;
   if (zero) $("#alcohol-amount").value = "";
 });
+// 모바일은 진단·복약·음주·외식 선택을 브라우저 선택 창 대신 펼침 목록(트리거 + 라디오 목록)으로 받는다.
+// 선택 창 목록은 기기마다 팝업 위치·글자 크기가 달라 읽기 어렵다(design.md 2절).
+// 값은 계속 select 가 들고 있어 제출·검증 코드는 그대로 select 를 읽는다.
+// 목록을 연 동안 라디오 값은 임시값이다. 누르기·Enter·Space·Tab 으로 확정할 때만 select 에 넣고,
+// Esc·같은 트리거로 닫으면 버린다. 그래서 방향키로 '마시지 않음'을 지나도 음주량이 지워지지 않는다.
+// 어느 쪽을 보일지는 live.css 미디어쿼리가 정한다
+const CHOICE_NOTES = {
+  "alcohol-frequency": (value) =>
+    value === "1" ? "음주량 입력은 생략해요." : "",
+  "alcohol-amount": () => "한 번 마실 때 마시는 잔 수예요.",
+};
+const selectValue = Object.getOwnPropertyDescriptor(
+  HTMLSelectElement.prototype,
+  "value",
+);
+let choiceCount = 0;
+function enhanceChoice(select) {
+  const label = select.closest("label");
+  const key = `choice-${++choiceCount}`;
+  const question = [...label.childNodes]
+    .filter((node) => node.nodeType === Node.TEXT_NODE)
+    .map((node) => node.textContent.trim())
+    .join("");
+  const options = [...select.options].filter((option) => option.value !== "");
+  // 라디오 행(label)을 넣어야 해서 바깥 label 을 div 로 바꾼다. label 안에 label 을 둘 수 없다
+  const field = document.createElement("div");
+  field.className = "choice-field";
+  label.replaceWith(field);
+  field.innerHTML = `<span class="choice-title" id="${key}-title">${escape(question)}</span><button type="button" class="choice-trigger" aria-expanded="false" aria-controls="${key}-list" aria-labelledby="${key}-title ${key}-value" aria-describedby="${key}-how"><span class="choice-value" id="${key}-value"></span></button><span class="choice-sr" id="${key}-how">목록에서 고른 뒤 Enter 로 확정하고 Esc 로 취소해요.</span><fieldset class="choice-list" id="${key}-list" hidden><legend class="choice-sr">${escape(question)}</legend>${options.map((option) => `<label class="choice-row"><input type="radio" name="${key}" value="${escape(option.value)}"><span>${escape(option.text)}</span></label>`).join("")}</fieldset><p class="choice-note" hidden></p>`;
+  field.querySelector(".choice-title").after(select);
+  const trigger = field.querySelector(".choice-trigger");
+  const list = field.querySelector(".choice-list");
+  const note = field.querySelector(".choice-note");
+  const sync = () => {
+    const value = selectValue.get.call(select);
+    const picked = options.find((option) => option.value === value);
+    field.querySelector(".choice-value").textContent = picked
+      ? picked.text
+      : "선택해 주세요";
+    trigger.classList.toggle("is-empty", !picked);
+    note.textContent = CHOICE_NOTES[select.id]?.(value) || "";
+    note.hidden = !note.textContent;
+  };
+  // 앱이 저장된 값을 채우거나 비울 때 이벤트 없이 value 를 바꾼다. 그때도 트리거가 따라오게 한다
+  Object.defineProperty(select, "value", {
+    configurable: true,
+    get: () => selectValue.get.call(select),
+    set: (value) => {
+      selectValue.set.call(select, value);
+      sync();
+    },
+  });
+  const commit = (value, { focus = true } = {}) => {
+    if (trigger.getAttribute("aria-invalid")) clearFieldErrors();
+    closeChoice(trigger);
+    if (value !== undefined && value !== select.value) {
+      select.value = value;
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    if (focus) trigger.focus({ preventScroll: true });
+  };
+  const temp = () => list.querySelector("input:checked")?.value;
+  trigger.addEventListener("click", () =>
+    trigger.getAttribute("aria-expanded") === "true"
+      ? closeChoice(trigger)
+      : openChoice(trigger),
+  );
+  // 방향키가 라디오를 바꿀 때도 click 이 오지만 detail 이 0 이다. 손으로 누른 것만 바로 확정한다
+  list.addEventListener("click", (event) => {
+    const row = event.target.closest(".choice-row");
+    if (row && event.detail > 0) commit(row.querySelector("input").value);
+  });
+  list.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      // 폼의 암묵적 제출·라디오 기본 토글을 막고 지금 라디오로 확정한다
+      event.preventDefault();
+      commit(event.target.closest("input")?.value ?? temp());
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      closeChoice(trigger);
+      trigger.focus({ preventScroll: true });
+    } else if (event.key === "Tab") list.dataset.tabbing = "true";
+  });
+  // Tab 으로 목록을 벗어나면 임시값을 확정하고 닫는다. 손가락으로 누를 때는 웹킷이 초점을 스크롤 영역으로
+  // 먼저 옮기므로 초점 이동으로 닫으면 누르는 도중 화면이 움직인다. 그 경우는 아래 문서 click 에서 처리한다
+  list.addEventListener("focusout", (event) => {
+    const tabbing = list.dataset.tabbing === "true";
+    delete list.dataset.tabbing;
+    if (!tabbing || list.hidden || list.contains(event.relatedTarget)) return;
+    commit(temp(), { focus: false });
+  });
+  // 목록 밖을 누르면 임시값을 확정하고 닫는다. 누르는 동안 화면이 움직이지 않게 click 단계에서 닫는다.
+  // 다른 트리거를 누른 것이면 그 트리거가 이 목록을 닫는다(임시값은 버린다)
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (list.hidden || field.contains(event.target)) return;
+      if (event.target.closest?.(".choice-trigger")) return;
+      commit(temp(), { focus: false });
+    },
+    true,
+  );
+  sync();
+}
+function openChoice(trigger, { focusList = true } = {}) {
+  const field = trigger.closest(".choice-field");
+  const list = field.querySelector(".choice-list");
+  const value = field.querySelector("select").value;
+  const before = trigger.getBoundingClientRect().top;
+  // 한 번에 한 목록만 연다. 위쪽 목록이 닫혀 이 트리거가 손가락 아래에서 튀지 않게 스크롤을 보정한다
+  $$('.choice-trigger[aria-expanded="true"]').forEach(
+    (other) => other !== trigger && closeChoice(other),
+  );
+  list.querySelectorAll("input").forEach((radio) => {
+    radio.checked = radio.value === value;
+  });
+  list.hidden = false;
+  trigger.setAttribute("aria-expanded", "true");
+  const shift = trigger.getBoundingClientRect().top - before;
+  let scroller = trigger.parentElement;
+  while (scroller && scroller.scrollHeight <= scroller.clientHeight)
+    scroller = scroller.parentElement;
+  if (shift && scroller) scroller.scrollTop += shift;
+  if (focusList)
+    (list.querySelector("input:checked") || list.querySelector("input")).focus({
+      preventScroll: true,
+    });
+}
+function closeChoice(trigger) {
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.closest(".choice-field").querySelector(".choice-list").hidden = true;
+}
+$$(".diagnoses select").forEach(enhanceChoice);
 $$("input,select").forEach((el) =>
   el.addEventListener("input", () => {
     message("");
