@@ -842,20 +842,14 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
   font-size: 12px;
 }
 
-/* 모바일 최소 글자 크기(design.md 2절): 본문·버튼 12px 이상, 보조·배지 11px 이상 */
+/* 모바일 글자 크기(design.md 2절): 본문·설명·라벨·버튼 14px 이상, 보조·배지·지도 이름표 12px 이상 */
 @media (max-width: 760px), (max-height: 610px) {
-  .risk-summary-label b,
-  .home-risk-summary .risk-tile > span,
-  .quest-card-subtitle,
-  .quest-map-return,
-  .battle-caption,
-  .reco .battle-caption {
-    font-size: 12px;
-  }
   .risk-summary-label small,
   .home-risk-summary .risk-tile > span:after,
   .home-risk-summary .risk-tile strong small,
   .home-risk-summary .risk-tile.diagnosed strong,
+  .home-risk-summary .risk-tile .live-risk-delta,
+  .risk #map-level,
   .risk #map-xp-text,
   .compact-score small,
   .village-status,
@@ -871,19 +865,287 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
   .reco .fighter-label,
   .reco .fighter-panel small,
   .threat-note,
-  .battle-round {
-    font-size: 11px;
+  .battle-round,
+  .stepper .step span,
+  .reco-card .quest-card-lock,
+  .factor-fixed,
+  .factor-monster,
+  .live-shard-chip small,
+  .reward-tile p,
+  .medical-note p,
+  .growth-header .section-caption,
+  #app-menu .menu-section {
+    font-size: 12px;
   }
+  .risk-summary-label b,
+  .home-risk-summary .risk-tile > span,
+  .quest-card-subtitle,
+  .quest-map-return,
+  .battle-caption,
+  .reco .battle-caption,
+  .inline-links,
+  .inline-links .text-link,
+  .stack-field > span,
+  .consent span,
+  .number-field em,
+  .medicine label,
+  .live-monster > p,
+  .live-monster summary,
+  .growth-header p:not(.section-caption),
+  .growth-tabs button,
+  .reward-apply,
+  #app-menu p:not(.menu-section),
+  .hero-sub,
+  .secondary-action,
+  .unified-tabs .secondary-action,
+  .factor-contrib,
+  .live-shard-chip span,
+  .reward-tile h3,
+  .growth-display p,
   .risk .map-reselect,
-  .risk .map-continue {
+  .risk .map-continue,
+  .field-help,
+  #village-help,
+  .live-mission > span,
+  .live-monster details p,
+  .live-top-factors .factor-contrib {
     font-size: 14px;
+  }
+  /* 더 구체적인 기존 규칙(배지·제목 옆 *필수)이 있어 같은 구체성으로 다시 적는다 */
+  .live-top-factors .factor-monster,
+  .live-top-factors .factor-fixed {
+    font-size: 12px;
+  }
+  /* 시안이 *필수 표시를 11px !important 로 고정해 같은 방식으로만 바꿀 수 있다 */
+  .required-note,
+  .optional-note {
+    font-size: 12px !important;
   }
   .home-medical,
   .risk .home-medical {
-    font-size: 11px;
+    font-size: 12px;
     white-space: normal;
     text-align: center;
   }
+  /* 가족력 체크: 손가락으로 누르기 쉬운 크기 */
+  .medicine label {
+    min-height: 44px;
+    margin-right: 18px;
+    gap: 8px;
+  }
+  .medicine input {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+/* 선택 입력 펼침 목록(app.mjs enhanceChoice, design.md 2절). 모바일은 트리거를 눌러 같은 폭의 라디오 목록을
+   문서 흐름 안에 펼친다(팝업·바텀시트·그림자 없음). 데스크톱은 select 를 그대로 쓴다 */
+.diagnoses .choice-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px 16px;
+  font-size: 13px;
+}
+.diagnoses .choice-field + .choice-field {
+  border-top: 1px solid var(--border);
+}
+.diagnoses .choice-field[hidden],
+.choice-trigger,
+.choice-list,
+.choice-note {
+  display: none;
+}
+.choice-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 760px), (max-height: 610px) {
+  .diagnoses {
+    margin-top: 16px;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    overflow: visible;
+  }
+  .diagnoses .choice-field {
+    display: block;
+    padding: 0;
+    font-size: 16px;
+  }
+  .diagnoses .choice-field + .choice-field {
+    margin-top: 24px;
+    border-top: 0;
+  }
+  .diagnoses .choice-field[hidden],
+  .diagnoses .choice-field > select {
+    display: none;
+  }
+  .choice-title {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  .choice-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    width: 100%;
+    min-height: 52px;
+    padding: 0 16px;
+    border: 1px solid #848b9f;
+    border-radius: 12px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.5;
+    text-align: left;
+  }
+  .choice-trigger.is-empty {
+    color: var(--muted);
+  }
+  .choice-trigger::after {
+    content: "";
+    flex: none;
+    width: 9px;
+    height: 9px;
+    border-right: 2px solid var(--ink);
+    border-bottom: 2px solid var(--ink);
+    transform: translateY(-3px) rotate(45deg);
+  }
+  .choice-trigger[aria-expanded="true"] {
+    border-color: var(--purple-text);
+    border-radius: 12px 12px 0 0;
+  }
+  .choice-trigger[aria-expanded="true"]::after {
+    transform: translateY(3px) rotate(-135deg);
+  }
+  .choice-trigger:focus-visible {
+    outline: 2px solid var(--purple-text);
+    outline-offset: 2px;
+  }
+  .choice-trigger[aria-invalid="true"] {
+    border: 2px solid var(--threat);
+  }
+  .choice-list {
+    display: block;
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--purple-text);
+    border-top: 0;
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .choice-list[hidden] {
+    display: none;
+  }
+  /* 시안의 .diagnoses label 규칙(13px·좌우 배치)이 행 label 에도 걸려 같은 구체성 이상으로 적는다 */
+  .diagnoses .choice-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 52px;
+    padding: 0 16px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.5;
+    justify-content: flex-start;
+    cursor: pointer;
+  }
+  .diagnoses .choice-row + .choice-row {
+    border-top: 1px solid var(--border);
+  }
+  .diagnoses .choice-row input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+  }
+  .diagnoses .choice-row:has(input:checked) {
+    background: var(--lilac);
+    color: var(--purple-text);
+    font-weight: 600;
+  }
+  .diagnoses .choice-row:has(input:checked)::after {
+    content: "✓";
+    margin-left: auto;
+    font-weight: 700;
+  }
+  .diagnoses .choice-row:has(input:focus-visible) {
+    outline: 2px solid var(--purple-text);
+    outline-offset: -2px;
+  }
+  .choice-note {
+    display: block;
+    margin: 8px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  .choice-note[hidden] {
+    display: none;
+  }
+  .diagnoses .choice-field + .field-error {
+    margin: 8px 0 0;
+  }
+  .diagnoses .field-error + .choice-field {
+    margin-top: 24px;
+  }
+  /* 건강정보 입력 화면: 제목은 Pretendard 로 통일하고 설명·오류는 14px(아스트라 스펙) */
+  .health :is(h1, h2),
+  .health2 :is(h1, h2),
+  .health3 :is(h1, h2) {
+    font-family:
+      Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    font-weight: 700;
+  }
+  .health h1,
+  .health2 h1,
+  .health3 h1 {
+    font-size: 28px;
+    line-height: 1.4;
+  }
+  .health h2,
+  .health2 h2,
+  .health3 h2 {
+    font-size: 20px;
+    line-height: 1.5;
+  }
+  .health .panel-pad,
+  .health2 .panel-pad,
+  .health3 .panel-pad {
+    padding-right: 20px;
+    padding-left: 20px;
+  }
+  .health :is(.small-copy, .section-copy),
+  .health2 :is(.small-copy, .section-copy),
+  .health3 :is(.small-copy, .section-copy),
+  .field-error {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
+/* 웹폰트가 늦거나 실패할 때도 한글을 읽기 좋은 시스템 글꼴로 받친다 */
+body {
+  font-family:
+    Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 }
 /* 마을 지도 버튼을 점수판 아래로(글자가 커져 공략 점수 줄과 겹치지 않게) */
 @media (max-width: 760px) {
