@@ -574,7 +574,8 @@ async function renderBattle(ticket) {
         .map((card, index) => {
           // 슬롯이 다 차면 아직 시작 안 한 추천은 눌러도 시작할 수 없다
           const locked = slotsFull && !card.live;
-          return `<button type="button" class="reco-card${locked ? " is-locked" : ""}" data-live-card="${index}"${locked ? " disabled" : ""}><span class="quest-card-heading"><span class="quest-card-label">${escape(attackName(card))}</span></span><span class="quest-card-subtitle">${escape(card.title)}${card.live ? " · 진행 중" : ""}</span>${locked ? '<span class="quest-card-lock">지금은 추가로 시작할 수 없어요</span>' : ""}</button>`;
+          // 카드는 공격 이름만 보이는 작은 상자다. 누르면 상세로 가므로 챌린지 이름·상태는 화면 읽기용으로만 둔다
+          return `<button type="button" class="reco-card${card.live ? " is-live" : ""}${locked ? " is-locked" : ""}" data-live-card="${index}"${locked ? " disabled" : ""}><span class="quest-card-heading"><span class="quest-card-label">${escape(attackName(card))}</span></span><span class="sr-only">${escape(card.title)}${card.live ? " · 진행 중" : ""}${locked ? " · 지금은 추가로 시작할 수 없어요" : ""}</span></button>`;
         })
         .join("")
     : '<p class="live-empty">지금 시작할 수 있는 챌린지가 없어요. 건강정보를 다시 확인해 주세요.</p>';
@@ -1345,7 +1346,7 @@ async function renderGrowth(ticket) {
     calendar.cycles
       .map(
         (c) =>
-          `<article class="history-week-card">${art(c.target)}<div><h2>${escape(labels[c.target])} 공략</h2><p>${c.start_date} ~ ${c.end_date} · ${escape({ active: "진행 중", completed: "기간 종료", abandoned: "중단", draft: "시작 전" }[c.status])}</p>${[
+          `<article class="history-week-card">${art(c.target)}<div class="history-body"><header class="history-head"><h2>${escape(labels[c.target])} 공략</h2><span class="history-status is-${escape(c.status)}">${escape({ active: "진행 중", completed: "기간 종료", abandoned: "중단", draft: "시작 전" }[c.status])}</span><p class="history-period">${c.start_date} ~ ${c.end_date}</p></header>${[
             1, 2, 3, 4,
           ]
             .map((week) => {
@@ -1362,7 +1363,8 @@ async function renderGrowth(ticket) {
                   m.start_date <= end &&
                   m.end_date >= start,
               );
-              return `<h3>${week}주차 · ${start} ~ ${end}</h3><ul>${items.map((m) => `<li>${escape(m.title)} · 이달 ${m.logs.filter((l) => l.date >= start && l.date <= end).length}회 완료${m.status === "abandoned" ? " · 중단" : ""}</li>`).join("") || "<li>선택한 챌린지가 없어요.</li>"}</ul>`;
+              // 주차 이름 아래 미션을 왼쪽 정렬 목록으로, 완료 횟수는 오른쪽에 둔다
+              return `<section class="history-week"><h3>${week}주차 <small>${start.slice(5)} ~ ${end.slice(5)}</small></h3><ul>${items.map((m) => `<li><span>${escape(m.title)}${m.status === "abandoned" ? " · 중단" : ""}</span><b>${m.logs.filter((l) => l.date >= start && l.date <= end).length}회 완료</b></li>`).join("") || "<li><span>선택한 챌린지가 없어요.</span></li>"}</ul></section>`;
             })
             .join("")}</div></article>`,
       )
@@ -1732,7 +1734,7 @@ $("#alcohol-frequency").addEventListener("change", (event) => {
   if (zero) $("#alcohol-amount").value = "";
 });
 // 모바일은 진단·복약·음주·외식 선택을 브라우저 선택 창 대신 펼침 목록(트리거 + 라디오 목록)으로 받는다.
-// 선택 창 목록은 기기마다 팝업 위치·글자 크기가 달라 읽기 어렵다(design.md 2절).
+// 선택 창 목록은 기기마다 팝업 위치·글자 크기가 달라 읽기 어렵다(design.md 6절).
 // 값은 계속 select 가 들고 있어 제출·검증 코드는 그대로 select 를 읽는다.
 // 목록을 연 동안 라디오 값은 임시값이다. 누르기·Enter·Space·Tab 으로 확정할 때만 select 에 넣고,
 // Esc·같은 트리거로 닫으면 버린다. 그래서 방향키로 '마시지 않음'을 지나도 음주량이 지워지지 않는다.
@@ -1865,6 +1867,15 @@ function closeChoice(trigger) {
   trigger.closest(".choice-field").querySelector(".choice-list").hidden = true;
 }
 $$(".diagnoses select").forEach(enhanceChoice);
+// 전투 카드는 줄바꿈되는 작은 상자라 줄 수에 따라 높이가 바뀐다. 그 높이를 --battle-strip 으로 넘겨
+// 모험가·캐릭터·안내 문구를 카드 바로 위에 세운다(live.css)
+const battleStrip = $(".reco .battle-challenges");
+if (battleStrip && "ResizeObserver" in window)
+  new ResizeObserver(() =>
+    battleStrip
+      .closest(".battle-scene, .quest-battle-shell")
+      ?.style.setProperty("--battle-strip", `${battleStrip.offsetHeight}px`),
+  ).observe(battleStrip);
 // 로그인·가입 배경 영상 안에도 캐릭터가 있어, 영상이 실제로 재생되는 동안에는 대체 그림(스프라이트·탐험가)을
 // 숨긴다(.video-ready). 둘 다 보이면 같은 캐릭터가 이중으로 겹쳐 보인다. 자동 재생이 막히면 대체 그림이 남는다
 $$(".hero-video").forEach((video) => {
