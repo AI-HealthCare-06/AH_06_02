@@ -1141,6 +1141,19 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
     font-size: 14px;
     line-height: 1.5;
   }
+  /* 글자 대비 4.5:1 이상(아스트라 스펙). 밝은 회색 배경에서 연한 설명·단계 이름·*필수가 모자랐다 */
+  :is(.health, .health2, .health3) :is(.small-copy, .section-copy),
+  :is(.health, .health2, .health3) .stepper .step:not(.active) span {
+    color: var(--muted);
+  }
+  /* 시안이 *필수를 72% 투명 빨강 !important 로 고정해 같은 방식으로만 바꿀 수 있다 */
+  :is(.health, .health2, .health3) .required-note {
+    color: #c52e3d !important;
+  }
+  /* 주요 버튼(다음·예측 보기)도 선택 행과 같은 52px */
+  :is(.health, .health2, .health3) button[type="submit"] {
+    min-height: 52px;
+  }
 }
 /* 웹폰트가 늦거나 실패할 때도 한글을 읽기 좋은 시스템 글꼴로 받친다 */
 body {
