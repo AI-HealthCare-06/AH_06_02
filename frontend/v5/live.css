@@ -1176,3 +1176,253 @@ body {
     top: 106px;
   }
 }
+
+/* ---- 모바일 화면 다듬기(2026-10-30, 병주님 지시). 전투 장면·카드·하단 메뉴·히스토리·로그인 ---- */
+@media (max-width: 760px) {
+  /* 전투: 카드를 한 줄 가로 띠로 두고 그 위 남은 높이에 모험가와 캐릭터를 나란히 세운다(잘림·겹침 없음) */
+  .reco .battle-fighters {
+    inset: 128px 4px 104px;
+  }
+  .reco .battle-hero,
+  .reco .battle-enemy {
+    top: auto;
+    bottom: 0;
+    height: 100%;
+    display: grid;
+    place-items: end center;
+  }
+  .reco .battle-hero {
+    left: 1%;
+    width: 44%;
+  }
+  .reco .battle-enemy {
+    right: 1%;
+    width: 54%;
+  }
+  .reco .battle-hero .avatar-rig {
+    width: auto;
+    height: min(225px, 84%);
+    aspect-ratio: 155 / 225;
+    max-width: 100%;
+  }
+  .reco .battle-enemy #battle-monster-art {
+    height: 100%;
+    width: 100%;
+    display: grid;
+    place-items: end center;
+  }
+  .reco .battle-enemy .evolution-art {
+    width: auto;
+    height: min(230px, 92%);
+    aspect-ratio: 195 / 230;
+    max-width: 100%;
+  }
+  .reco .battle-ground {
+    bottom: 64px;
+  }
+  /* 안내 문구는 카드 띠 바로 위에 둔다(카드 뒤로 가려지던 문제) */
+  .reco .battle-caption {
+    bottom: 104px;
+  }
+  .reco .battle-challenges {
+    padding: 10px 0;
+  }
+  /* 위 안내 띠가 보여도 전투 장면이 남은 높이에만 맞게 한다(띠 높이만큼 카드가 화면 밖으로 밀리던 문제) */
+  #screen:has(> .reco:not([hidden])) {
+    display: flex;
+    flex-direction: column;
+  }
+  #screen > #live-feedback {
+    flex: none;
+  }
+  #screen > .reco:not([hidden]) {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+  .reco .battle-scene {
+    min-height: 0;
+  }
+  .reco .battle-challenges .reco-list {
+    display: flex;
+    flex-flow: row nowrap;
+    gap: 8px;
+    padding: 0 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .reco .battle-challenges .reco-list::-webkit-scrollbar {
+    display: none;
+  }
+  /* 카드 제목 상자는 작게, 글은 한 줄씩(넘치면 말줄임) */
+  .reco .battle-challenges .reco-card {
+    flex: 0 0 42%;
+    height: 76px;
+    min-width: 0;
+    min-height: 0;
+    gap: 2px;
+    padding: 8px 8px;
+    border-radius: 12px;
+    scroll-snap-align: start;
+  }
+  .reco .battle-challenges .reco-card > span {
+    display: block;
+    max-width: 100%;
+    min-height: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .reco .quest-card-heading svg {
+    display: none;
+  }
+  .reco .quest-card-label {
+    font:
+      600 13px/1.45 Pretendard,
+      "Apple SD Gothic Neo",
+      sans-serif;
+    opacity: 0.85;
+  }
+  .reco .quest-card-subtitle {
+    font:
+      600 14px/1.45 Pretendard,
+      "Apple SD Gothic Neo",
+      sans-serif;
+  }
+  .reco .reco-card .quest-card-lock {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  /* 하단 메뉴: 늘 보이되 지금보다 낮게(66 → 60px), 테두리를 둘러 떠 있는 띠로 */
+  .phone:not(.onboarding) {
+    grid-template-rows: 56px auto minmax(0, 1fr) calc(
+        60px + env(safe-area-inset-bottom)
+      );
+  }
+  .phone #adventure-nav,
+  .phone.home-map #adventure-nav {
+    margin: 0 8px calc(6px + env(safe-area-inset-bottom));
+    padding: 3px 4px;
+    gap: 2px;
+    border: 1px solid #d6d9e8;
+    border-radius: 16px;
+    background: #fffffff2;
+    box-shadow: 0 4px 14px #14213d1f;
+  }
+  .phone #adventure-nav button,
+  .phone.home-map #adventure-nav button {
+    min-height: 44px;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .phone #adventure-nav svg {
+    width: 18px;
+    height: 18px;
+  }
+  .phone #adventure-nav [aria-current="page"],
+  .phone.home-map #adventure-nav [aria-current="page"] {
+    border-color: #c9bff5;
+    background: #f0ecfe;
+    color: #5542b5;
+  }
+
+  /* 나의 성장 히스토리: 캐릭터 그림이 글 칸으로 넘치지 않게 열 너비에 맞춘다 */
+  .history-week-card > .evolution-art {
+    width: 70px;
+    height: 86px;
+  }
+  .history-week-card h2,
+  .history-week-card h3 {
+    overflow-wrap: anywhere;
+  }
+
+  /* 로그인: 배경 위 글자를 밝은 막으로 받쳐 읽히게 한다 */
+  .login-art .hero-shade {
+    background: linear-gradient(
+      180deg,
+      #f4f7fff2 0%,
+      #f4f7ffe0 46%,
+      #f4f7ff80 60%,
+      transparent 72%,
+      transparent 86%,
+      #fff 100%
+    );
+  }
+  .login-art .hero-sub {
+    color: #26305a;
+    font-weight: 500;
+    text-shadow:
+      0 0 6px #fff,
+      0 0 2px #fff;
+  }
+}
+/* 모바일 굵기 한 단계 낮춤(병주님 지시: 실제 폰에서 너무 굵어 뭉개지고 겹쳐 보인다).
+   Black Han Sans 는 더 가는 굵기가 없어 제목도 Pretendard 700 으로 바꾼다. 로고(DangoKiller·당고킬러)만 그대로 둔다.
+   시안의 둘째 style 블록이 body 안에 있어 같은 구체성이면 그쪽이 이기므로 한 단계 더 구체적으로 적는다 */
+@media (max-width: 760px) {
+  .phone .scene :is(h1, h2, h3),
+  #app-menu .menu-heading :is(h1, h2, h3),
+  .phone .scene .village-plaque strong,
+  .phone .scene .map-core {
+    font-family:
+      Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .phone
+    .scene
+    :is(
+      .live-shard-chip b,
+      .stepper .step b,
+      .village-status,
+      .compact-identity-line span,
+      #map-level,
+      .risk-tile strong,
+      .compact-score b,
+      .battle-versus
+    ) {
+    font-weight: 700;
+  }
+  .phone
+    :is(
+      button.primary,
+      button.secondary-action,
+      .growth-tabs button,
+      .text-link,
+      .map-continue,
+      .map-reselect,
+      .calendar-weekdays span
+    ),
+  .phone .topbar span,
+  #app-menu button.secondary-action {
+    font-weight: 600;
+  }
+  .phone
+    .scene
+    :is(
+      .reco-card .quest-card-lock,
+      .factor-fixed,
+      .factor-monster,
+      .factor-contrib,
+      .factor-card > strong,
+      .stepper .step span,
+      .risk-tile > span,
+      .user-name,
+      .hero-kicker,
+      .live-shard-chip span,
+      .risk-summary-label b,
+      .fighter-panel > b,
+      .live-mission > b,
+      .choice-options button,
+      .sex-options button,
+      article > b
+    ) {
+    font-weight: 600;
+  }
+}

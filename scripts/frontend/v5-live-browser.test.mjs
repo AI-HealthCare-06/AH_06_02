@@ -1754,7 +1754,9 @@ test("서버의 성장 단계에 맞는 결정 이름과 외형을 표시하고 
 // 예외는 같은 절에 이유와 함께 적은 곳만 둔다.
 const HEADING_SIZE = { H1: "28px", H2: "18px", H3: "15px" };
 const HEADING_RULE = { sizes: HEADING_SIZE, family: "Adventure" };
-// 같은 절: 모바일 건강정보 입력 화면 제목은 Pretendard 28px · 섹션 제목 20px (입력 문항과 같은 글꼴로 읽힘을 맞춘다)
+// 같은 절: 모바일(760px 이하) 제목은 Pretendard 700. Black Han Sans 는 실제 폰에서 너무 굵어 뭉개진다.
+// 건강정보 입력 화면은 섹션 제목만 20px (입력 문항과 같은 글꼴로 읽힘을 맞춘다)
+const MOBILE_HEADING_RULE = { sizes: HEADING_SIZE, family: "Pretendard" };
 const MOBILE_FORM_HEADING_RULE = { sizes: { ...HEADING_SIZE, H2: "20px" }, family: "Pretendard" };
 const HEADING_EXCEPTIONS = [".hero-copy", ".signup-copy", ".waiting-copy", ".growth-level", ".reward-tile", ".draw-result", ".room-prop", "#app-menu"];
 
@@ -1799,8 +1801,9 @@ test("모든 화면의 제목은 디자인 규칙의 크기·굵기·글꼴을 �
             await page.locator(`[${tab}="${name}"][aria-pressed="true"]`).waitFor();
             await settled(page, id);
           }
-          const form = width <= 760 && id.startsWith("health");
-          const report = await headingReport(page, undefined, form ? MOBILE_FORM_HEADING_RULE : HEADING_RULE);
+          const mobile = width <= 760;
+          const rule = mobile ? (id.startsWith("health") ? MOBILE_FORM_HEADING_RULE : MOBILE_HEADING_RULE) : HEADING_RULE;
+          const report = await headingReport(page, undefined, rule);
           const where = `${width}px ${id}${tab ? ` ${name}` : ""}`;
           if (report.h1 !== 1) problems.push(`${where}: 화면 제목 ${report.h1}개`);
           for (const h of report.bad) problems.push(`${where}: ${h.tag} ${h.size} ${h.weight} ${h.family} "${h.text}"`);
