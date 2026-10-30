@@ -41,6 +41,7 @@ const names = {
   evolution: "캐릭터 변화 도감",
   "evolution-complete": "수행 후 변화",
   rewards: "가방 · 나의 보상",
+  chat: "공략 도우미",
 };
 const labels = {
   viscera: "비세라",
@@ -247,6 +248,7 @@ function storedPrediction() {
   }
 }
 function reset() {
+  resetChat();
   user = null;
   signupDraft = null;
   healthRecordId = null;
@@ -393,6 +395,7 @@ async function go(id, push = true) {
     if (id === "progress") await renderGrowth(ticket);
     scene.classList.remove("live-loading");
   } else if (id === "health") fillProfile();
+  else if (id === "chat") renderChat();
   $$(".user-name").forEach(
     (el) =>
       (el.textContent =
@@ -1051,7 +1054,7 @@ async function renderToday() {
   const area = $(".today .panel-pad");
   const card = selected;
   if (!card) {
-    area.innerHTML = `<h1>오늘의 공략</h1>${missions.map((m, index) => `<button type="button" class="live-mission" data-live-mission="${index}"><b>${escape(m.title)}</b><span>${m.completed_count}회 완료 · 수행률 ${m.progress_rate === null ? "—" : Math.round(m.progress_rate * 100) + "%"}</span></button>`).join("") || "<p>진행 중인 챌린지가 없어요.</p>"}${button("챌린지 살펴보기", "data-live-quests")}`;
+    area.innerHTML = `<h1>오늘의 공략</h1>${missions.map((m, index) => `<button type="button" class="live-mission" data-live-mission="${index}"><b>${escape(m.title)}</b><span>${m.completed_count}회 완료 · 수행률 ${m.progress_rate === null ? "—" : Math.round(m.progress_rate * 100) + "%"}</span></button>`).join("") || "<p>진행 중인 챌린지가 없어요.</p>"}${button("챌린지 살펴보기", "data-live-quests")}${button("공략 도우미에게 묻기", 'data-route="chat"')}`;
     return;
   }
   const mission = missions.find((m) => m.challenge_id === card.challenge_id);
@@ -1379,6 +1382,7 @@ function chooseButton(button) {
   });
 }
 async function click(button) {
+  if (button.closest(".chat") && (await chatClick(button))) return;
   // 메뉴에서 갈 곳을 고르면 메뉴를 닫는다. 모션 끄기 같은 메뉴 안 설정은 그대로 둔다
   const menu = button.closest("#app-menu");
   if (
@@ -1630,6 +1634,241 @@ function renderDrawReceipt(receipt) {
   const panel = $("#live-bag-panel");
   panel.innerHTML = `<h2>보상을 받았어요!</h2><div class="reward-results">${receipt.results.map((i) => `<article class="draw-result ${i.rarity.toLowerCase()}"><span class="rarity">${i.rarity}</span>${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt=""></div>` : "✦"}<h3>${escape(i.name)}</h3><p>${i.duplicate ? "중복 → " : ""}${i.materials ? "성장의 조각 +" + i.materials : "새 보상 획득"}</p></article>`).join("")}</div>${remaining ? button(`다음 보상 고르기 · ${remaining}회`, 'data-live-bag="draw"') : ""}${button("바로 꾸미기", 'data-live-bag="adventurer"')}`;
 }
+// ---- 질의 챗봇(공략 도우미) 화면(design.md 13절). 하루 일과를 대화로 듣고 /challenge-chat/select 로
+// 챌린지를 고른다. 고른 챌린지는 전투 카드와 같은 상세·시작 흐름(오늘의 공략)으로 연다.
+// 대화는 메모리에만 둔다(localStorage·sessionStorage 금지). 새로고침·로그아웃하면 사라진다
+const CHAT_LIMIT = 12; // 서버 MAX_CHAT_MESSAGES
+const CHAT_MAX_LENGTH = 400;
+const CHAT_PHYSICAL = new Set([
+  "meal_walk",
+  "transit",
+  "movement_breaks",
+  "stairs",
+  "strength",
+  "evening_walk",
+  "housework",
+  "squat",
+  "wall_pushup",
+  "stand_call",
+  "screen_break",
+]);
+// 선택형 질문의 답(app/services/rag_cards.py SituationAnswers). 나머지는 예/아니요
+const CHAT_OPTIONS = {
+  meal_walk: [
+    ["both", "점심·저녁 모두 돼요"],
+    ["lunch_only", "점심만 돼요"],
+    ["dinner_only", "저녁만 돼요"],
+    ["none", "어려워요"],
+  ],
+  movement_breaks: [
+    ["three", "하루 세 번 돼요"],
+    ["less", "그보다 적게 돼요"],
+    ["none", "어려워요"],
+  ],
+};
+const CHAT_WELCOME =
+  "하루 일과를 편하게 들려주세요. 지금 시작할 만한 챌린지를 함께 골라 볼게요. 이 대화는 저장하지 않아서 화면을 새로 열면 사라져요.";
+const chat = {};
+function resetChat() {
+  Object.assign(chat, {
+    messages: [],
+    asked: [],
+    answers: {},
+    view: [{ kind: "ai", tone: "notice", text: CHAT_WELCOME }],
+    pending: false,
+    closed: false,
+  });
+}
+resetChat();
+function chatOptions(key) {
+  const base = CHAT_OPTIONS[key] || [
+    ["yes", "할 수 있어요"],
+    ["no", "어려워요"],
+  ];
+  return CHAT_PHYSICAL.has(key)
+    ? [...base, ["limited", "몸 상태 때문에 어려워요"]]
+    : base;
+}
+function chatItemHtml(item, index, previous) {
+  const ai = item.kind !== "me";
+  const turn = !previous || (previous.kind !== "me") !== ai;
+  const label = ai && turn ? '<p class="chat-label">공략 도우미</p>' : "";
+  const gap = turn ? " turn" : "";
+  if (item.kind === "me")
+    return `<p class="chat-bubble me${gap}"><span class="sr-only">나: </span>${escape(item.text)}</p>`;
+  if (item.kind === "typing")
+    return `${label}<p class="chat-bubble ai chat-typing">답을 만들고 있어요<span aria-hidden="true"><i></i><i></i><i></i></span></p>`;
+  if (item.kind === "questions")
+    return `${label}<div class="chat-bubble ai"><p>${escape(item.answer)}</p>${item.questions
+      .map(
+        (q) =>
+          `<fieldset class="chat-question"><legend>${escape(q.text)}</legend><div class="chat-chips">${chatOptions(
+            q.key,
+          )
+            .map(
+              ([value, text]) =>
+                `<button type="button" class="chat-chip" data-chat-answer="${escape(q.key)}" data-value="${escape(value)}" aria-pressed="${chat.answers[q.key] === value}"${item.done ? " disabled" : ""}>${escape(text)}</button>`,
+            )
+            .join("")}</div></fieldset>`,
+      )
+      .join("")}</div>`;
+  if (item.kind === "results")
+    return `${label}<p class="chat-bubble ai">${escape(item.answer)}</p><section class="chat-results"><h2>${item.mode === "conversation" ? "대화로 고른 챌린지" : "추천 챌린지"}</h2>${item.mode === "rules" ? '<p class="chat-note">지금은 대화로 고르지 못해 추천 목록을 보여 드려요.</p>' : ""}${
+      item.items
+        .map(
+          (pick, at) =>
+            `<button type="button" class="chat-pick" data-chat-pick="${index}:${at}"><b>${escape(pick.title)}</b><span class="chat-pick-meta">${escape(attackName(pick))}${pick.daily_xp ? ` · 하루 ${pick.daily_xp} XP` : ""}</span>${item.mode === "conversation" && pick.reason ? `<small>고른 이유</small><span class="chat-pick-reason">${escape(pick.reason)}</span>` : ""}</button>`,
+        )
+        .join("") ||
+      '<p class="chat-note">지금 고를 수 있는 챌린지가 없어요.</p>'
+    }</section>`;
+  const tone = item.tone ? ` ${item.tone}` : "";
+  const after =
+    item.kind === "error"
+      ? `<button type="button" class="secondary-action chat-retry" data-chat-retry="${item.retry}">다시 보내기</button>`
+      : item.kind === "hold"
+        ? button("모험 지도로 가기", 'data-main-target="home"')
+        : item.kind === "off"
+          ? button("추천 목록 보기", "data-live-quests")
+          : "";
+  return `${label}<p class="chat-bubble ai${tone}">${escape(item.text)}</p>${after}`;
+}
+function renderChat() {
+  const scene = $(".chat");
+  if (!scene) return;
+  const log = scene.querySelector(".chat-log");
+  log.innerHTML =
+    '<h1>공략 도우미</h1><p class="small-copy chat-intro">하루 일과를 들려주면 지금 시작할 만한 챌린지를 함께 골라요.</p>' +
+    chat.view
+      .map((item, index) => chatItemHtml(item, index, chat.view[index - 1]))
+      .join("");
+  const last = chat.view.at(-1)?.kind;
+  const replied = chat.messages.some((m) => m.role === "assistant");
+  const full = chat.messages.length >= CHAT_LIMIT - 1;
+  scene.querySelector(".chat-select").hidden =
+    !replied ||
+    chat.pending ||
+    chat.closed ||
+    ["results", "questions", "hold"].includes(last);
+  scene.querySelector(".chat-full").hidden = !full || chat.closed;
+  const input = scene.querySelector(".chat-form textarea");
+  input.disabled = chat.pending || chat.closed || full;
+  scene.querySelector(".chat-send").disabled =
+    input.disabled || !input.value.trim();
+  log.scrollTop = log.scrollHeight;
+}
+async function askChat(kind) {
+  chat.pending = true;
+  chat.view.push({ kind: "typing" });
+  renderChat();
+  const dropTyping = () =>
+    (chat.view = chat.view.filter((item) => item.kind !== "typing"));
+  try {
+    if (kind === "chat") {
+      const data = await api("/challenge-chat", {
+        method: "POST",
+        body: { messages: chat.messages },
+      });
+      dropTyping();
+      if (data.mode === "off") {
+        chat.closed = true;
+        chat.view.push({ kind: "off", tone: "notice", text: data.reply });
+      } else {
+        chat.messages.push({ role: "assistant", content: data.reply });
+        chat.view.push({ kind: "ai", text: data.reply });
+      }
+    } else {
+      const data = await api("/challenge-chat/select", {
+        method: "POST",
+        body: {
+          messages: chat.messages,
+          answers: chat.answers,
+          asked: chat.asked,
+        },
+      });
+      dropTyping();
+      if (data.mode === "ask") {
+        chat.asked.push(...data.questions.map((q) => q.key));
+        chat.view.push({
+          kind: "questions",
+          answer: data.answer,
+          questions: data.questions,
+        });
+      } else if (data.mode === "hold")
+        chat.view.push({ kind: "hold", tone: "notice", text: data.answer });
+      else
+        chat.view.push({
+          kind: "results",
+          mode: data.mode,
+          answer: data.answer,
+          items: data.items,
+        });
+    }
+  } catch (error) {
+    dropTyping();
+    // 슬롯이 다 찼으면 새 챌린지를 고를 수 없다. 사용자의 잘못이 아니므로 오류색 없이 안내만 한다
+    if (error.code === "CHLG_RECOMMENDATION_UNAVAILABLE") {
+      chat.closed = true;
+      chat.view.push({ kind: "hold", tone: "notice", text: error.message });
+    } else
+      chat.view.push({
+        kind: "error",
+        tone: "notice",
+        text: error.message || "답을 받지 못했어요.",
+        retry: kind,
+      });
+  } finally {
+    chat.pending = false;
+    renderChat();
+  }
+}
+async function chatClick(button) {
+  if (button.dataset.chatAnswer) {
+    chat.answers[button.dataset.chatAnswer] = button.dataset.value;
+    const ask = chat.view.findLast((item) => item.kind === "questions");
+    renderChat();
+    // 마지막으로 물은 질문에 모두 답하면 바로 다시 고른다
+    if (ask && ask.questions.every((q) => chat.answers[q.key])) {
+      ask.done = true;
+      await askChat("select");
+    }
+    return true;
+  }
+  if (button.dataset.chatPick) {
+    const [at, pick] = button.dataset.chatPick.split(":").map(Number);
+    selected = chat.view[at].items[pick];
+    await go("today");
+    return true;
+  }
+  if (button.dataset.chatRetry) {
+    chat.view = chat.view.filter((item) => item.kind !== "error");
+    await askChat(button.dataset.chatRetry);
+    return true;
+  }
+  if (button.hasAttribute("data-chat-select")) {
+    await askChat("select");
+    return true;
+  }
+  return false;
+}
+async function sendChat(form) {
+  const input = form.querySelector("textarea");
+  const text = input.value.trim().slice(0, CHAT_MAX_LENGTH);
+  if (!text || chat.pending || chat.closed) return;
+  input.value = "";
+  sizeChatInput(input);
+  chat.messages.push({ role: "user", content: text });
+  chat.view.push({ kind: "me", text });
+  await askChat("chat");
+}
+function sizeChatInput(input) {
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+  const count = $(".chat-count");
+  count.hidden = input.value.length < 350;
+  count.textContent = `${input.value.length} / ${CHAT_MAX_LENGTH}`;
+  $(".chat-send").disabled = input.disabled || !input.value.trim();
+}
 document.addEventListener("click", (event) => {
   const target = event.target.closest("button");
   if (!target || target.disabled) return;
@@ -1645,6 +1884,10 @@ document.addEventListener("submit", (event) => {
   event.preventDefault();
   const form = event.target;
   run(async () => {
+    if (form.classList.contains("chat-form")) {
+      await sendChat(form);
+      return;
+    }
     if (form.classList.contains("login-form")) {
       const accepted = await auth.login({
         email: form.querySelector('[type="email"]').value.trim(),
@@ -1914,6 +2157,28 @@ $(".waiting .waiting-bottom")?.insertAdjacentHTML(
 );
 $(".health h1")?.nextElementSibling?.replaceChildren(
   document.createTextNode("현재 건강정보를 입력해 주세요."),
+);
+// 공략 도우미 화면(대화). 하단 메뉴는 숨기고 입력창을 맨 아래에 둔다(design.md 13절)
+$("#screen").insertAdjacentHTML(
+  "beforeend",
+  `<section class="scene chat" data-page="chat" hidden><div class="chat-shell"><div class="chat-log" role="log" aria-live="polite"></div><p class="chat-medical">건강 수치·질환 판단은 하지 않아요. 진단·치료는 의료진과 상의해 주세요.</p><p class="chat-full small-copy" hidden>대화가 길어졌어요. 지금까지 내용으로 골라 볼까요?</p><button type="button" class="primary chat-select" data-chat-select hidden>이 대화로 챌린지 고르기</button><form class="chat-form" novalidate><label class="sr-only" for="chat-input">공략 도우미에게 보낼 말</label><textarea id="chat-input" rows="1" maxlength="${CHAT_MAX_LENGTH}" placeholder="하루 일과를 편하게 적어 주세요. 이름·연락처는 적지 말아 주세요."></textarea><span class="chat-count" hidden></span><button type="submit" class="chat-send" aria-label="보내기" disabled>↑</button></form></div></section>`,
+);
+$("#chat-input").addEventListener("input", (event) =>
+  sizeChatInput(event.target),
+);
+// Enter 로 보내고 Shift+Enter 는 줄바꿈. 한글 조합 중 Enter 는 글자 확정이라 보내지 않는다
+$("#chat-input").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  event.target.form.requestSubmit();
+});
+$(".quest-map-return")?.insertAdjacentHTML(
+  "afterend",
+  '<button type="button" class="quest-chat-open" data-route="chat">공략 도우미</button>',
+);
+$('#app-menu [data-main-target="quests"]')?.insertAdjacentHTML(
+  "afterend",
+  '<button data-route="chat">공략 도우미 · 대화로 챌린지 고르기 <span>→</span></button>',
 );
 $('#app-menu [data-route="signup"]')?.remove();
 $("#app-menu").insertAdjacentHTML(

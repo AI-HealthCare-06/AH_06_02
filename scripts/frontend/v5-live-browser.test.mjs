@@ -318,6 +318,53 @@ async function mock(page, state = {}) {
           },
         ],
       };
+    else if (p === "/challenge-chat") {
+      if (state.chatFull)
+        return route.fulfill({
+          status: 409,
+          json: {
+            success: false,
+            error: {
+              code: "CHLG_RECOMMENDATION_UNAVAILABLE",
+              message:
+                "현재 주기에 추가로 시작할 수 있는 챌린지가 없어요. 진행 중인 챌린지를 이어가세요.",
+              reason: "slots_unavailable",
+            },
+          },
+        });
+      data = {
+        mode: "chat",
+        reply: "식후에 잠깐 걷는 걸로 시작해 볼까요?",
+        sources: [],
+      };
+    } else if (p === "/challenge-chat/select")
+      // 처음에는 상황 질문 하나를 묻고, 답이 오면 고른 챌린지를 준다
+      data = body.asked.length
+        ? {
+            mode: "conversation",
+            answer: "나눈 대화에 맞춰 골랐어요.",
+            questions: [],
+            items: state.chatPicks || [],
+            total: (state.chatPicks || []).length,
+            sources: [],
+            model_version: "test",
+            remaining_slots: 2,
+          }
+        : {
+            mode: "ask",
+            answer: "몇 가지만 확인할게요.",
+            questions: [
+              {
+                key: "meal_walk",
+                text: "점심과 저녁 식후에 각각 10분씩 걷는 것이 가능한가요?",
+              },
+            ],
+            items: [],
+            total: 0,
+            sources: [],
+            model_version: "test",
+            remaining_slots: 2,
+          };
     else if (p === "/challenge-recommendations/generate") {
       if (state.full)
         return route.fulfill({
@@ -923,6 +970,64 @@ const card = (overrides) => ({
   action: null,
   ...overrides,
 });
+
+test("공략 도우미는 대화 → 상황 질문 → 고른 챌린지 → 전투 카드와 같은 상세로 이어진다", async () =>
+  withPage(async (page, base) => {
+    const calls = await mock(page, {
+      chatPicks: [
+        card({
+          recommendation_id: 77,
+          challenge_id: 1,
+          title: "식후 걷기",
+          reason: "점심과 저녁에 10분씩 걸을 수 있다고 해서 골랐어요.",
+        }),
+      ],
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(new URL(path + "#reco", base).href);
+    await page.locator(".quest-chat-open").click();
+    await page.locator('.scene[data-page="chat"]:not([hidden])').waitFor();
+    // 대화 화면은 하단 메뉴를 숨기고 입력창이 맨 아래에 붙는다
+    assert.equal(await page.locator("#adventure-nav").isVisible(), false);
+    assert.equal(await page.locator(".chat-send").isDisabled(), true);
+    await page.locator("#chat-input").fill("점심 먹고 나면 졸려요");
+    await page.locator(".chat-send").click();
+    await page.locator(".chat-bubble.ai", { hasText: "식후에 잠깐" }).waitFor();
+    await page.locator(".chat-select").click();
+    await page.locator(".chat-chip", { hasText: "점심·저녁 모두 돼요" }).click();
+    const pick = page.locator(".chat-pick", { hasText: "식후 걷기" });
+    await pick.waitFor();
+    assert.match(await pick.textContent(), /고른 이유.*10분씩/);
+    const last = calls.filter((c) => c.path === "/challenge-chat/select").at(-1);
+    assert.deepEqual(last.body.answers, { meal_walk: "both" });
+    assert.deepEqual(last.body.asked, ["meal_walk"]);
+    assert.deepEqual(
+      last.body.messages.map((m) => m.role),
+      ["user", "assistant"],
+    );
+    await pick.click();
+    await page.locator(".today h1", { hasText: "식후 걷기" }).waitFor();
+    assert.equal(await page.locator("[data-live-start]").count(), 1);
+  }));
+
+test("슬롯이 다 찬 계정은 공략 도우미에서 오류색 없이 진행 중인 챌린지를 이어가도록 안내한다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { chatFull: true });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(new URL(path + "#chat", base).href);
+    await page.locator('.scene[data-page="chat"]:not([hidden])').waitFor();
+    await page.locator("#chat-input").fill("뭐부터 하면 좋을까요?");
+    await page.locator(".chat-send").click();
+    await page
+      .locator(".chat-bubble.notice", { hasText: "진행 중인 챌린지를 이어가세요" })
+      .waitFor();
+    assert.equal(
+      await page.locator('.chat-log [data-main-target="home"]').isVisible(),
+      true,
+    );
+    assert.equal(await page.locator("#chat-input").isDisabled(), true);
+    assert.equal(await page.locator(".chat-select").isVisible(), false);
+  }));
 
 test("공략 대상이 정해지기 전에 전투 화면으로 바로 들어와도 첫 추천이 정한 대상의 카드를 보여 준다", async () =>
   withPage(async (page, base) => {
