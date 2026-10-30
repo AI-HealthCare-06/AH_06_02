@@ -16,10 +16,13 @@ try {
   ));
 }
 const repo = fileURLToPath(new URL("../../", import.meta.url));
+// macOS·리눅스에는 python 없이 python3 만 있는 경우가 많다. 다른 실행 파일은 PYTHON 으로 지정한다
+const python =
+  process.env.PYTHON || (process.platform === "win32" ? "python" : "python3");
 
 export async function withPage(run) {
   const server = spawn(
-    "python",
+    python,
     [
       "-u",
       "-m",
@@ -61,7 +64,14 @@ export async function withPage(run) {
     await run(page, `http://127.0.0.1:${port}/frontend/`);
   } finally {
     await browser?.close();
-    server.kill();
-    await once(server, "exit").catch(() => {});
+    // 실행 파일을 못 찾아 시작조차 못 한 서버는 exit 를 보내지 않아 기다리면 테스트가 끝나지 않는다
+    if (
+      server.pid !== undefined &&
+      server.exitCode === null &&
+      server.signalCode === null
+    ) {
+      server.kill();
+      await once(server, "exit").catch(() => {});
+    }
   }
 }
