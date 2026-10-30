@@ -1750,19 +1750,21 @@ test("서버의 성장 단계에 맞는 결정 이름과 외형을 표시하고 
     }
   }));
 
-// docs/02_team/design.md 2절. 화면 제목 28px · 섹션 제목 18px · 소제목 15px, 굵기 700, 글꼴 Adventure.
+// docs/02_team/design.md 3절. 화면 제목 28px · 섹션 제목 18px · 소제목 15px, 굵기 700, 글꼴 Adventure.
 // 예외는 같은 절에 이유와 함께 적은 곳만 둔다.
 const HEADING_SIZE = { H1: "28px", H2: "18px", H3: "15px" };
 const HEADING_RULE = { sizes: HEADING_SIZE, family: "Adventure" };
 // 같은 절: 모바일(760px 이하) 제목은 Pretendard 700. Black Han Sans 는 실제 폰에서 너무 굵어 뭉개진다.
 // 건강정보 입력 화면은 섹션 제목만 20px (입력 문항과 같은 글꼴로 읽힘을 맞춘다)
-const MOBILE_HEADING_RULE = { sizes: HEADING_SIZE, family: "Pretendard" };
-const MOBILE_FORM_HEADING_RULE = { sizes: { ...HEADING_SIZE, H2: "20px" }, family: "Pretendard" };
+// 모바일 화면 제목은 한 단계 더 굵게(800), 나머지 제목은 700
+const MOBILE_WEIGHTS = { H1: "800", H2: "700", H3: "700" };
+const MOBILE_HEADING_RULE = { sizes: HEADING_SIZE, family: "Pretendard", weights: MOBILE_WEIGHTS };
+const MOBILE_FORM_HEADING_RULE = { sizes: { ...HEADING_SIZE, H2: "20px" }, family: "Pretendard", weights: MOBILE_WEIGHTS };
 const HEADING_EXCEPTIONS = [".hero-copy", ".signup-copy", ".waiting-copy", ".growth-level", ".reward-tile", ".draw-result", ".room-prop", "#app-menu"];
 
 async function headingReport(page, root = ".scene:not([hidden])", rule = HEADING_RULE) {
   return page.evaluate(
-    ([{ sizes, family }, exceptions, rootSelector]) => {
+    ([{ sizes, family, weights }, exceptions, rootSelector]) => {
       const scope = document.querySelector(rootSelector);
       const headings = [...scope.querySelectorAll("h1,h2,h3")].filter((h) => h.getClientRects().length > 0);
       const bad = headings
@@ -1771,7 +1773,7 @@ async function headingReport(page, root = ".scene:not([hidden])", rule = HEADING
           const style = getComputedStyle(h);
           return { tag: h.tagName, size: style.fontSize, weight: style.fontWeight, family: style.fontFamily.split(",")[0].trim(), text: h.textContent.trim().slice(0, 16) };
         })
-        .filter((h) => h.size !== sizes[h.tag] || h.weight !== "700" || h.family !== family);
+        .filter((h) => h.size !== sizes[h.tag] || h.weight !== (weights?.[h.tag] ?? "700") || h.family !== family);
       return { h1: headings.filter((h) => h.tagName === "H1").length, bad };
     },
     [rule, HEADING_EXCEPTIONS, root],
