@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     env:
-      IMAGE: ${{ vars.DOCKERHUB_USERNAME }}/dangokiller
+      IMAGE: ozcodingschool/ai-06-02
       VERSION: v1.1.${{ github.run_number }}
     steps:
       # 외부 Action은 커밋 해시로 고정한다. 주석은 그 해시의 버전이다
