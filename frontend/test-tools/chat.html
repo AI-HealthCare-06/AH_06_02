@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>챗봇 테스트 도구</title>
+    <!-- 임시 테스트 도구. 서버 TEST_TOOL_EMAILS 계정만 쓸 수 있다. 발표가 끝나면 별도 PR 로 이 폴더를 지운다 (app/apis/v1/test_tool_routers.py 참고) -->
+    <style>
+      :root {
+        --bg: #f6f3ea;
+        --card: #fffdf7;
+        --ink: #2f2a24;
+        --muted: #6f665b;
+        --line: #ddd3c2;
+        --accent: #3f7d5a;
+        --warn: #b4532a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+      section {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 14px;
+        display: grid;
+        gap: 10px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0;
+      }
+      h2 {
+        font-size: 15px;
+        margin: 0;
+      }
+      p,
+      small {
+        margin: 0;
+        color: var(--muted);
+      }
+      input,
+      select,
+      textarea,
+      button {
+        font: inherit;
+        font-size: 16px;
+        min-height: 44px;
+        border-radius: 8px;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+      }
+      button {
+        padding: 8px 14px;
+        border: 0;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+      }
+      button.warn {
+        background: var(--warn);
+      }
+      button:disabled {
+        opacity: 0.5;
+      }
+      pre {
+        margin: 0;
+        padding: 10px;
+        background: #f0ebe0;
+        border-radius: 8px;
+        font-size: 12px;
+        white-space: pre-wrap;
+        word-break: break-all;
+        max-height: 320px;
+        overflow: auto;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .row > * {
+        flex: 1 1 140px;
+      }
+      .bubble {
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #eef4ef;
+      }
+      .bubble.me {
+        background: #f3ece0;
+      }
+      .item {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px;
+        display: grid;
+        gap: 6px;
+      }
+      .grid {
+        display: grid;
+        gap: 8px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      #status {
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>[테스트] 질의 챗봇 주기 우회</h1>
+      <p>
+        테스트 계정 전용 임시 도구예요. 주기를 끝내고 질의 → 챌린지 선택 →
+        시작까지 한 화면에서 확인해요.
+      </p>
+      <p id="status" role="status"></p>
+
+      <section id="login" hidden>
+        <h2>로그인</h2>
+        <form id="login-form" class="row">
+          <input
+            type="email"
+            name="email"
+            placeholder="이메일"
+            required
+            autocomplete="username"
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="비밀번호"
+            required
+            autocomplete="current-password"
+          />
+          <button type="submit">로그인</button>
+        </form>
+      </section>
+
+      <section id="cycle" hidden>
+        <h2>1. 주기 상태</h2>
+        <pre id="cycle-json"></pre>
+        <button id="finish" class="warn" type="button">
+          [테스트] 28일 주기 종료하고 다음 주기 열기
+        </button>
+        <small>진행 중인 챌린지는 28일이 지난 것처럼 '기간 종료'가 돼요.</small>
+      </section>
+
+      <section id="chat" hidden>
+        <h2>2. 자유 질의 (1단계)</h2>
+        <div id="log" class="grid"></div>
+        <form id="chat-form" class="row">
+          <textarea
+            name="q"
+            rows="2"
+            placeholder="예: 회사에서 오래 앉아 있어요. 뭐부터 하면 좋을까요?"
+            required
+          ></textarea>
+          <button type="submit">보내기</button>
+        </form>
+        <pre id="chat-json" hidden></pre>
+      </section>
+
+      <section id="select" hidden>
+        <h2>3. 챌린지 고르기 (2단계 · 디시전 모델)</h2>
+        <form id="questions" class="grid"></form>
+        <button id="select-btn" type="button">대화로 챌린지 고르기</button>
+        <div id="items" class="grid"></div>
+        <pre id="select-json" hidden></pre>
+      </section>
+
+      <section id="started" hidden>
+        <h2>4. 챌린지 생성 결과</h2>
+        <pre id="start-json"></pre>
+        <a href="../index.html">서비스 화면으로 가기</a>
+      </section>
+    </main>
+    <script type="module">
+      import { AuthSession } from "../shared/auth.mjs";
+
+      const auth = new AuthSession();
+      const api = auth.api;
+      const $ = (id) => document.getElementById(id);
+      const messages = [];
+      const answers = {};
+      const asked = [];
+      // 선택형 질문의 답. 나머지 질문은 예/아니요다 (app/services/rag_cards.py SituationAnswers)
+      const OPTIONS = {
+        meal_walk: [
+          ["both", "점심·저녁 둘 다"],
+          ["lunch_only", "점심만"],
+          ["dinner_only", "저녁만"],
+          ["none", "어려워요"],
+        ],
+        movement_breaks: [
+          ["three", "하루 세 번 가능"],
+          ["less", "그보다 적게"],
+          ["none", "어려워요"],
+        ],
+      };
+      const YES_NO = [
+        ["yes", "가능해요"],
+        ["no", "어려워요"],
+      ];
+
+      function status(text, error = false) {
+        $("status").textContent = text;
+        $("status").style.color = error ? "var(--warn)" : "";
+      }
+      function show(id, data) {
+        $(id).hidden = false;
+        $(id).textContent = JSON.stringify(data, null, 2);
+      }
+      async function call(path, options, label) {
+        try {
+          return await api(path, options);
+        } catch (error) {
+          status(
+            `${label} 실패: ${error.status} ${error.code || ""} ${error.message}`,
+            true,
+          );
+          throw error;
+        }
+      }
+
+      async function loadCycle() {
+        let data;
+        try {
+          data = await api("/test-tools/attack-cycle");
+        } catch (error) {
+          if (error.status === 404) {
+            status(
+              "이 계정은 테스트 도구를 쓸 수 없어요. 서버 TEST_TOOL_EMAILS 를 확인하세요.",
+              true,
+            );
+            return;
+          }
+          throw error;
+        }
+        show("cycle-json", data);
+        $("cycle").hidden = $("chat").hidden = $("select").hidden = false;
+        status(
+          `${auth.user.email} · 남은 슬롯 ${data.remaining_slots ?? "주기 없음"}`,
+        );
+      }
+
+      $("finish").addEventListener("click", async () => {
+        if (
+          !confirm(
+            "지금 주기를 끝내고 진행 중 챌린지를 '기간 종료'로 바꿀까요?",
+          )
+        )
+          return;
+        const data = await call(
+          "/test-tools/attack-cycle/finish",
+          { method: "POST" },
+          "주기 종료",
+        );
+        show("cycle-json", data);
+        status(
+          data.finished
+            ? `주기 ${data.closed_cycle_id} 종료 · 챌린지 ${data.ended_challenges}개 기간 종료. 이제 질의할 수 있어요.`
+            : "진행 중인 주기가 없어요. 바로 질의할 수 있어요.",
+        );
+      });
+
+      $("chat-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const q = event.target.q.value.trim();
+        if (!q) return;
+        messages.push({ role: "user", content: q });
+        bubble(q, true);
+        event.target.reset();
+        const started = performance.now();
+        const data = await call(
+          "/challenge-chat",
+          { method: "POST", body: { messages } },
+          "질의",
+        ).catch(() => null);
+        if (!data) {
+          messages.pop();
+          return;
+        }
+        messages.push({ role: "assistant", content: data.reply });
+        bubble(data.reply, false);
+        show("chat-json", data);
+        status(
+          `1단계 mode=${data.mode} · ${((performance.now() - started) / 1000).toFixed(1)}초`,
+        );
+      });
+
+      function bubble(text, me) {
+        const div = document.createElement("div");
+        div.className = me ? "bubble me" : "bubble";
+        div.textContent = text;
+        $("log").append(div);
+      }
+
+      $("select-btn").addEventListener("click", async () => {
+        for (const field of $("questions").elements)
+          if (field.name) answers[field.name] = field.value;
+        $("select-btn").disabled = true;
+        const started = performance.now();
+        try {
+          const body = { messages, answers, asked };
+          const data = await call(
+            "/challenge-chat/select",
+            { method: "POST", body },
+            "선택",
+          );
+          show("select-json", data);
+          status(
+            `2단계 mode=${data.mode} · 카드 ${data.total}개 · ${((performance.now() - started) / 1000).toFixed(1)}초`,
+          );
+          renderQuestions(data.questions);
+          renderItems(data.mode === "ask" ? [] : data.items);
+        } finally {
+          $("select-btn").disabled = false;
+        }
+      });
+
+      function renderQuestions(questions) {
+        $("questions").replaceChildren(
+          ...questions.map((question) => {
+            asked.push(question.key);
+            const label = document.createElement("label");
+            label.className = "grid";
+            const select = document.createElement("select");
+            select.name = question.key;
+            for (const [value, text] of OPTIONS[question.key] || YES_NO)
+              select.add(new Option(text, value));
+            label.append(question.text, select);
+            return label;
+          }),
+        );
+        $("select-btn").textContent = questions.length
+          ? "답하고 다시 고르기"
+          : "대화로 챌린지 고르기";
+      }
+
+      function renderItems(items) {
+        $("items").replaceChildren(
+          ...items.map((item) => {
+            const div = document.createElement("div");
+            div.className = "item";
+            const title = document.createElement("strong");
+            title.textContent = `${item.rank}. ${item.title} (${item.challenge_code})`;
+            const reason = document.createElement("small");
+            reason.textContent = item.reason || "이유 없음 (규칙 추천)";
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = "이 챌린지 시작하기";
+            button.addEventListener("click", async () => {
+              button.disabled = true;
+              const body = {
+                recommendation_ids: [item.recommendation_id],
+                safety_confirmed: true,
+              };
+              const data = await call(
+                "/user-challenges",
+                { method: "POST", body },
+                "시작",
+              ).catch(() => null);
+              button.disabled = false;
+              if (!data) return;
+              show("start-json", data);
+              $("started").hidden = false;
+              status(`챌린지 생성 완료: ${item.title}`);
+              await loadCycle();
+            });
+            div.append(title, reason, button);
+            return div;
+          }),
+        );
+      }
+
+      $("login-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.target;
+        const ok = await auth
+          .login({ email: form.email.value, password: form.password.value })
+          .catch((error) => status(`로그인 실패: ${error.message}`, true));
+        if (!ok) return;
+        $("login").hidden = true;
+        await loadCycle();
+      });
+
+      if (await auth.restore()) await loadCycle();
+      else $("login").hidden = false;
+    </script>
+  </body>
+</html>

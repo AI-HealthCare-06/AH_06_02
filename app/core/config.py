@@ -61,3 +61,7 @@ class Config(BaseSettings):
     OPENAI_MODEL: str = Field(default="gpt-4o", min_length=1, max_length=32)
     # Responses API 주소. 로컬 E2E 에서 가짜 서버를 붙일 때만 바꾼다
     OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+
+    # 임시 테스트 도구(/api/v1/test-tools, frontend/test-tools/)를 쓸 수 있는 계정 이메일. 쉼표로 구분한다.
+    # 비어 있으면(기본) 모든 계정에 404 다. 발표가 끝나면 별도 PR 로 이 설정과 도구를 함께 지운다
+    TEST_TOOL_EMAILS: str = ""
