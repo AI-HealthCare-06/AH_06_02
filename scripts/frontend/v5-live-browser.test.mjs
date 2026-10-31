@@ -156,6 +156,7 @@ async function mock(page, state = {}) {
           ? [
               {
                 ...mission,
+                verification_type: state.verification || mission.verification_type,
                 completed_count: state.completed ? 1 : 0,
                 today_occurrences: mission.today_occurrences.map((o) => ({
                   ...o,
@@ -1790,6 +1791,20 @@ test("아이템 단계는 2단계에 조각 20개, 3단계에 40개가 필요하
     const upgrade = growth.locator("[data-live-upgrade]");
     assert.equal(await upgrade.isDisabled(), false);
     assert.match(await upgrade.textContent(), /조각 40개로 3단계/);
+  }));
+
+test("320px 사진 인증 회차 카드는 파일 입력 때문에 화면 밖으로 밀리지 않는다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { mission: true, verification: "photo" });
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(new URL(path + "#today", base).href);
+    await page.getByRole("button", { name: "식후 걷기", exact: false }).click();
+    await page.locator("[data-photo-for]").waitFor({ state: "attached" });
+    const box = await page.evaluate(() => ({
+      right: Math.round(document.querySelector(".live-occurrences .slot").getBoundingClientRect().right),
+      scroll: document.querySelector(".screen").scrollWidth - innerWidth,
+    }));
+    assert.ok(box.right <= 320 && box.scroll <= 0, JSON.stringify(box));
   }));
 
 test("진행 중인 타이머는 일시정지하고 이어할 수 있다", async () =>

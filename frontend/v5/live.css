@@ -410,8 +410,9 @@ button:focus-visible {
   .evolution-strip .evolution-art {
     height: 90px;
   }
+  /* 1fr 은 내용 최소 폭까지 늘어나 320px 에서 사진 파일 입력이 회차 카드를 화면 밖으로 밀었다 */
   .live-occurrences {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (prefers-reduced-motion: reduce) {
