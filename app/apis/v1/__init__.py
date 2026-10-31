@@ -6,6 +6,7 @@ from app.apis.v1.challenge_chat_routers import challenge_chat_router
 from app.apis.v1.challenge_routers import challenge_router
 from app.apis.v1.health_routers import health_router
 from app.apis.v1.prediction_routers import prediction_router
+from app.apis.v1.test_tool_routers import test_tool_router
 from app.apis.v1.user_routers import user_router
 
 v1_routers = APIRouter(prefix="/api/v1")
@@ -16,3 +17,6 @@ v1_routers.include_router(challenge_router)
 v1_routers.include_router(challenge_chat_router)
 v1_routers.include_router(health_router)
 v1_routers.include_router(prediction_router)
+# 발표용 임시 테스트 도구. 기본 OFF(TEST_TOOL_EMAILS 비면 404)
+# 발표가 끝나면 별도 PR 로 지운다 (test_tool_routers.py 참고)
+v1_routers.include_router(test_tool_router)
