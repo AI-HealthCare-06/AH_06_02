@@ -1920,6 +1920,30 @@ test("모든 화면의 제목은 디자인 규칙의 크기·굵기·글꼴을 �
     assert.deepEqual(problems, []);
   }));
 
+test("모바일 나의 성장 모든 탭의 글자는 12px 이상이다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { materials: 0, stage: 1 });
+    const problems = [];
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(new URL(path + "#progress", base).href);
+      await settled(page, "progress");
+      for (const name of await page.locator("[data-growth-tab]").evaluateAll((els) => els.map((el) => el.dataset.growthTab))) {
+        await page.locator(`[data-growth-tab="${name}"]`).click();
+        await page.locator(`[data-growth-tab="${name}"][aria-pressed="true"]`).waitFor();
+        await settled(page, "progress");
+        const small = await page.evaluate(() =>
+          [...document.querySelectorAll(".scene:not([hidden]) *")]
+            .filter((el) => el.getClientRects().length && !el.closest("[aria-hidden=true], .sr-only") && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+            .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 12)
+            .map((el) => `${getComputedStyle(el).fontSize} "${el.textContent.trim().slice(0, 16)}"`),
+        );
+        for (const s of small) problems.push(`${width}px ${name}: ${s}`);
+      }
+    }
+    assert.deepEqual(problems, []);
+  }));
+
 test("화면 위에 뜨는 창의 제목도 디자인 규칙을 따른다", async () =>
   withPage(async (page, base) => {
     const problems = [];
