@@ -156,6 +156,7 @@ async function mock(page, state = {}) {
           ? [
               {
                 ...mission,
+                verification_type: state.verification || mission.verification_type,
                 completed_count: state.completed ? 1 : 0,
                 today_occurrences: mission.today_occurrences.map((o) => ({
                   ...o,
@@ -1792,6 +1793,20 @@ test("아이템 단계는 2단계에 조각 20개, 3단계에 40개가 필요하
     assert.match(await upgrade.textContent(), /조각 40개로 3단계/);
   }));
 
+test("320px 사진 인증 회차 카드는 파일 입력 때문에 화면 밖으로 밀리지 않는다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { mission: true, verification: "photo" });
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(new URL(path + "#today", base).href);
+    await page.getByRole("button", { name: "식후 걷기", exact: false }).click();
+    await page.locator("[data-photo-for]").waitFor({ state: "attached" });
+    const box = await page.evaluate(() => ({
+      right: Math.round(document.querySelector(".live-occurrences .slot").getBoundingClientRect().right),
+      scroll: document.querySelector(".screen").scrollWidth - innerWidth,
+    }));
+    assert.ok(box.right <= 320 && box.scroll <= 0, JSON.stringify(box));
+  }));
+
 test("진행 중인 타이머는 일시정지하고 이어할 수 있다", async () =>
   withPage(async (page, base) => {
     const state = { mission: true };
@@ -1915,6 +1930,30 @@ test("모든 화면의 제목은 디자인 규칙의 크기·굵기·글꼴을 �
           if (report.h1 !== 1) problems.push(`${where}: 화면 제목 ${report.h1}개`);
           for (const h of report.bad) problems.push(`${where}: ${h.tag} ${h.size} ${h.weight} ${h.family} "${h.text}"`);
         }
+      }
+    }
+    assert.deepEqual(problems, []);
+  }));
+
+test("모바일 나의 성장 모든 탭의 글자는 12px 이상이다", async () =>
+  withPage(async (page, base) => {
+    await mock(page, { materials: 0, stage: 1 });
+    const problems = [];
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto(new URL(path + "#progress", base).href);
+      await settled(page, "progress");
+      for (const name of await page.locator("[data-growth-tab]").evaluateAll((els) => els.map((el) => el.dataset.growthTab))) {
+        await page.locator(`[data-growth-tab="${name}"]`).click();
+        await page.locator(`[data-growth-tab="${name}"][aria-pressed="true"]`).waitFor();
+        await settled(page, "progress");
+        const small = await page.evaluate(() =>
+          [...document.querySelectorAll(".scene:not([hidden]) *")]
+            .filter((el) => el.getClientRects().length && !el.closest("[aria-hidden=true], .sr-only") && [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()))
+            .filter((el) => parseFloat(getComputedStyle(el).fontSize) < 12)
+            .map((el) => `${getComputedStyle(el).fontSize} "${el.textContent.trim().slice(0, 16)}"`),
+        );
+        for (const s of small) problems.push(`${width}px ${name}: ${s}`);
       }
     }
     assert.deepEqual(problems, []);

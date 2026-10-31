@@ -410,8 +410,9 @@ button:focus-visible {
   .evolution-strip .evolution-art {
     height: 90px;
   }
+  /* 1fr 은 내용 최소 폭까지 늘어나 320px 에서 사진 파일 입력이 회차 카드를 화면 밖으로 밀었다 */
   .live-occurrences {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -926,6 +927,14 @@ label:has(> input[aria-invalid="true"]:not([type="checkbox"])) {
     font-size: 12px;
     white-space: normal;
     text-align: center;
+  }
+  /* 업적 달력: 시안이 요일·안내를 11px 로 줄이고 안내를 옅은 보라(#9a91a8)로 둬서 .phone 으로 구체성을 올린다 */
+  .phone .calendar-weekdays span,
+  .phone .calendar-note {
+    font-size: 12px;
+  }
+  .phone .calendar-note {
+    color: #4f5a66;
   }
   /* 가족력 체크: 손가락으로 누르기 쉬운 크기 */
   .medicine label {
