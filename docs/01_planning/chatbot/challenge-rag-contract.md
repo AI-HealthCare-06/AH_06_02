@@ -84,31 +84,26 @@ AI·RAG를 붙이기 전에 챌린지 쪽이 어디까지 만들었고, AI가 �
 
 AI는 **서버가 정한 챌린지 후보에 확률을 매기는 일**만 한다(Select, not Generate). 새 챌린지, 목표량, 난이도, 단계, 점수, 기간, 요인은 만들지 않는다. 고른 챌린지의 값은 서버가 규칙·마스터로 채워 JSON으로 내려 주고, 시작은 사용자가 기존 CHLG-05로 한다. 2026-10-28부터 이 절의 결정은 최병주가 한다.
 
-2026-11-01 재설계(최병주 승인, 설계 `docs/02_team/chatbot-question-redesign.md`): 질문을 먼저 하고, 판단 모델은 확률만 낸다. 참고 DecisionRAG(arXiv 2610.35868)의 Multiple-Choice 판단.
+2026-11-01 재설계(최병주 승인, 설계 `docs/02_team/chatbot-question-redesign.md`): 질문을 먼저 하고, 판단 모델은 확률만 낸다. 참고 DecisionRAG(arXiv 2610.35868)의 Multiple-Choice 판단. 같은 날 자유 대화를 없앴다: **답은 선택지 클릭으로만 받는다**(자유 대화 API `/challenge-chat` 삭제).
 
 ```
-1. 질문  POST /api/v1/challenge-chat/select   (대화 없이 바로 부른다)
+1. 질문  POST /api/v1/challenge-chat/select   body: { answers, asked }  (자유 입력 필드 없음)
   Page Index 의 질문 페이지(docs/01_planning/chatbot/questions-*.json) 중
   열린 요인 가지 → 답 키 → 표현 순으로 한 장을 랜덤으로 고른다                 → ask (질문 1개)
     시드: 사용자·주기 + 이미 물은 키. 같은 사람·같은 주기·같은 답이면 같은 질문
     최대 3개, 이미 답한 키는 생략. '몸 상태 때문에 어려워요'면 질문을 멈추고 hold
-  사용자는 선택지를 눌러 답한다(자유 입력으로 답받지 않는다)
+  사용자는 선택지를 눌러 답한다
 
 2. 고르기  (같은 API, 질문에 다 답한 뒤)
   후보 = 사용자가 '할 수 있어요'로 답한 챌린지(그 밖은 추정해 넣지 않는다)
   → 후보가 2개 이상이면 판단 모델: 후보마다 A·B·C 라벨, 출력 1토큰의 logprobs(상위 20개)로
     라벨별 확률만 받는다. temperature 0, 문장 생성 없음. 후보가 1개면 모델을 부르지 않는다
   → 서버: 후보 라벨 확률 합이 0.5 미만이면 버림 → 확률 순 최대 3개
-       이유 문장 = 답한 질문 페이지의 문장, 근거 카드 = 그 챌린지의 승인 카드(대화와 겹친 카드 먼저)
+       이유 문장 = 답한 질문 페이지의 문장, 근거 카드 = 그 챌린지의 첫 승인 카드
        통과  → conversation: 규칙이 정한 목표 값으로 추천 행을 만들어 서빙
        실패  → rules: 규칙 추천 그대로
        후보 없음(모두 '어려워요') → rules
   → 사용자가 서빙 JSON의 recommendation_id로 CHLG-05 시작
-
-3. 자유 대화  POST /api/v1/challenge-chat   (결과 뒤 선택)
-  사용자 자유 질문 → Page Index 검색(카드·챌린지·단계표) → gpt-4o 자유 대화
-  → 답 문장만 돌려준다. 아무것도 저장하지 않는다. 대화 기록은 클라이언트가 들고 있다
-  → '다시 고르기'는 같은 답 + 대화로 2를 다시 부른다(대화는 카드 검색·판단 모델 입력에 들어간다)
 ```
 
 ### 판단 모델 출력 제한
@@ -125,7 +120,7 @@ AI는 **서버가 정한 챌린지 후보에 확률을 매기는 일**만 한다
 | 운영자 말투 | "\~라고 답한 경우", "\~를 제안한다" 같은 카드 원문 말투가 없을 것 |
 | 단정 표현 | 질환 치료·예방·수치 개선·위험도·진단을 말하지 않을 것 |
 
-바꿨는지는 `conversation_snapshot.reason_replaced`에 남는다. 자유 대화 답도 단정 표현이 있으면 고정 안내 문장으로 바꾼다.
+바꿨는지는 `conversation_snapshot.reason_replaced`에 남는다.
 
 ### 고를 수 있는 코드
 
@@ -144,34 +139,32 @@ AI는 **서버가 정한 챌린지 후보에 확률을 매기는 일**만 한다
 
 | 방향 | 내용 |
 | --- | --- |
-| 서버 → LLM (자유 대화) | 대화 기록(가린 뒤), 후보 코드·제목·상황·서빙 목표, 검색된 페이지 |
-| 서버 → LLM (판단) | 선택형 답변, 대화 기록(가린 뒤, 있으면), 캐릭터 코호트 범주(상태·진행 중 단계·지난 수행률 구간), 라벨 붙은 후보와 서빙 목표(읽기 전용), 승인 카드 |
-| 가리고 보냄 | 대화 속 이메일·전화번호·6자리 이상 숫자는 `[생략]`으로 바꾼다 |
+| 서버 → LLM (판단) | 선택형 답변, 캐릭터 코호트 범주(상태·진행 중 단계·지난 수행률 구간), 라벨 붙은 후보와 서빙 목표(읽기 전용), 승인 카드. 사용자가 쓴 글은 없다 |
 | 보내지 않음 | 이름 · 이메일(계정) · 건강 수치 · 예측 확률 · 진단 기록 |
 | LLM이 정하지 않음 | 사용자 · 주기 · 공략 대상 · 모델 점수 · 목표 값 · 단계. 모두 서버가 정한다 |
-| LLM → 서버 | 자유 대화: 답 문장 / 판단: 첫 토큰 logprobs(후보 라벨별 확률). 문장·코드·카드·이유는 받지 않는다 |
+| LLM → 서버 | 첫 토큰 logprobs(후보 라벨별 확률). 문장·코드·카드·이유는 받지 않는다 |
 
-LLM 호출이 실패하거나(키 없음·키 오류·시간 초과) 응답이 검증을 못 넘으면 오류를 내지 않는다. 자유 대화는 고정 안내 문장, 고르기는 `rules`로 돌아간다. 로그에는 예외 종류와 HTTP 상태만 남기고 키·본문은 남기지 않는다.
+LLM 호출이 실패하거나(키 없음·키 오류·시간 초과) 응답이 검증을 못 넘으면 오류를 내지 않는다. `rules`로 돌아간다. 로그에는 예외 종류와 HTTP 상태만 남기고 키·본문은 남기지 않는다.
 
 ### 저장
 
-새 테이블이나 컬럼은 만들지 않는다. 고르기에서 고른 것만 `challenge_recommendations`에 새 행으로 저장하고, 이미 있는 세 칸을 쓴다. 질문·자유 대화는 저장하지 않는다.
+새 테이블이나 컬럼은 만들지 않는다. 고르기에서 고른 것만 `challenge_recommendations`에 새 행으로 저장하고, 이미 있는 세 칸을 쓴다. 질문·답 과정은 저장하지 않는다(답은 `conversation_snapshot.answers` 에만 남는다).
 
 | 컬럼 | 넣는 값 |
 | --- | --- |
-| `conversation_snapshot` | `policy_version`(`RAG-CHAT-20261101-v3`) · `fingerprint` · `answers` · `asked` · `card_versions` · `model_version`(예측 모델) · `health_record_id` · `reason` · `reason_replaced` · `probability` |
+| `conversation_snapshot` | `policy_version`(`RAG-CHAT-20261101-v4`) · `fingerprint` · `answers` · `asked` · `card_versions` · `model_version`(예측 모델) · `health_record_id` · `reason` · `reason_replaced` · `probability` |
 | `llm_model_version` | 판단에 쓴 LLM 식별자 (32자 이내, 예: `gpt-4o`). 후보가 1개라 부르지 않았어도 남긴다(`probability` 1) |
 | `evidence_card_ids` | 근거로 쓴 승인 카드 ID 배열 (`C01`\~`C48`) |
 
 - `source_type`은 원래 값(`prediction_personal` · `diagnosis_global`)을 그대로 둔다. 대화를 거쳤다고 `conversation`으로 바꾸지 않는다 (10/13 A·D 합의).
 - `proposed_goal`은 규칙 추천이 정한 개인 목표 단계다(5절). 대화형 추천도 같은 값을 넣는다.
-- 같은 사용자·주기·건강기록·모델·카드 버전·대화·답변으로 다시 부르면 처음 저장한 결과를 돌려준다.
+- 같은 사용자·주기·건강기록·모델·카드 버전·답변으로 다시 부르면 처음 저장한 결과를 돌려준다.
 
 ### 설정
 
 | 환경 변수 | 기본 | 뜻 |
 | --- | --- | --- |
-| `CHALLENGE_CHAT_ENABLED` | `false` | 켜고 키가 있어야 LLM을 부른다. 아니면 자유 대화 `off`, 고르기 `rules`(질문도 하지 않는다) |
+| `CHALLENGE_CHAT_ENABLED` | `false` | 켜고 키가 있어야 LLM을 부른다. 아니면 `rules`(질문도 하지 않는다) |
 | `OPENAI_API_KEY` | 빈 값 | 로컬은 루트 `.env`(= `envs/.local.env`), 운영 서버는 `~/project/.env`. 예시 파일에는 넣지 않는다 |
 | `OPENAI_MODEL` | `gpt-4o` | 32자 이내 |
 
@@ -181,13 +174,13 @@ LLM 호출이 실패하거나(키 없음·키 오류·시간 초과) 응답이 �
 
 | 파일 | 하는 일 |
 | --- | --- |
-| `app/apis/v1/challenge_chat_routers.py` | 질문·고르기 · 자유 대화 API, 설정 점검 경고 |
-| `app/services/challenge_chat.py` | 질문·고르기·대화 흐름, 캐시, 저장 |
+| `app/apis/v1/challenge_chat_routers.py` | 질문·고르기 API, 설정 점검 경고 |
+| `app/services/challenge_chat.py` | 질문·고르기 흐름, 캐시, 저장 |
 | `app/services/challenge_selections.py` | 후보 라벨, 판단 확률 검증, 확률 순 선택, 이유 문장 검사 |
-| `app/services/page_index.py` | 카드·챌린지·단계표·질문 페이지. 카드 태그 검색, 질문 시드 랜덤 추출 |
+| `app/services/page_index.py` | 카드·챌린지·단계표·질문 페이지. 질문 시드 랜덤 추출 |
 | `app/services/monster_cohorts.py` | 캐릭터별 기록 묶음과 LLM에 넘기는 범주 요약 |
 | `app/services/rag_cards.py` | 카드·질문 페이지 스키마와 검사, 승인 카드 필터 |
-| `app/services/rag_provider.py` | OpenAI Responses API 어댑터(`chat` · `judge`) |
+| `app/services/rag_provider.py` | OpenAI Responses API 어댑터(`judge`) |
 | `docs/01_planning/chatbot/questions-20261101.json` | 질문 페이지 42장(답 키 21개 × 표현 2개). 질문 문장·선택지·이유 문장. 운영 이미지에도 복사한다 |
 | `docs/01_planning/chatbot/cards-20261026.json` | 카드 C01\~C48. 모두 승인(배수빈, 2026-10-26). 근거는 WHO 신체활동·건강한 식사·음주·흡연 팩트시트. 운영 이미지에도 복사한다 |
 | `scripts/evaluate_rag_preparation.py` | 외부 호출 없이 도는 고정 평가 54건 (`golden-cases-20261026.json`, 결과 `evaluation-20261026.json`) |
@@ -197,7 +190,7 @@ LLM 호출이 실패하거나(키 없음·키 오류·시간 초과) 응답이 �
 - 근거 출처는 `https://www.who.int/` 주소만 허용한다. 페이지에 실제로 있는 문장만 근거로 쓰고, 목표량·횟수는 팀 운영 기준이라고 `policy_note`에 적는다.
 - 지원 코드를 늘리면 질문 페이지(`questions-*.json`), 목표 고정 표(`FIXED_GOALS`), 승인 카드를 함께 넣어야 한다. 셋 중 하나가 빠지면 테스트가 실패한다.
 
-임베딩이나 벡터 DB 없이 작은 카드 묶음을 태그로 검색하는 방식이다. 검색 방식은 바꿔도 되지만, 위 입출력과 검증은 지킨다.
+임베딩이나 벡터 DB 없이, 후보마다 승인 카드를 붙여 판단 모델에 넘긴다. 사용자가 쓴 글이 없어 태그 검색은 쓰지 않는다. 카드 선택 방식은 바꿔도 되지만, 위 입출력과 검증은 지킨다.
 
 새 챌린지 만들기, 목표량·난이도·단계·점수 바꾸기, 위험도·위협도를 말하거나 진단처럼 말하기는 자동화하지 않는다.
 
