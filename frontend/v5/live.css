@@ -1657,15 +1657,6 @@ body {
   border-top-left-radius: 6px;
   background: #fff;
 }
-.chat-bubble.me {
-  align-self: flex-end;
-  max-width: 80%;
-  border-top-right-radius: 6px;
-  background: #f0ecfe;
-}
-.chat-bubble.me.turn {
-  margin-top: 14px;
-}
 .chat-bubble.notice {
   color: var(--muted);
 }
@@ -1792,62 +1783,12 @@ body.reduce-motion .chat-typing i {
 }
 .chat-medical {
   margin: 0;
-  padding: 8px 20px 0;
-  color: #7a4a12;
-  font-size: 12px;
-}
-.chat-full {
-  margin: 6px 20px 0;
-}
-.chat-select {
-  min-height: 48px;
-  margin: 8px 20px 0;
-}
-.chat-form {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  /* 자유 입력창이 없어 의료 안내가 맨 아래에 붙는다 */
+  padding: 8px 20px calc(12px + env(safe-area-inset-bottom));
   border-top: 1px solid #e1e3ee;
   background: #fff;
-}
-/* 질문에 다 답하기 전에는 자유 입력을 숨긴다. display:flex 가 hidden 속성을 덮어 다시 적는다 */
-.chat-form[hidden] {
-  display: none;
-}
-.chat-form textarea {
-  flex: 1 1 auto;
-  min-height: 44px;
-  max-height: 120px;
-  padding: 10px 14px;
-  border: 1px solid #e1e3ee;
-  border-radius: 14px;
-  color: var(--ink);
-  font:
-    16px/1.5 Pretendard,
-    sans-serif;
-  resize: none;
-}
-.chat-count {
-  align-self: center;
-  color: var(--muted);
+  color: #7a4a12;
   font-size: 12px;
-  white-space: nowrap;
-}
-.chat-send {
-  flex: none;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 12px;
-  background: #f0ecfe;
-  color: #5542b5;
-  font-size: 20px;
-  font-weight: 700;
-}
-.chat-send:disabled {
-  opacity: 0.5;
 }
 /* 전투 화면 오른쪽 위에서 공략 도우미로(왼쪽 '← 마을 지도'와 마주 보게) */
 .quest-chat-open {
