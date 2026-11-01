@@ -1,9 +1,12 @@
-"""질의 챗봇. 두 단계로 나눈다.
+"""질의 챗봇. 선택형 질문을 먼저 하고, 자유 대화는 질문 뒤에 덧붙일 수 있다.
 
-1. 대화(reply): 사용자가 자유롭게 묻고 GPT 가 Page Index 페이지 안에서 대화하며 상황을 묻는다. 아무것도 저장하지 않는다.
-2. 선택(select): 대화 결과를 입력으로 디시전 모델이 고를 수 있는 코드 중에서만 고른다.
-   출력은 enum 으로 묶은 JSON 스키마로 제한하고, 서버가 스키마·코드·카드를 다시 검사한다.
+1. 선택(select): Page Index 의 질문 페이지를 열린 요인 가지에서 사용자·주기로 고정한 시드로 한 장씩 랜덤으로 고른다.
+   사용자는 선택지를 눌러 답한다(최대 3개). 모두 답하면 '할 수 있어요'로 남은 챌린지만 후보가 되고,
+   판단 모델이 후보 라벨에 대한 확률(logprobs)만 내서 서버가 확률 순으로 최대 3개를 고른다. 문장은 만들지 않는다.
+   이유 문장은 답한 질문 페이지의 문장, 근거 카드는 그 챌린지의 승인 카드다.
    고른 챌린지의 목표 값은 규칙(지난 주기 수행률로 정한 단계, 없으면 마스터)이 채워 추천 행으로 저장·서빙한다.
+2. 대화(reply): 질문 뒤 사용자가 자유롭게 묻고 GPT 가 Page Index 페이지 안에서 답한다. 아무것도 저장하지 않는다.
+   대화는 다시 고를 때 판단 모델 입력과 카드 검색에 함께 들어간다.
 
 질문·대화는 이메일·전화번호·긴 숫자를 가린 뒤 보낸다. 건강 수치·확률·진단 여부·이름은 보내지 않는다.
 실패하면 규칙 추천(mode=rules)으로 돌아간다.
@@ -30,21 +33,22 @@ from app.services.challenge_goals import display_goal
 from app.services.challenge_selections import (
     MAX_REPLY_LENGTH,
     ValidatedSelection,
-    decision_schema,
+    candidate_labels,
     goal_numbers,
     has_unsafe_claim,
-    validate_selections,
+    rank_selections,
+    validate_judgment,
 )
 from app.services.conversation_recommendations import ConversationRecommendationService
 from app.services.monster_cohorts import MonsterCohortService
 from app.services.page_index import MAX_QUERY_LENGTH, Page, PageIndex
-from app.services.rag_cards import SUPPORTED_CODES, EvidenceCard, SituationAnswers, questions_for
+from app.services.rag_cards import ANSWER_FIELDS, SUPPORTED_CODES, EvidenceCard, QuestionPage, SituationAnswers
 from app.services.rag_provider import ChatProvider, failure_label
 from app.services.recommendations import EligibleChallenges, GeneratedRecommendations, RecommendationService
 
 logger = logging.getLogger(__name__)
 
-CHAT_POLICY_VERSION = "RAG-CHAT-20261028-v2"
+CHAT_POLICY_VERSION = "RAG-CHAT-20261101-v3"
 #: 선택 단계에 넘길 근거 카드 수. 후보마다 한 장은 먼저 넣는다
 MAX_CONTEXT_CARDS = 12
 
@@ -52,9 +56,9 @@ ChatMode = Literal["conversation", "rules", "ask", "hold"]
 ReplyMode = Literal["chat", "off"]
 
 FALLBACK_ANSWERS: dict[str, str] = {
-    "conversation": "나눈 대화에 맞춰 챌린지를 골랐어요.",
+    "conversation": "답해 주신 내용에 맞춰 챌린지를 골랐어요.",
     "rules": "지금 받은 추천을 그대로 보여 드릴게요.",
-    "ask": "추천을 맞추려고 몇 가지만 여쭤볼게요.",
+    "ask": "하나만 골라 주세요.",
     "hold": "지금은 새 추천을 잠시 미룰게요. 진행 중인 챌린지를 무리 없이 이어가 주세요.",
 }
 FALLBACK_REPLIES: dict[str, str] = {
@@ -96,7 +100,7 @@ class ChatResult:
     mode: ChatMode
     answer: str
     recommendations: GeneratedRecommendations
-    questions: list[dict[str, str]]
+    questions: list[dict[str, Any]]
     reasons: dict[int, str]
     sources: list[str]
 
@@ -156,9 +160,9 @@ class ChallengeChatService:
         feasible = self._feasible(found)
         if answers.activity_limited:
             return self._result("hold", found.batch([]))
-        questions = questions_for(set(feasible), answers, asked)
-        if questions:
-            return self._result("ask", found.batch([]), questions=questions)
+        question = self.index.next_question(set(feasible), answers, asked, f"{user.id}:{found.cycle.id}")
+        if question is not None:
+            return self._result("ask", found.batch([]), questions=[question_body(question)])
         selectable = {code: challenge for code, challenge in feasible.items() if answers.supports(code)}
 
         conversation = redact_messages(messages)
@@ -170,22 +174,20 @@ class ChallengeChatService:
         }
         if not selectable:
             return self._result("rules", await self.current_batch(user))
+        labels = candidate_labels(set(selectable))
         cohort = (await self.cohorts.build(user.id)).get(found.monster.code)
         context = {
             "conversation": conversation,
             "answers": {key: value for key, value in answers.model_dump().items() if value != "unknown"},
             "cohort": self.cohorts.llm_context(cohort) if cohort else None,
             "candidates": [
-                candidate_context(challenge, found.goals.get(challenge.id))
-                for _, challenge in sorted(selectable.items())
+                {"label": label, **candidate_context(selectable[code], found.goals.get(selectable[code].id))}
+                for label, code in labels.items()
             ],
             "cards": [
                 {"card_id": c.card_id, "challenge_code": c.challenge_code, "guidance": c.guidance} for c in cards
             ],
         }
-        schema = decision_schema(
-            {code: [card.card_id for card in cards if card.challenge_code == code] for code in selectable}
-        )
         record_id = await self.conversation._record_id(user.id)
         fingerprint = _fingerprint(
             context=context,
@@ -204,8 +206,17 @@ class ChallengeChatService:
             return replace(cached, sources=sources)
         try:
             served = {code: goal_numbers(display_goal(c, found.goals.get(c.id))) for code, c in selectable.items()}
-            output = await self.provider.decide(context, schema)
-            decided = validate_selections(output, selectable, cards, answers, served)
+            # 후보가 하나면 고를 것이 없어 판단 모델을 부르지 않는다
+            if len(labels) == 1:
+                probabilities = {code: 1.0 for code in labels.values()}
+            else:
+                probabilities = validate_judgment(await self.provider.judge(context, list(labels)), labels)
+            given = answers.model_dump()
+            reasons = {
+                code: self.index.question_page(ANSWER_FIELDS[code]).reason_for(given[ANSWER_FIELDS[code]])
+                for code in selectable
+            }
+            decided = rank_selections(probabilities, selectable, cards, answers, reasons, served)
         except (ValueError, AppError, OSError, TimeoutError, httpx.HTTPError) as exc:
             # 모델 실패 내용·대화 원문·토큰을 로그에 남기지 않는다.
             # 키 오류(401)·모델 이름 오류(404)를 알 수 있게 예외 종류와 상태만 남긴다
@@ -347,6 +358,7 @@ class ChallengeChatService:
                         "health_record_id": record_id,
                         "reason": selection.reason,
                         "reason_replaced": selection.reason_replaced,
+                        "probability": round(selection.probability, 4),
                     },
                 )
                 rows.append(row)
@@ -358,10 +370,20 @@ class ChallengeChatService:
         mode: ChatMode,
         generated: GeneratedRecommendations,
         *,
-        questions: list[dict[str, str]] | None = None,
+        questions: list[dict[str, Any]] | None = None,
         sources: list[str] | None = None,
     ) -> ChatResult:
         return ChatResult(mode, FALLBACK_ANSWERS[mode], generated, questions or [], {}, sources or [])
+
+
+def question_body(question: QuestionPage) -> dict[str, Any]:
+    """화면에 그릴 질문 한 장. 선택지 문구도 질문 페이지에서 온다. 이유 문장은 보내지 않는다."""
+    return {
+        "key": question.answer_key,
+        "question_id": question.question_id,
+        "text": question.text,
+        "options": [{"value": option.value, "label": option.label} for option in question.options],
+    }
 
 
 def candidate_context(challenge: Challenge, proposed_goal: dict[str, Any] | None) -> dict[str, Any]:

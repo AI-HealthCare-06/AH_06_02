@@ -2,12 +2,13 @@
 
 - select: 대화형 추천. 승인 카드의 키만 고른다
 - chat: 질의 챗봇 1단계. 자유 대화 문장을 돌려준다
-- decide: 질의 챗봇 2단계(디시전 모델). 서버가 만든 enum 스키마 안의 JSON 만 돌려준다
+- judge: 질의 챗봇 2단계(판단 모델). 후보 라벨 하나를 고르는 1토큰의 logprobs 로 라벨별 확률만 돌려준다
 
 어느 쪽이든 서버가 다시 검사한다. 목표 단계표·설명 원문·보상은 서버에서 정한다.
 """
 
 import json
+import math
 from typing import Any, Protocol
 
 import httpx
@@ -26,31 +27,19 @@ CHAT_INSTRUCTIONS = (
     "한 번에 3~4문장 이내의 한국어로 답하세요."
 )
 
-DECISION_INSTRUCTIONS = (
-    "당신은 챌린지 선택기입니다. conversation·answers·cohort 를 보고 candidates 중 사용자에게 맞는 챌린지를 "
-    "최대 3개 고르세요. challenge_code 는 candidates 의 코드만, evidence_card_ids 는 같은 challenge_code 의 cards 만 "
-    "쓰세요. 목표 값은 고르지 않습니다(served_goal 은 앱이 정한 값입니다). "
-    "reason 은 그 카드 guidance 를 근거로 사용자에게 건네는 존댓말 한 문장입니다. "
-    "guidance 는 운영 기준 문장이니 그대로 옮기거나 '~라고 답한 경우', '~를 제안한다' 같은 말투를 따라 쓰지 마세요. "
-    "숫자는 그 후보의 served_goal 값과 같을 때만 쓰고, 질병·치료·위험도·효과는 말하지 마세요. "
-    "맞는 후보가 없으면 selections 를 비우세요."
+JUDGE_INSTRUCTIONS = (
+    "당신은 챌린지 판단기입니다. answers 는 사용자가 선택형 질문에 직접 고른 답이고, conversation 은 덧붙인 말, "
+    "cohort 는 지난 수행 요약, cards 는 각 후보의 운영 근거입니다. 이것을 보고 candidates 중 지금 이 사용자에게 "
+    "가장 알맞은 챌린지 하나를 고르세요. 그 후보의 label 한 글자만 출력하고 다른 글자는 쓰지 마세요."
 )
 
-#: 질의 챗봇 온도. 선택 단계는 같은 입력에 같은 결정을 내도록 0 으로 둔다
+#: 질의 챗봇 온도. 판단 단계는 같은 입력에 같은 분포를 내도록 0 으로 둔다
 CHAT_TEMPERATURE = 0.5
-DECISION_TEMPERATURE = 0.0
-
-
-#: 구조화 출력이 받지 않을 수 있는 키. 길이는 서버가 다시 검사한다
-UNSENT_SCHEMA_KEYS = frozenset({"maxLength", "minLength"})
-
-
-def strict_schema(schema: Any) -> Any:
-    if isinstance(schema, dict):
-        return {key: strict_schema(value) for key, value in schema.items() if key not in UNSENT_SCHEMA_KEYS}
-    if isinstance(schema, list):
-        return [strict_schema(item) for item in schema]
-    return schema
+JUDGE_TEMPERATURE = 0.0
+#: logprobs 로 받을 상위 토큰 수(API 최대값). 후보는 질문 수(최대 3개)만큼이라 모두 담긴다
+JUDGE_TOP_LOGPROBS = 20
+#: Responses API 의 최소 출력 토큰. 실제로는 첫 토큰(라벨)만 읽는다
+JUDGE_MAX_TOKENS = 16
 
 
 def failure_label(exc: BaseException) -> str:
@@ -71,7 +60,7 @@ class ChatProvider(Protocol):
 
     async def chat(self, context: dict[str, Any], messages: list[dict[str, str]]) -> str: ...
 
-    async def decide(self, context: dict[str, Any], schema: dict[str, Any]) -> object: ...
+    async def judge(self, context: dict[str, Any], labels: list[str]) -> dict[str, float]: ...
 
 
 class OpenAISelectionProvider:
@@ -127,16 +116,28 @@ class OpenAISelectionProvider:
         )
         return self._text(result)
 
-    async def decide(self, context: dict[str, Any], schema: dict[str, Any]) -> object:
-        """2단계 디시전 모델. 출력은 schema(enum 으로 묶은 코드·카드) 안의 JSON 하나다."""
+    async def judge(self, context: dict[str, Any], labels: list[str]) -> dict[str, float]:
+        """2단계 판단 모델. 첫 출력 토큰의 상위 logprobs 를 라벨별 확률로 바꾼다. 문장은 쓰지 않는다.
+
+        context 의 candidates 에는 label 이 붙어 있다. 라벨이 아닌 토큰은 버리고, 라벨이 하나도 없으면 ValueError.
+        """
         content = json.dumps(context, ensure_ascii=False, default=str)
         result = await self._call(
-            [{"role": "system", "content": DECISION_INSTRUCTIONS}, {"role": "user", "content": content}],
-            {"type": "json_schema", "name": "challenge_decision", "strict": True, "schema": strict_schema(schema)},
-            600,
-            DECISION_TEMPERATURE,
+            [{"role": "system", "content": JUDGE_INSTRUCTIONS}, {"role": "user", "content": content}],
+            None,
+            JUDGE_MAX_TOKENS,
+            JUDGE_TEMPERATURE,
+            top_logprobs=JUDGE_TOP_LOGPROBS,
         )
-        return json.loads(self._text(result))
+        first = self._first_token(result)
+        probabilities: dict[str, float] = {}
+        for item in first.get("top_logprobs") or [first]:
+            token = str(item.get("token", "")).strip()
+            if token in labels:
+                probabilities[token] = probabilities.get(token, 0.0) + math.exp(float(item["logprob"]))
+        if not probabilities:
+            raise ValueError("판단 모델 출력에 후보 라벨이 없습니다.")
+        return probabilities
 
     async def _respond(
         self, system: str, content: str, schema_name: str, schema: dict[str, Any], max_tokens: int
@@ -155,6 +156,8 @@ class OpenAISelectionProvider:
         text_format: dict[str, Any] | None,
         max_tokens: int,
         temperature: float | None,
+        *,
+        top_logprobs: int | None = None,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": self.model_version,
@@ -166,6 +169,9 @@ class OpenAISelectionProvider:
             payload["text"] = {"format": text_format}
         if temperature is not None:
             payload["temperature"] = temperature
+        if top_logprobs is not None:
+            payload["top_logprobs"] = top_logprobs
+            payload["include"] = ["message.output_text.logprobs"]
         async with httpx.AsyncClient(timeout=12, transport=self._transport) as client:
             response = await client.post(self._url, json=payload, headers={"Authorization": f"Bearer {self._api_key}"})
             response.raise_for_status()
@@ -173,6 +179,17 @@ class OpenAISelectionProvider:
         if result.get("status") != "completed":
             raise ValueError("모델 응답이 완료되지 않았습니다.")
         return result
+
+    @classmethod
+    def _first_token(cls, result: dict[str, Any]) -> dict[str, Any]:
+        """출력 문장의 첫 토큰 logprobs 항목. 응답에 logprobs 가 없으면 ValueError."""
+        cls._text(result)
+        for message in result.get("output", []):
+            for item in message.get("content", []):
+                if item.get("type") == "output_text" and item.get("logprobs"):
+                    first: dict[str, Any] = item["logprobs"][0]
+                    return first
+        raise ValueError("판단 모델 응답에 logprobs 가 없습니다.")
 
     @staticmethod
     def _text(result: dict[str, Any]) -> str:
