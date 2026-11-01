@@ -1812,6 +1812,10 @@ body.reduce-motion .chat-typing i {
   border-top: 1px solid #e1e3ee;
   background: #fff;
 }
+/* 질문에 다 답하기 전에는 자유 입력을 숨긴다. display:flex 가 hidden 속성을 덮어 다시 적는다 */
+.chat-form[hidden] {
+  display: none;
+}
 .chat-form textarea {
   flex: 1 1 auto;
   min-height: 44px;

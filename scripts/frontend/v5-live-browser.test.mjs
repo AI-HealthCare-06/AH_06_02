@@ -338,34 +338,67 @@ async function mock(page, state = {}) {
         reply: "식후에 잠깐 걷는 걸로 시작해 볼까요?",
         sources: [],
       };
-    } else if (p === "/challenge-chat/select")
-      // 처음에는 상황 질문 하나를 묻고, 답이 오면 고른 챌린지를 준다
-      data = body.asked.length
+    } else if (p === "/challenge-chat/select") {
+      // 실제 서버처럼 질문을 한 장씩 묻고(선택지도 서버가 준다), 다 답하면 고른 챌린지를 준다
+      if (state.chatFull)
+        return route.fulfill({
+          status: 409,
+          json: {
+            success: false,
+            error: {
+              code: "CHLG_RECOMMENDATION_UNAVAILABLE",
+              message:
+                "현재 주기에 추가로 시작할 수 있는 챌린지가 없어요. 진행 중인 챌린지를 이어가세요.",
+              reason: "slots_unavailable",
+            },
+          },
+        });
+      const pages = [
+        {
+          key: "meal_walk",
+          question_id: "Q-meal_walk-2",
+          text: "점심과 저녁을 먹은 뒤에 잠깐씩 걸을 시간이 있나요?",
+          options: [
+            { value: "both", label: "점심·저녁 모두 돼요" },
+            { value: "lunch_only", label: "점심만 돼요" },
+            { value: "none", label: "어려워요" },
+            { value: "limited", label: "몸 상태 때문에 어려워요" },
+          ],
+        },
+        {
+          key: "stairs",
+          question_id: "Q-stairs-1",
+          text: "회사나 역처럼 자주 가는 곳에서 엘리베이터 대신 계단을 이용할 수 있나요?",
+          options: [
+            { value: "yes", label: "할 수 있어요" },
+            { value: "no", label: "어려워요" },
+            { value: "limited", label: "몸 상태 때문에 어려워요" },
+          ],
+        },
+      ];
+      const next = pages[body.asked.length];
+      data = next
         ? {
+            mode: "ask",
+            answer: "하나만 골라 주세요.",
+            questions: [next],
+            items: [],
+            total: 0,
+            sources: [],
+            model_version: "test",
+            remaining_slots: 2,
+          }
+        : {
             mode: "conversation",
-            answer: "나눈 대화에 맞춰 골랐어요.",
+            answer: "답해 주신 내용에 맞춰 챌린지를 골랐어요.",
             questions: [],
             items: state.chatPicks || [],
             total: (state.chatPicks || []).length,
             sources: [],
             model_version: "test",
             remaining_slots: 2,
-          }
-        : {
-            mode: "ask",
-            answer: "몇 가지만 확인할게요.",
-            questions: [
-              {
-                key: "meal_walk",
-                text: "점심과 저녁 식후에 각각 10분씩 걷는 것이 가능한가요?",
-              },
-            ],
-            items: [],
-            total: 0,
-            sources: [],
-            model_version: "test",
-            remaining_slots: 2,
           };
+    }
     else if (p === "/challenge-recommendations/generate") {
       if (state.full)
         return route.fulfill({
@@ -972,7 +1005,7 @@ const card = (overrides) => ({
   ...overrides,
 });
 
-test("공략 도우미는 대화 → 상황 질문 → 고른 챌린지 → 전투 카드와 같은 상세로 이어진다", async () =>
+test("공략 도우미는 열자마자 질문을 한 장씩 묻고, 눌러서 다 답하면 고른 챌린지 → 전투 카드와 같은 상세로 이어진다", async () =>
   withPage(async (page, base) => {
     const calls = await mock(page, {
       chatPicks: [
@@ -980,7 +1013,7 @@ test("공략 도우미는 대화 → 상황 질문 → 고른 챌린지 → 전�
           recommendation_id: 77,
           challenge_id: 1,
           title: "식후 걷기",
-          reason: "점심과 저녁에 10분씩 걸을 수 있다고 해서 골랐어요.",
+          reason: "점심과 저녁 식후에 걸을 시간이 있다고 하셔서 골랐어요.",
         }),
       ],
     });
@@ -988,25 +1021,40 @@ test("공략 도우미는 대화 → 상황 질문 → 고른 챌린지 → 전�
     await page.goto(new URL(path + "#reco", base).href);
     await page.locator(".quest-chat-open").click();
     await page.locator('.scene[data-page="chat"]:not([hidden])').waitFor();
-    // 대화 화면은 하단 메뉴를 숨기고 입력창이 맨 아래에 붙는다
+    // 대화 화면은 하단 메뉴를 숨긴다. 입력 없이 첫 질문이 바로 뜨고, 자유 입력은 아직 닫혀 있다
     assert.equal(await page.locator("#adventure-nav").isVisible(), false);
-    assert.equal(await page.locator(".chat-send").isDisabled(), true);
-    await page.locator("#chat-input").fill("점심 먹고 나면 졸려요");
+    await page.locator(".chat-question", { hasText: "잠깐씩 걸을 시간" }).waitFor();
+    assert.equal(await page.locator(".chat-form").isVisible(), false);
+    // 선택지 문구는 서버 질문 페이지 그대로다
+    assert.deepEqual(
+      await page.locator(".chat-question").last().locator(".chat-chip").allTextContents(),
+      ["점심·저녁 모두 돼요", "점심만 돼요", "어려워요", "몸 상태 때문에 어려워요"],
+    );
+    await page.locator(".chat-chip", { hasText: "점심·저녁 모두 돼요" }).click();
+    await page.locator(".chat-question", { hasText: "계단을 이용할 수" }).waitFor();
+    await page.locator(".chat-question").last().locator(".chat-chip", { hasText: "할 수 있어요" }).click();
+    const pick = page.locator(".chat-pick", { hasText: "식후 걷기" });
+    await pick.waitFor();
+    assert.match(await pick.textContent(), /고른 이유.*걸을 시간이 있다고/);
+    assert.equal(await page.locator(".chat-results h2").textContent(), "답에 맞춰 고른 챌린지");
+    const selects = calls.filter((c) => c.path === "/challenge-chat/select");
+    assert.deepEqual(
+      selects.map((c) => c.body.asked),
+      [[], ["meal_walk"], ["meal_walk", "stairs"]],
+    );
+    assert.deepEqual(selects.at(-1).body.answers, { meal_walk: "both", stairs: "yes" });
+    assert.deepEqual(selects.at(-1).body.messages, []);
+    // 결과를 본 뒤에 자유 입력이 열린다. 대화하면 대화까지 반영해 다시 고를 수 있다
+    assert.equal(await page.locator(".chat-form").isVisible(), true);
+    await page.locator("#chat-input").fill("회사 계단이 좁아요");
     await page.locator(".chat-send").click();
     await page.locator(".chat-bubble.ai", { hasText: "식후에 잠깐" }).waitFor();
     await page.locator(".chat-select").click();
-    await page.locator(".chat-chip", { hasText: "점심·저녁 모두 돼요" }).click();
-    const pick = page.locator(".chat-pick", { hasText: "식후 걷기" });
-    await pick.waitFor();
-    assert.match(await pick.textContent(), /고른 이유.*10분씩/);
-    const last = calls.filter((c) => c.path === "/challenge-chat/select").at(-1);
-    assert.deepEqual(last.body.answers, { meal_walk: "both" });
-    assert.deepEqual(last.body.asked, ["meal_walk"]);
-    assert.deepEqual(
-      last.body.messages.map((m) => m.role),
-      ["user", "assistant"],
-    );
-    await pick.click();
+    await page.locator(".chat-results").nth(1).waitFor();
+    const again = calls.filter((c) => c.path === "/challenge-chat/select").at(-1);
+    assert.deepEqual(again.body.messages.map((m) => m.role), ["user", "assistant"]);
+    assert.deepEqual(again.body.asked, ["meal_walk", "stairs"]);
+    await page.locator(".chat-pick", { hasText: "식후 걷기" }).first().click();
     await page.locator(".today h1", { hasText: "식후 걷기" }).waitFor();
     assert.equal(await page.locator("[data-live-start]").count(), 1);
   }));
@@ -1017,8 +1065,7 @@ test("슬롯이 다 찬 계정은 공략 도우미에서 오류색 없이 진행
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(new URL(path + "#chat", base).href);
     await page.locator('.scene[data-page="chat"]:not([hidden])').waitFor();
-    await page.locator("#chat-input").fill("뭐부터 하면 좋을까요?");
-    await page.locator(".chat-send").click();
+    // 열자마자 묻는 첫 요청이 409 면 질문 대신 안내한다
     await page
       .locator(".chat-bubble.notice", { hasText: "진행 중인 챌린지를 이어가세요" })
       .waitFor();
@@ -1026,7 +1073,7 @@ test("슬롯이 다 찬 계정은 공략 도우미에서 오류색 없이 진행
       await page.locator('.chat-log [data-main-target="home"]').isVisible(),
       true,
     );
-    assert.equal(await page.locator("#chat-input").isDisabled(), true);
+    assert.equal(await page.locator(".chat-form").isVisible(), false);
     assert.equal(await page.locator(".chat-select").isVisible(), false);
   }));
 

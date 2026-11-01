@@ -395,7 +395,14 @@ async function go(id, push = true) {
     if (id === "progress") await renderGrowth(ticket);
     scene.classList.remove("live-loading");
   } else if (id === "health") fillProfile();
-  else if (id === "chat") renderChat();
+  else if (id === "chat") {
+    renderChat();
+    // 열자마자 첫 질문을 받는다. 대화 없이 선택형 질문부터 시작한다
+    if (!chat.started && !chat.closed) {
+      chat.started = true;
+      askChat("select");
+    }
+  }
   $$(".user-name").forEach(
     (el) =>
       (el.textContent =
@@ -1639,35 +1646,9 @@ function renderDrawReceipt(receipt) {
 // 대화는 메모리에만 둔다(localStorage·sessionStorage 금지). 새로고침·로그아웃하면 사라진다
 const CHAT_LIMIT = 12; // 서버 MAX_CHAT_MESSAGES
 const CHAT_MAX_LENGTH = 400;
-const CHAT_PHYSICAL = new Set([
-  "meal_walk",
-  "transit",
-  "movement_breaks",
-  "stairs",
-  "strength",
-  "evening_walk",
-  "housework",
-  "squat",
-  "wall_pushup",
-  "stand_call",
-  "screen_break",
-]);
-// 선택형 질문의 답(app/services/rag_cards.py SituationAnswers). 나머지는 예/아니요
-const CHAT_OPTIONS = {
-  meal_walk: [
-    ["both", "점심·저녁 모두 돼요"],
-    ["lunch_only", "점심만 돼요"],
-    ["dinner_only", "저녁만 돼요"],
-    ["none", "어려워요"],
-  ],
-  movement_breaks: [
-    ["three", "하루 세 번 돼요"],
-    ["less", "그보다 적게 돼요"],
-    ["none", "어려워요"],
-  ],
-};
+// 질문·선택지는 서버 질문 페이지(docs/01_planning/chatbot/questions-*.json)에서 온다. 화면은 받은 대로 그린다
 const CHAT_WELCOME =
-  "하루 일과를 편하게 들려주세요. 지금 시작할 만한 챌린지를 함께 골라 볼게요. 이 대화는 저장하지 않아서 화면을 새로 열면 사라져요.";
+  "몇 가지만 눌러서 답해 주세요. 답에 맞는 챌린지를 골라 드릴게요. 이 대화는 저장하지 않아서 화면을 새로 열면 사라져요.";
 const chat = {};
 function resetChat() {
   Object.assign(chat, {
@@ -1677,18 +1658,10 @@ function resetChat() {
     view: [{ kind: "ai", tone: "notice", text: CHAT_WELCOME }],
     pending: false,
     closed: false,
+    started: false,
   });
 }
 resetChat();
-function chatOptions(key) {
-  const base = CHAT_OPTIONS[key] || [
-    ["yes", "할 수 있어요"],
-    ["no", "어려워요"],
-  ];
-  return CHAT_PHYSICAL.has(key)
-    ? [...base, ["limited", "몸 상태 때문에 어려워요"]]
-    : base;
-}
 function chatItemHtml(item, index, previous) {
   const ai = item.kind !== "me";
   const turn = !previous || (previous.kind !== "me") !== ai;
@@ -1702,18 +1675,16 @@ function chatItemHtml(item, index, previous) {
     return `${label}<div class="chat-bubble ai"><p>${escape(item.answer)}</p>${item.questions
       .map(
         (q) =>
-          `<fieldset class="chat-question"><legend>${escape(q.text)}</legend><div class="chat-chips">${chatOptions(
-            q.key,
-          )
+          `<fieldset class="chat-question"><legend>${escape(q.text)}</legend><div class="chat-chips">${q.options
             .map(
-              ([value, text]) =>
-                `<button type="button" class="chat-chip" data-chat-answer="${escape(q.key)}" data-value="${escape(value)}" aria-pressed="${chat.answers[q.key] === value}"${item.done ? " disabled" : ""}>${escape(text)}</button>`,
+              (option) =>
+                `<button type="button" class="chat-chip" data-chat-answer="${escape(q.key)}" data-value="${escape(option.value)}" aria-pressed="${chat.answers[q.key] === option.value}"${item.done ? " disabled" : ""}>${escape(option.label)}</button>`,
             )
             .join("")}</div></fieldset>`,
       )
       .join("")}</div>`;
   if (item.kind === "results")
-    return `${label}<p class="chat-bubble ai">${escape(item.answer)}</p><section class="chat-results"><h2>${item.mode === "conversation" ? "대화로 고른 챌린지" : "추천 챌린지"}</h2>${item.mode === "rules" ? '<p class="chat-note">지금은 대화로 고르지 못해 추천 목록을 보여 드려요.</p>' : ""}${
+    return `${label}<p class="chat-bubble ai">${escape(item.answer)}</p><section class="chat-results"><h2>${item.mode === "conversation" ? "답에 맞춰 고른 챌린지" : "추천 챌린지"}</h2>${item.mode === "rules" ? '<p class="chat-note">지금은 대화로 고르지 못해 추천 목록을 보여 드려요.</p>' : ""}${
       item.items
         .map(
           (pick, at) =>
@@ -1738,7 +1709,7 @@ function renderChat() {
   if (!scene) return;
   const log = scene.querySelector(".chat-log");
   log.innerHTML =
-    '<h1>공략 도우미</h1><p class="small-copy chat-intro">하루 일과를 들려주면 지금 시작할 만한 챌린지를 함께 골라요.</p>' +
+    '<h1>공략 도우미</h1><p class="small-copy chat-intro">질문에 눌러서 답하면 지금 시작할 만한 챌린지를 골라요.</p>' +
     chat.view
       .map((item, index) => chatItemHtml(item, index, chat.view[index - 1]))
       .join("");
@@ -1751,6 +1722,10 @@ function renderChat() {
     chat.closed ||
     ["results", "questions", "hold"].includes(last);
   scene.querySelector(".chat-full").hidden = !full || chat.closed;
+  // 자유 입력은 질문에 다 답하고 결과를 본 뒤에 연다
+  scene.querySelector(".chat-form").hidden = !chat.view.some(
+    (item) => item.kind === "results",
+  );
   const input = scene.querySelector(".chat-form textarea");
   input.disabled = chat.pending || chat.closed || full;
   scene.querySelector(".chat-send").disabled =
@@ -2161,7 +2136,7 @@ $(".health h1")?.nextElementSibling?.replaceChildren(
 // 공략 도우미 화면(대화). 하단 메뉴는 숨기고 입력창을 맨 아래에 둔다(design.md 13절)
 $("#screen").insertAdjacentHTML(
   "beforeend",
-  `<section class="scene chat" data-page="chat" hidden><div class="chat-shell"><div class="chat-log" role="log" aria-live="polite"></div><p class="chat-medical">건강 수치·질환 판단은 하지 않아요. 진단·치료는 의료진과 상의해 주세요.</p><p class="chat-full small-copy" hidden>대화가 길어졌어요. 지금까지 내용으로 골라 볼까요?</p><button type="button" class="primary chat-select" data-chat-select hidden>이 대화로 챌린지 고르기</button><form class="chat-form" novalidate><label class="sr-only" for="chat-input">공략 도우미에게 보낼 말</label><textarea id="chat-input" rows="1" maxlength="${CHAT_MAX_LENGTH}" placeholder="하루 일과를 편하게 적어 주세요. 이름·연락처는 적지 말아 주세요."></textarea><span class="chat-count" hidden></span><button type="submit" class="chat-send" aria-label="보내기" disabled>↑</button></form></div></section>`,
+  `<section class="scene chat" data-page="chat" hidden><div class="chat-shell"><div class="chat-log" role="log" aria-live="polite"></div><p class="chat-medical">건강 수치·질환 판단은 하지 않아요. 진단·치료는 의료진과 상의해 주세요.</p><p class="chat-full small-copy" hidden>대화가 길어졌어요. 지금까지 내용으로 골라 볼까요?</p><button type="button" class="primary chat-select" data-chat-select hidden>이 대화까지 반영해 다시 고르기</button><form class="chat-form" novalidate><label class="sr-only" for="chat-input">공략 도우미에게 보낼 말</label><textarea id="chat-input" rows="1" maxlength="${CHAT_MAX_LENGTH}" placeholder="궁금한 점을 적어 주세요. 이름·연락처는 빼 주세요."></textarea><span class="chat-count" hidden></span><button type="submit" class="chat-send" aria-label="보내기" disabled>↑</button></form></div></section>`,
 );
 $("#chat-input").addEventListener("input", (event) =>
   sizeChatInput(event.target),
