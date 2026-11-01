@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import json
+from functools import cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -57,29 +58,10 @@ ANSWER_FIELDS = {
     "CH_SMOKE_FREE_HOME": "smoke_free_home",
     "CH_QUIT_REASON": "quit_reason",
 }
-QUESTION_TEXT = {
-    "meal_walk": "점심과 저녁 식후에 각각 10분씩 걷는 것이 가능한가요?",
-    "transit": "대중교통 이용일에 한 정거장 먼저 내려 걷는 것이 가능한가요?",
-    "movement_breaks": "앉아서 지내는 중간에 3분씩 하루 세 번 움직일 수 있나요?",
-    "stairs": "평소 다니는 곳에 계단이 있고, 하루 한 번 계단으로 올라갈 수 있나요?",
-    "strength": "하루 10분 맨몸 근력 운동을 할 시간과 공간이 있나요?",
-    "no_drink": "술을 마시지 않는 날을 정해서 그날 하루 지킬 수 있나요?",
-    "no_smoke": "피우지 않는 날을 정해서 그날 하루 시도해 볼 수 있나요?",
-    "evening_walk": "저녁에 20분 이어서 걸을 시간이 있나요?",
-    "housework": "청소처럼 몸을 쓰는 집안일을 15분 이어서 할 수 있나요?",
-    "squat": "의자를 뒤에 두고 앉았다 일어나기를 15회 할 수 있나요?",
-    "wall_pushup": "벽에 손을 짚고 팔굽혀펴기를 10회 할 수 있나요?",
-    "stand_call": "전화 통화를 서서 할 수 있나요?",
-    "screen_break": "영상을 볼 때 30분마다 일어날 수 있나요?",
-    "sweet_drink": "오늘 단 음료 대신 물을 마실 수 있나요?",
-    "late_snack": "저녁 식사 뒤로 야식을 먹지 않을 수 있나요?",
-    "home_alcohol": "오늘 집에 술을 사두지 않을 수 있나요?",
-    "alcohol_free": "저녁 식사 때 술 대신 다른 음료를 마실 수 있나요?",
-    "postpone_drinks": "오늘 술 약속이 있다면 미루거나 술 없는 만남으로 바꿀 수 있나요?",
-    "first_cig": "아침에 일어나 첫 담배를 30분 미룰 수 있나요?",
-    "smoke_free_home": "집 안과 차 안에서 피우지 않을 수 있나요?",
-    "quit_reason": "담배를 끊고 싶은 이유를 한 줄 적어 볼 수 있나요?",
-}
+#: 답 키 → 챌린지 코드. 질문 페이지가 어느 챌린지 가지에 붙는지 정한다
+CODE_BY_ANSWER_KEY = {field: code for code, field in ANSWER_FIELDS.items()}
+#: 질문 페이지 원본. 질문 문장·선택지·이유 문장은 코드가 아니라 이 파일에 둔다
+QUESTION_CORPUS = Path(__file__).resolve().parents[2] / "docs/01_planning/chatbot/questions-20261101.json"
 #: "예"라고 답하면 후보로 남는 질문. 식후 걷기·한 정거장·움직임 휴식은 답 종류가 달라 따로 본다
 YES_ANSWER_CODES = {
     code: field
@@ -129,6 +111,67 @@ class SituationAnswers(BaseModel):
         }.get(code, False)
 
 
+class QuestionOption(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    value: str = Field(min_length=1, max_length=20)
+    label: str = Field(min_length=1, max_length=40)
+    #: 이 답으로 챌린지가 남을 때 보여 줄 이유 문장. 챌린지를 남기는 답에만 두고, 서버는 문장을 만들지 않는다
+    reason: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class QuestionPage(BaseModel):
+    """선택형 질문 한 장. 같은 답 키에 표현이 다른 페이지를 여러 장 두고 그중 하나를 고른다."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    question_id: str = Field(min_length=1, max_length=40)
+    answer_key: str
+    text: str = Field(min_length=1, max_length=120)
+    options: list[QuestionOption] = Field(min_length=2, max_length=5)
+
+    @model_validator(mode="after")
+    def check_options(self) -> QuestionPage:
+        if self.answer_key not in CODE_BY_ANSWER_KEY:
+            raise ValueError(f"{self.question_id}: 알 수 없는 답 키입니다.")
+        allowed = set(get_args(SituationAnswers.model_fields[self.answer_key].annotation)) - {"unknown"}
+        values = [option.value for option in self.options]
+        if len(set(values)) != len(values) or not set(values) <= allowed:
+            raise ValueError(f"{self.question_id}: 선택지 값이 답 키의 값과 맞지 않습니다.")
+        # 몸을 쓰는 질문은 '몸 상태 때문에 어려워요'를 늘 함께 보여 보류로 이어지게 한다
+        if "limited" in allowed and "limited" not in values:
+            raise ValueError(f"{self.question_id}: 몸을 쓰는 질문에는 활동 제한 선택지가 있어야 합니다.")
+        code = CODE_BY_ANSWER_KEY[self.answer_key]
+        for option in self.options:
+            keeps = SituationAnswers.model_validate({self.answer_key: option.value}).supports(code)
+            if keeps != (option.reason is not None):
+                raise ValueError(f"{self.question_id}: 챌린지를 남기는 답에만 이유 문장을 둡니다.")
+        if not any(option.reason for option in self.options):
+            raise ValueError(f"{self.question_id}: 챌린지를 남기는 답이 하나는 있어야 합니다.")
+        return self
+
+    def reason_for(self, value: str) -> str | None:
+        return next((option.reason for option in self.options if option.value == value), None)
+
+
+def load_questions(path: Path) -> list[QuestionPage]:
+    pages = [QuestionPage.model_validate(item) for item in json.loads(path.read_text(encoding="utf-8"))]
+    if len({page.question_id for page in pages}) != len(pages):
+        raise ValueError("질문 페이지 ID가 중복되었습니다.")
+    if {page.answer_key for page in pages} != set(CODE_BY_ANSWER_KEY):
+        raise ValueError("답 키마다 질문 페이지가 한 장 이상 있어야 합니다.")
+    # 같은 답에는 어느 표현으로 물었든 같은 이유 문장을 보여 준다
+    reasons: dict[tuple[str, str], str | None] = {}
+    for page in pages:
+        for option in page.options:
+            if reasons.setdefault((page.answer_key, option.value), option.reason) != option.reason:
+                raise ValueError(f"{page.question_id}: 같은 답의 이유 문장이 페이지마다 다릅니다.")
+    return pages
+
+
+@cache
+def question_bank() -> tuple[QuestionPage, ...]:
+    return tuple(load_questions(QUESTION_CORPUS))
+
+
 class EvidenceCard(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     card_id: str = Field(min_length=1, max_length=32)
@@ -162,14 +205,21 @@ def load_cards(path: Path) -> list[EvidenceCard]:
 
 
 def questions_for(codes: set[str], answers: SituationAnswers, asked: list[str]) -> list[dict[str, str]]:
-    if len(asked) > 3 or len(set(asked)) != len(asked) or any(key not in QUESTION_TEXT for key in asked):
+    """대화형 추천(ConversationRecommendationService)의 질문. 답 키마다 첫 질문 페이지를 정해진 순서로 쓴다.
+
+    질의 챗봇은 PageIndex.next_question 으로 질문 페이지를 랜덤으로 고른다.
+    """
+    first: dict[str, QuestionPage] = {}
+    for page in question_bank():
+        first.setdefault(page.answer_key, page)
+    if len(asked) > 3 or len(set(asked)) != len(asked) or any(key not in first for key in asked):
         raise ValueError("질문 기록은 알려진 질문을 중복 없이 최대 세 개까지 사용합니다.")
     if answers.activity_limited:
         return []
     values = answers.model_dump()
     wanted = {ANSWER_FIELDS[code] for code in codes & SUPPORTED_CODES}
-    keys = [key for key in QUESTION_TEXT if key in wanted and values[key] == "unknown" and key not in asked]
-    return [{"key": key, "text": QUESTION_TEXT[key]} for key in keys[: 3 - len(asked)]]
+    keys = [key for key in ANSWER_FIELDS.values() if key in wanted and values[key] == "unknown" and key not in asked]
+    return [{"key": key, "text": first[key].text} for key in keys[: 3 - len(asked)]]
 
 
 def search_cards(

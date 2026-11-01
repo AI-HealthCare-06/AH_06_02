@@ -4,10 +4,10 @@
     uv run python -m scripts.rag.check_openai --base-url http://localhost:8000  # 3단계까지
 
 1. 설정: 저장소 루트 .env 에서 OPENAI_API_KEY · OPENAI_MODEL · CHALLENGE_CHAT_ENABLED 를 읽는다. 키 값은 출력하지 않는다
-2. 직접 호출: 개인정보가 없는 고정 예시 문맥으로 대화(자유 문장) 한 번, 선택(enum JSON 스키마) 한 번을 부르고
-   선택 출력이 스키마·코드·카드 안인지 본다
-3. 서버 흐름: 띄워 둔 API 에 새 계정으로 가입 → 건강정보 → 예측 → 대화(/challenge-chat) → 선택(/challenge-chat/select)
-   을 불러 mode=conversation 이고 서빙 JSON 에 규칙 값이 채워졌는지 본다.
+2. 직접 호출: 개인정보가 없는 고정 예시 문맥으로 대화(자유 문장) 한 번, 판단(라벨 1토큰 logprobs) 한 번을 부르고
+   판단 출력이 후보 라벨의 확률로 나오는지 본다. 모델·API 가 logprobs 를 주지 않으면 여기서 FAIL 이다
+3. 서버 흐름: 띄워 둔 API 에 새 계정으로 가입 → 건강정보 → 예측 → 선택형 질문(/challenge-chat/select)에 차례로 답하고
+   → 대화(/challenge-chat) → 다시 선택을 불러 mode=conversation 이고 서빙 JSON 에 규칙 값이 채워졌는지 본다.
    서버·워커·시드가 준비돼 있어야 한다(scripts/smoke.py 와 같은 전제). 서버는 .env 를 고친 뒤 다시 띄운다
 
 2단계는 실제 요금이 드는 호출을 두 번 보낸다. 3단계는 실행할 때마다 로컬 DB 에 계정을 하나 만든다.
@@ -17,14 +17,12 @@ import argparse
 import asyncio
 import sys
 import time
-from decimal import Decimal
 from typing import Any
 
 import httpx
-from pydantic import ValidationError
 
 from app.core import config
-from app.services.challenge_selections import ChatDecision, decision_schema, reason_is_safe
+from app.services.challenge_selections import candidate_labels, validate_judgment
 from app.services.page_index import CARD_CORPUS
 from app.services.rag_cards import load_cards
 from app.services.rag_provider import OpenAISelectionProvider
@@ -46,20 +44,8 @@ STAIRS = "CH_STAIRS"
 SAMPLE_MESSAGES = [
     {"role": "user", "content": "점심 먹고 사무실 근처를 걸을 시간이 있어요. 뭘 해 보면 좋을까요?"},
 ]
-#: 3단계에서 되묻기 질문에 줄 답. 모든 상황을 "가능"으로 둬 후보가 넓게 남게 한다
-YES_ANSWERS = {
-    "meal_walk": "both",
-    "transit": "yes",
-    "movement_breaks": "three",
-    **{
-        key: "yes"
-        for key in (
-            "stairs", "strength", "evening_walk", "housework", "squat", "wall_pushup", "stand_call", "screen_break",
-            "sweet_drink", "late_snack", "no_drink", "home_alcohol", "alcohol_free", "postpone_drinks", "no_smoke",
-            "first_cig", "smoke_free_home", "quit_reason",
-        )
-    },
-}  # fmt: skip
+#: 3단계에서 질문에 줄 답. 선택지 중 챌린지를 남기는 첫 값(yes·both·three)을 골라 후보가 넓게 남게 한다
+KEEP_VALUES = ("yes", "both", "three")
 QUERY = "점심 저녁 식후 걷기나 계단 오르기처럼 부담 없이 시작할 수 있는 걸 추천해 주세요"
 
 
@@ -83,47 +69,32 @@ def check_settings() -> str | None:
     return key
 
 
-def sample_context() -> tuple[dict[str, Any], dict[str, list[str]]]:
+def sample_context() -> tuple[dict[str, Any], dict[str, str]]:
     corpus = [card for card in load_cards(CARD_CORPUS) if card.status == "approved"]
     cards = [card for code in (WALK, STAIRS) for card in corpus if card.challenge_code == code][:4]
+    labels = candidate_labels({WALK, STAIRS})
+    goals = {
+        WALK: ("식후 걷기", "식후", "challenge", {"target_value": 10.0, "unit": "분", "daily_target_count": 2}),
+        STAIRS: ("계단 이용하기", "이동", "normal", {"target_value": None, "unit": None, "daily_target_count": 1}),
+    }
     context = {
         "conversation": SAMPLE_MESSAGES,
         "answers": {"meal_walk": "both", "stairs": "yes"},
         "cohort": {"monster": "viscera", "state": "normal", "is_target": True, "active": [], "history": []},
         "candidates": [
             {
-                "challenge_code": WALK,
-                "title": "식후 걷기",
-                "context_label": "식후",
-                "difficulty": "challenge",
-                "served_goal": {"target_value": 10.0, "unit": "분", "daily_target_count": 2},
-            },
-            {
-                "challenge_code": STAIRS,
-                "title": "계단 이용하기",
-                "context_label": "이동",
-                "difficulty": "normal",
-                "served_goal": {"target_value": None, "unit": None, "daily_target_count": 1},
-            },
+                "label": label,
+                "challenge_code": code,
+                "title": goals[code][0],
+                "context_label": goals[code][1],
+                "difficulty": goals[code][2],
+                "served_goal": goals[code][3],
+            }
+            for label, code in labels.items()
         ],
         "cards": [{"card_id": c.card_id, "challenge_code": c.challenge_code, "guidance": c.guidance} for c in cards],
     }
-    return context, {code: [c.card_id for c in cards if c.challenge_code == code] for code in (WALK, STAIRS)}
-
-
-def contract_problems(output: ChatDecision, context: dict[str, Any]) -> list[str]:
-    """서버 검증(validate_selections)과 같은 기준을 예시 문맥에 맞춰 본다."""
-    problems = []
-    owner = {card["card_id"]: card["challenge_code"] for card in context["cards"]}
-    for item in output.selections:
-        if item.challenge_code not in (WALK, STAIRS):
-            problems.append(f"후보 밖 코드 {item.challenge_code}")
-        if any(owner.get(card_id) != item.challenge_code for card_id in item.evidence_card_ids):
-            problems.append(f"다른 챌린지·보내지 않은 카드 {item.evidence_card_ids}")
-        served = {Decimal("10"), Decimal("2")} if item.challenge_code == WALK else {Decimal("1")}
-        if not reason_is_safe(item.reason.strip(), served):
-            problems.append(f"이유 문장 교체(단정·운영자 말투·목표와 다른 숫자): {item.reason!r}")
-    return problems
+    return context, labels
 
 
 def http_failure(exc: Exception) -> str:
@@ -146,7 +117,7 @@ def http_failure(exc: Exception) -> str:
 async def check_direct_call(key: str) -> bool:
     print(f"\n=== 2. 직접 호출 ({config.OPENAI_MODEL}, 예시 문맥 · 개인정보 없음)")
     provider = OpenAISelectionProvider(key, config.OPENAI_MODEL, base_url=config.OPENAI_BASE_URL)
-    context, card_ids = sample_context()
+    context, labels = sample_context()
     started = time.monotonic()
     try:
         reply = await provider.chat(
@@ -159,25 +130,16 @@ async def check_direct_call(key: str) -> bool:
     print(f"  [대화] {time.monotonic() - started:.1f}초 · {reply!r}")
     started = time.monotonic()
     try:
-        raw = await provider.decide(context, decision_schema(card_ids))
+        raw = await provider.judge(context, list(labels))
+        probabilities = validate_judgment(raw, labels)
     except (httpx.HTTPError, ValueError) as exc:
-        print(f"  [선택] → FAIL  {http_failure(exc)}")
+        print(f"  [판단] → FAIL  {http_failure(exc)}")
+        print("          logprobs 가 없다는 오류면 OPENAI_MODEL 이 logprobs 를 지원하는지 확인하세요(gpt-4o 지원).")
         return False
-    print(f"  [선택] {time.monotonic() - started:.1f}초 · {raw}")
-    try:
-        output = ChatDecision.model_validate(raw)
-    except ValidationError as exc:
-        print(f"  → FAIL  계약 스키마와 다릅니다: {exc.error_count()}개 오류")
-        return False
-    problems = contract_problems(output, context)
-    for problem in problems:
-        print(f"  검증: {problem}")
-    if not output.selections:
-        print("  → PASS  (선택 없음. 연결·스키마는 정상이지만 모델이 후보를 고르지 않았습니다)")
-        return True
-    hard = [p for p in problems if not p.startswith("이유 문장 교체")]
-    print("  → FAIL  서버 검증에서 거절될 출력입니다" if hard else "  → PASS")
-    return not hard
+    shown = " · ".join(f"{code} {value:.2f}" for code, value in sorted(probabilities.items(), key=lambda x: -x[1]))
+    print(f"  [판단] {time.monotonic() - started:.1f}초 · 라벨 확률 {raw} → {shown}")
+    print("  → PASS")
+    return True
 
 
 def check_server_flow(base_url: str) -> bool:
@@ -219,14 +181,21 @@ def check_server_flow(base_url: str) -> bool:
         if status != "done":
             print("  → FAIL  예측이 끝나지 않았습니다. ai_worker 가 떠 있는지 확인하세요.")
             return False
+        answers: dict[str, str] = {}
+        asked: list[str] = []
+        data = call("POST", "/challenge-chat/select", json={})
+        while data["mode"] == "ask" and len(asked) < 4:
+            [question] = data["questions"]
+            value = next(o["value"] for o in question["options"] if o["value"] in KEEP_VALUES)
+            print(f"  [질문] {question['question_id']} {question['text']!r} → {value}")
+            answers[question["key"]] = value
+            asked.append(question["key"])
+            data = call("POST", "/challenge-chat/select", json={"answers": answers, "asked": asked})
         messages = [{"role": "user", "content": QUERY}]
         chat = call("POST", "/challenge-chat", json={"messages": messages})
         print(f"  [대화] mode={chat['mode']} reply={chat['reply']!r}")
         messages.append({"role": "assistant", "content": chat["reply"][:400]})
-        first = call("POST", "/challenge-chat/select", json={"messages": messages})
-        asked = [question["key"] for question in first["questions"]]
-        print(f"  [선택] 첫 요청 mode={first['mode']} 되묻기={asked}")
-        body = {"messages": messages, "answers": YES_ANSWERS, "asked": asked}
+        body = {"messages": messages, "answers": answers, "asked": asked}
         data = call("POST", "/challenge-chat/select", json=body)
     except (RuntimeError, httpx.HTTPError, KeyError) as exc:
         print(f"  → FAIL  {exc}")

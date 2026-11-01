@@ -1,17 +1,22 @@
 """운영 승인이 없는 근거를 검색·추천에 쓰지 않는지 확인한다."""
 
+import json
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
+from app.services.challenge_selections import reason_is_safe
 from app.services.rag_cards import (
     ANSWER_FIELDS,
-    QUESTION_TEXT,
+    CODE_BY_ANSWER_KEY,
     SUPPORTED_CODES,
     EvidenceCard,
+    QuestionPage,
     SituationAnswers,
     load_cards,
+    load_questions,
+    question_bank,
     questions_for,
     search_cards,
     validate_selection,
@@ -166,5 +171,45 @@ def test_every_supported_code_has_an_approved_card_in_the_corpus() -> None:
 
 def test_every_supported_code_has_its_own_question_and_answer_field() -> None:
     assert set(ANSWER_FIELDS) == SUPPORTED_CODES
-    assert set(ANSWER_FIELDS.values()) == set(QUESTION_TEXT)
-    assert set(QUESTION_TEXT) <= set(SituationAnswers.model_fields)
+    assert {page.answer_key for page in question_bank()} == set(ANSWER_FIELDS.values())
+    assert set(CODE_BY_ANSWER_KEY) <= set(SituationAnswers.model_fields)
+
+
+def test_question_pages_come_from_data_with_several_wordings_per_answer() -> None:
+    pages = question_bank()
+    # 같은 답 키에 표현이 다른 질문을 두 장 이상 둬야 랜덤으로 고를 의미가 있다
+    for key in ANSWER_FIELDS.values():
+        texts = {page.text for page in pages if page.answer_key == key}
+        assert len(texts) >= 2, key
+    for page in pages:
+        # 몸을 쓰는 질문은 활동 제한 선택지를 늘 보여 준다
+        values = [option.value for option in page.options]
+        physical = page.answer_key in ACTIVITY_FIELDS | {"meal_walk", "transit", "movement_breaks"}
+        assert ("limited" in values) == physical, page.question_id
+        # 이유 문장은 사용자에게 건네는 말투이고 숫자·단정 표현이 없다
+        for option in page.options:
+            if option.reason:
+                assert reason_is_safe(option.reason, set()), option.reason
+
+
+def test_question_page_rejects_reasons_on_answers_that_drop_the_challenge(tmp_path: Path) -> None:
+    base = {"question_id": "Q-x", "answer_key": "stairs", "text": "계단을 오를 수 있나요?"}
+    keep = {"value": "yes", "label": "돼요", "reason": "계단을 오를 수 있다고 하셔서 골랐어요."}
+    limited = {"value": "limited", "label": "몸 상태 때문에 어려워요"}
+    with pytest.raises(ValidationError):  # '어려워요'에 이유 문장
+        QuestionPage.model_validate(
+            {**base, "options": [keep, {"value": "no", "label": "어려워요", "reason": "x"}, limited]}
+        )
+    with pytest.raises(ValidationError):  # 몸을 쓰는 질문인데 활동 제한 선택지가 없다
+        QuestionPage.model_validate({**base, "options": [keep, {"value": "no", "label": "어려워요"}]})
+    with pytest.raises(ValidationError):  # 답 키에 없는 값
+        QuestionPage.model_validate({**base, "options": [keep, {"value": "maybe", "label": "글쎄요"}, limited]})
+    # 같은 답에 페이지마다 다른 이유 문장
+    pages = [
+        {**base, "question_id": "Q-a", "options": [keep, {"value": "no", "label": "어려워요"}, limited]},
+        {**base, "question_id": "Q-b", "options": [{**keep, "reason": "다른 이유예요."}, limited]},
+    ]
+    corpus = tmp_path / "questions.json"
+    corpus.write_text(json.dumps(pages, ensure_ascii=False), encoding="utf-8")
+    with pytest.raises(ValueError):
+        load_questions(corpus)

@@ -1,6 +1,7 @@
 """실제 API 호출 없이 전송 형식·미완료·거절 응답을 확인한다."""
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -9,7 +10,6 @@ import pytest
 from pydantic import SecretStr, ValidationError
 
 from app.core.config import Config
-from app.services.challenge_selections import decision_schema
 from app.services.rag_cards import SituationAnswers, load_cards
 from app.services.rag_provider import OpenAISelectionProvider, failure_label
 
@@ -90,20 +90,44 @@ def _completed(text: str) -> httpx.Response:
     )
 
 
+def _judged(top: list[tuple[str, float]]) -> httpx.Response:
+    first = {"token": top[0][0], "logprob": top[0][1], "top_logprobs": [{"token": t, "logprob": lp} for t, lp in top]}
+    content = {"type": "output_text", "text": top[0][0], "logprobs": [first]}
+    return httpx.Response(200, json={"status": "completed", "output": [{"content": [content]}]})
+
+
 @pytest.mark.asyncio
-async def test_decide_forces_the_enum_schema_at_zero_temperature() -> None:
+async def test_judge_reads_label_probabilities_from_one_token_at_zero_temperature() -> None:
     sent: dict[str, Any] = {}
 
     def handle(request: httpx.Request) -> httpx.Response:
         sent.update(json.loads(request.content))
-        return _completed('{"selections": []}')
+        # 라벨이 아닌 토큰(" A" 앞 공백은 같은 라벨, "Z" 는 후보 밖)은 버리거나 합친다
+        return _judged([("A", math.log(0.6)), (" A", math.log(0.1)), ("B", math.log(0.25)), ("Z", math.log(0.05))])
 
     provider = OpenAISelectionProvider("test-key", "gpt-4o", httpx.MockTransport(handle))
-    schema = decision_schema({"CH_DELAY_FIRST_CIG": ["C43"]})
-    assert await provider.decide({"conversation": []}, schema) == {"selections": []}
-    assert sent["model"] == "gpt-4o" and sent["temperature"] == 0.0 and sent["store"] is False
-    assert sent["text"]["format"]["strict"] is True
-    assert sent["text"]["format"]["schema"] == schema
+    probabilities = await provider.judge({"candidates": []}, ["A", "B"])
+    assert probabilities == pytest.approx({"A": 0.7, "B": 0.25})
+    # 문장을 만들지 않는다: 온도 0, 출력 최소 토큰, 상위 20개 logprobs 를 받는다. 구조화 출력 스키마는 없다
+    assert sent["temperature"] == 0.0 and sent["store"] is False and sent["max_output_tokens"] == 16
+    assert sent["top_logprobs"] == 20 and sent["include"] == ["message.output_text.logprobs"]
+    assert "text" not in sent
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(
+            200, json={"status": "completed", "output": [{"content": [{"type": "output_text", "text": "A"}]}]}
+        ),
+        _judged([("Z", math.log(0.9))]),
+    ],
+)
+async def test_judge_without_logprobs_or_labels_cannot_be_used(response: httpx.Response) -> None:
+    provider = OpenAISelectionProvider("test-key", "gpt-4o", httpx.MockTransport(lambda _: response))
+    with pytest.raises(ValueError):
+        await provider.judge({"candidates": []}, ["A", "B"])
 
 
 @pytest.mark.asyncio

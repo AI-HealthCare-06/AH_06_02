@@ -1,4 +1,4 @@
-"""질의 챗봇: 1단계 대화 · 2단계 선택(디시전 모델) · 저장 · 서빙 값. 실제 LLM 은 부르지 않는다."""
+"""질의 챗봇: 선택형 질문 · 판단 모델(확률) 선택 · 자유 대화 · 저장 · 서빙 값. 실제 LLM 은 부르지 않는다."""
 
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -35,10 +35,16 @@ from app.services.challenge_chat import (
     redact,
 )
 from app.services.challenge_goals import goal_policy
-from app.services.challenge_selections import FALLBACK_REASON, decision_schema, has_unsafe_claim, reason_is_safe
+from app.services.challenge_selections import (
+    FALLBACK_REASON,
+    candidate_labels,
+    has_unsafe_claim,
+    reason_is_safe,
+    validate_judgment,
+)
 from app.services.monster_cohorts import MonsterCohortService, completion_band
 from app.services.page_index import PageIndex
-from app.services.rag_cards import SituationAnswers
+from app.services.rag_cards import SituationAnswers, question_bank
 from app.services.recommendations import RecommendationService, challenge_goal_body
 from app.tests.d_fixtures import TEST_MODEL_VERSION, fake_artifact, make_target
 from app.tests.prediction_apis.helpers import login
@@ -55,21 +61,16 @@ CONVERSATION = [
 ]
 
 
-def delay_pick(**overrides: Any) -> dict[str, Any]:
-    item = {
-        "challenge_code": DELAY,
-        "evidence_card_ids": ["C43"],
-        "reason": "아침에 일어난 뒤 첫 담배를 조금 늦추는 것부터 해 볼 수 있어요.",
-    }
-    return {"selections": [{**item, **overrides}]}
+#: 후보 라벨은 코드 순이다: A = 미뤄 피우기, B = 오늘 안 피우기
+PREFER_DELAY = {"A": 0.8, "B": 0.2}
 
 
 class FixtureProvider:
     model_version = "fixture-chat"
 
-    def __init__(self, decision: Any = None, reply: str = "", error: Exception | None = None) -> None:
-        self.decision, self.reply, self.error = decision, reply, error
-        self.decide_calls: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    def __init__(self, judgment: Any = None, reply: str = "", error: Exception | None = None) -> None:
+        self.judgment, self.reply, self.error = judgment, reply, error
+        self.judge_calls: list[tuple[dict[str, Any], list[str]]] = []
         self.chat_calls: list[tuple[dict[str, Any], list[dict[str, str]]]] = []
 
     async def chat(self, context: dict[str, Any], messages: list[dict[str, str]]) -> str:
@@ -78,11 +79,15 @@ class FixtureProvider:
             raise self.error
         return self.reply
 
-    async def decide(self, context: dict[str, Any], schema: dict[str, Any]) -> Any:
-        self.decide_calls.append((context, schema))
+    async def judge(self, context: dict[str, Any], labels: list[str]) -> Any:
+        self.judge_calls.append((context, labels))
         if self.error:
             raise self.error
-        return self.decision
+        return self.judgment
+
+
+def reason_for(key: str, value: str) -> str | None:
+    return next(page.reason_for(value) for page in question_bank() if page.answer_key == key)
 
 
 # ---------------------------------------------------------------- 순수 함수
@@ -132,32 +137,14 @@ def test_completion_band_follows_the_cycle_rule() -> None:
     ]
 
 
-def _objects(schema: Any) -> list[dict[str, Any]]:
-    if isinstance(schema, dict):
-        found = [schema] if schema.get("type") == "object" else []
-        return found + [o for value in schema.values() for o in _objects(value)]
-    if isinstance(schema, list):
-        return [o for item in schema for o in _objects(item)]
-    return []
-
-
-def test_decision_schema_ties_each_code_to_its_own_cards() -> None:
-    schema = decision_schema({NO_SMOKE: ["C20", "C19"], DELAY: ["C43"], "CH_STAIRS": []})
-    # Structured Outputs(strict) 규칙: 모든 객체가 추가 키를 막고 모든 속성을 required 로 둔다
-    for obj in _objects(schema):
-        assert obj["additionalProperties"] is False
-        assert sorted(obj["required"]) == sorted(obj["properties"])
-    branches = schema["properties"]["selections"]["items"]["anyOf"]
-    allowed = {b["properties"]["challenge_code"]["enum"][0]: b["properties"]["evidence_card_ids"] for b in branches}
-    # 카드가 없는 코드는 고를 수 없고, 코드마다 자기 카드만 붙일 수 있다
-    assert {code: cards["items"]["enum"] for code, cards in allowed.items()} == {
-        DELAY: ["C43"],
-        NO_SMOKE: ["C19", "C20"],
-    }
-    # 목표 값 필드는 스키마에 없다. AI 는 값을 낼 수 없다
-    assert all(set(b["properties"]) == {"challenge_code", "evidence_card_ids", "reason"} for b in branches)
-    with pytest.raises(ValueError):
-        decision_schema({DELAY: []})
+def test_labels_and_judgment_keep_only_candidate_probabilities() -> None:
+    labels = candidate_labels({NO_SMOKE, DELAY})
+    assert labels == {"A": DELAY, "B": NO_SMOKE}
+    # 후보 라벨끼리 합이 1이 되게 다시 나눈다. 후보 밖 라벨은 버린다
+    assert validate_judgment({"A": 0.6, "B": 0.2, "Z": 0.2}, labels) == pytest.approx({DELAY: 0.75, NO_SMOKE: 0.25})
+    for bad in ({"Z": 0.9}, {"A": 0.3}, {"A": 2.0}, ["A"]):
+        with pytest.raises(ValueError):
+            validate_judgment(bad, labels)
 
 
 # ---------------------------------------------------------------- DB
@@ -236,6 +223,7 @@ class TestChallengeChat(TestCase):
         assert kinds.count("card") == 48
         assert kinds.count("challenge") == await Challenge.all().count() == 33
         assert kinds.count("steps") == sum(1 for c in await Challenge.all() if goal_policy(c) is not None) == 9
+        assert kinds.count("question") == len(question_bank()) == 42
         assert index.by_id["steps:CH_DELAY_FIRST_CIG"].body.startswith("1단계: 아침 첫 담배 15분 미루기")
 
     async def test_search_returns_only_approved_cards_the_user_can_do(self) -> None:
@@ -296,75 +284,117 @@ class TestChallengeChat(TestCase):
         user, _ = await self._ready("chat-off@example.com")
         provider = FixtureProvider()
         result = await (await self._service(provider, enabled=False)).select(user, CONVERSATION, YES, [])
-        assert result.mode == "rules" and result.recommendations.items and provider.decide_calls == []
+        assert result.mode == "rules" and result.recommendations.items and provider.judge_calls == []
 
-    async def test_unknown_answers_ask_first(self) -> None:
+    async def test_questions_come_one_by_one_from_pages_with_a_fixed_seed(self) -> None:
         user, _ = await self._ready("chat-ask@example.com")
-        result = await (await self._service(FixtureProvider())).select(user, CONVERSATION, SituationAnswers(), [])
-        assert result.mode == "ask"
-        assert {q["key"] for q in result.questions} == {"first_cig", "no_smoke"}
+        service = await self._service(FixtureProvider())
+        # 대화 없이 바로 질문부터 시작한다
+        first = await service.select(user, [], SituationAnswers(), [])
+        assert first.mode == "ask" and len(first.questions) == 1
+        [question] = first.questions
+        assert question["key"] in {"first_cig", "no_smoke"}
+        page = next(p for p in question_bank() if p.question_id == question["question_id"])
+        assert question["text"] == page.text and page.answer_key == question["key"]
+        # 선택지 문구도 질문 페이지에서 온다. 이유 문장은 화면에 보내지 않는다
+        assert question["options"] == [{"value": o.value, "label": o.label} for o in page.options]
+        # 같은 사람·같은 주기·같은 답이면 같은 질문
+        assert (await service.select(user, [], SituationAnswers(), [])).questions == first.questions
+        # 답하면 남은 답 키를 묻고, 더 물을 게 없으면 질문을 멈춘다
+        answered = SituationAnswers.model_validate({question["key"]: "yes"})
+        second = await service.select(user, [], answered, [question["key"]])
+        assert (
+            second.mode == "ask" and second.questions[0]["key"] == ({"first_cig", "no_smoke"} - {question["key"]}).pop()
+        )
+        # 활동 제한·알 수 없는 질문 기록
+        assert (
+            await service.select(user, [], SituationAnswers(first_cig="no"), ["first_cig", "no_smoke"])
+        ).mode != "ask"
+        with pytest.raises(ValueError):
+            await service.select(user, [], SituationAnswers(), ["unknown_key"])
 
-    async def test_selection_is_saved_with_rule_values_and_served(self) -> None:
-        # 지난 주기 2단계 85% → 규칙이 3단계로 올린다. AI 는 고르기만 하고 값은 규칙 그대로 서빙한다
+    async def test_random_questions_spread_over_branches_and_stop_at_three(self) -> None:
+        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
+        index = await PageIndex.build()
+        codes = {"CH_WALK_AFTER_MEAL", "CH_STAIRS", "CH_STAND_HOURLY", "CH_SCREEN_BREAK", "CH_SQUAT_15"}
+        picks = [index.next_question(codes, SituationAnswers(), [], f"user-{n}:1") for n in range(30)]
+        drawn = {pick.answer_key for pick in picks if pick is not None}
+        # 시드가 다르면 다른 질문이 나온다(코드 순서로 고정돼 있지 않다)
+        assert len(drawn) >= 3
+        asked: list[str] = []
+        for _ in range(3):
+            question = index.next_question(codes, SituationAnswers(), asked, "user-1:1")
+            assert question is not None and question.answer_key not in asked
+            asked.append(question.answer_key)
+        assert index.next_question(codes, SituationAnswers(), asked, "user-1:1") is None
+        assert index.next_question(codes, SituationAnswers(stairs="limited"), [], "user-1:1") is None
+
+    async def test_selection_ranks_by_probability_and_fills_reason_from_the_page(self) -> None:
+        # 지난 주기 2단계 85% → 규칙이 3단계로 올린다. AI 는 확률만 내고 값·문장은 서버가 채운다
         user, target = await self._ready("chat-save@example.com")
         await self._finished(user, target, "0.8500", level=2)
-        provider = FixtureProvider(delay_pick())
+        provider = FixtureProvider(PREFER_DELAY)
         service = await self._service(provider)
 
         result = await service.select(user, CONVERSATION, YES, ["first_cig", "no_smoke"])
 
         assert result.mode == "conversation"
-        [row] = result.recommendations.items
+        first, second = result.recommendations.items
         challenge = await Challenge.get(code=DELAY)
-        assert row.challenge_id == challenge.id and row.rank == 1
-        assert row.proposed_goal is not None and row.proposed_goal["level"] == 3
-        basis = row.proposed_goal["basis"]
+        assert first.challenge_id == challenge.id and first.rank == 1 and second.rank == 2
+        assert first.proposed_goal is not None and first.proposed_goal["level"] == 3
+        basis = first.proposed_goal["basis"]
         assert isinstance(basis, dict) and basis["direction"] == "up"
-        assert row.evidence_card_ids == ["C43"] and row.llm_model_version == "fixture-chat"
-        snapshot = row.conversation_snapshot or {}
+        [card_id] = first.evidence_card_ids or []
+        assert card_id.startswith("C") and first.llm_model_version == "fixture-chat"
+        snapshot = first.conversation_snapshot or {}
         assert snapshot["policy_version"] == CHAT_POLICY_VERSION
-        assert str(snapshot["reason"]).startswith("아침에 일어난 뒤")
+        assert snapshot["probability"] == 0.8 and (second.conversation_snapshot or {})["probability"] == 0.2
+        # 이유 문장은 답한 질문 페이지의 문장이다(모델이 만들지 않는다)
+        assert result.reasons[first.id] == snapshot["reason"] == reason_for("first_cig", "yes")
+        assert result.reasons[second.id] == reason_for("no_smoke", "yes")
         assert "a@b.com" not in str(snapshot)
-        served = challenge_goal_body(challenge, row.proposed_goal)
+        served = challenge_goal_body(challenge, first.proposed_goal)
         assert served["goal_level"] == 3 and served["safety_check_required"] is True
 
-        # 보낸 입력: 가린 대화·범주 요약·후보·카드. 목표 값·건강 수치·이메일은 없다
-        [(context, schema)] = provider.decide_calls
+        # 보낸 입력: 가린 대화·답·범주 요약·라벨 붙은 후보·카드. 건강 수치·이메일은 없다
+        [(context, labels)] = provider.judge_calls
         assert set(context) == {"conversation", "answers", "cohort", "candidates", "cards"}
+        assert labels == ["A", "B"] and [c["label"] for c in context["candidates"]] == labels
         assert "a@b.com" not in str(context) and "150" not in str(context)
-        # 후보의 목표 값은 규칙이 정한 값을 읽기 전용으로만 넘긴다. 출력 스키마에는 값 필드가 없다
         [delay_context] = [c for c in context["candidates"] if c["challenge_code"] == DELAY]
         assert delay_context["served_goal"]["target_value"] == served["target_value"]
-        branches = schema["properties"]["selections"]["items"]["anyOf"]
-        allowed = {b["properties"]["challenge_code"]["enum"][0]: b for b in branches}
-        assert set(allowed) == {DELAY, NO_SMOKE}
-        assert "C43" in allowed[DELAY]["properties"]["evidence_card_ids"]["items"]["enum"]
 
-        # 같은 입력은 저장한 결과를 돌려주고 디시전 모델을 다시 부르지 않는다
+        # 같은 입력은 저장한 결과를 돌려주고 판단 모델을 다시 부르지 않는다
         again = await service.select(user, CONVERSATION, YES, ["first_cig", "no_smoke"])
-        assert again.mode == "conversation" and [r.id for r in again.recommendations.items] == [row.id]
-        assert len(provider.decide_calls) == 1
+        assert again.mode == "conversation" and [r.id for r in again.recommendations.items] == [first.id, second.id]
+        assert len(provider.judge_calls) == 1
         # 시작은 클라이언트가 CHLG-05 로 한다
-        assert not await UserChallenge.filter(user_id=user.id, cycle_id=row.cycle_id).exists()
+        assert not await UserChallenge.filter(user_id=user.id, cycle_id=first.cycle_id).exists()
 
-    async def test_invalid_selections_fall_back_to_rules_without_saving(self) -> None:
-        cases = [
-            delay_pick(challenge_code="CH_STAIRS"),  # 고를 수 있는 코드 밖
-            delay_pick(challenge_code="CH_CHECK_LABEL"),  # 21개 밖
-            delay_pick(evidence_card_ids=["C01"]),  # 다른 챌린지 카드
-            {"selections": [{**delay_pick()["selections"][0], "target_value": 30}]},  # AI 가 값을 낸 경우
-            {"selections": [delay_pick()["selections"][0]] * 2},  # 같은 코드 두 번
-        ]
-        for number, output in enumerate(cases):
+    async def test_one_candidate_needs_no_model_call(self) -> None:
+        user, _ = await self._ready("chat-single@example.com")
+        provider = FixtureProvider(error=TimeoutError())
+        answers = SituationAnswers(first_cig="yes", no_smoke="no")
+        result = await (await self._service(provider)).select(user, [], answers, ["first_cig", "no_smoke"])
+        [row] = result.recommendations.items
+        assert result.mode == "conversation" and provider.judge_calls == []
+        assert (row.conversation_snapshot or {})["probability"] == 1.0
+        assert result.reasons[row.id] == reason_for("first_cig", "yes")
+
+    async def test_unusable_judgments_fall_back_to_rules_without_saving(self) -> None:
+        for number, judgment in enumerate([{"Z": 0.9}, {"A": 0.3}, ["A"], None]):
             user, _ = await self._ready(f"chat-bad{number}@example.com")
-            result = await (await self._service(FixtureProvider(output))).select(user, CONVERSATION, YES, [])
-            assert result.mode == "rules", output
+            result = await (await self._service(FixtureProvider(judgment))).select(user, CONVERSATION, YES, [])
+            assert result.mode == "rules" and result.recommendations.items, judgment
             assert not await self._chat_rows(user)
 
-    async def test_empty_selection_falls_back_to_rules(self) -> None:
-        user, _ = await self._ready("chat-empty@example.com")
-        result = await (await self._service(FixtureProvider({"selections": []}))).select(user, CONVERSATION, YES, [])
-        assert result.mode == "rules" and result.recommendations.items
+    async def test_all_no_answers_fall_back_to_rules(self) -> None:
+        user, _ = await self._ready("chat-none@example.com")
+        answers = SituationAnswers(first_cig="no", no_smoke="no")
+        provider = FixtureProvider(PREFER_DELAY)
+        result = await (await self._service(provider)).select(user, [], answers, ["first_cig", "no_smoke"])
+        assert result.mode == "rules" and result.recommendations.items and provider.judge_calls == []
 
     async def test_wrong_key_falls_back_and_logs_only_the_status(self) -> None:
         user, _ = await self._ready("chat-401@example.com")
@@ -377,18 +407,27 @@ class TestChallengeChat(TestCase):
             "WARNING:app.services.challenge_chat:질의 챗봇 선택 호출·검증 실패, 규칙 추천으로 돌린다: HTTPStatusError 401"
         ]
 
-    async def test_unsafe_reason_is_replaced_by_the_card(self) -> None:
+    async def test_reason_with_numbers_not_served_is_replaced(self) -> None:
         user, _ = await self._ready("chat-claim@example.com")
-        output = delay_pick(reason="혈압을 확실히 낮춰요.")
-        result = await (await self._service(FixtureProvider(output))).select(user, CONVERSATION, YES, [])
-        [row] = result.recommendations.items
-        assert result.reasons[row.id] == FALLBACK_REASON
-        assert (row.conversation_snapshot or {})["reason_replaced"] is True
+        service = await self._service(FixtureProvider(PREFER_DELAY))
+        page = service.index.question_page("first_cig")
+        unsafe = page.model_copy(
+            update={
+                "options": [
+                    o.model_copy(update={"reason": "혈압을 확실히 낮춰요."}) if o.reason else o for o in page.options
+                ]
+            }
+        )
+        with patch.object(service.index, "question_page", lambda key: unsafe if key == "first_cig" else page):
+            result = await service.select(user, CONVERSATION, YES, [])
+        first = result.recommendations.items[0]
+        assert result.reasons[first.id] == FALLBACK_REASON
+        assert (first.conversation_snapshot or {})["reason_replaced"] is True
 
     async def test_selected_challenge_shows_up_as_a_normal_recommendation_card(self) -> None:
         """대화로 고른 추천은 CHLG-02 목록(전투 화면 카드)에 같은 값으로 나타나고 CHLG-05 로 시작할 수 있다."""
         user, _ = await self._ready("chat-card@example.com")
-        service = await self._service(FixtureProvider(delay_pick()))
+        service = await self._service(FixtureProvider(PREFER_DELAY))
         app.dependency_overrides[get_challenge_chat_service] = lambda: service
         app.dependency_overrides[get_request_user] = lambda: user
         try:
@@ -404,12 +443,13 @@ class TestChallengeChat(TestCase):
             app.dependency_overrides.clear()
 
         assert selected["mode"] == "conversation"
-        [item] = selected["items"]
+        item, _ = selected["items"]
         card = next(row for row in listed if row["recommendation_id"] == item["recommendation_id"])
         # 전투 화면이 카드를 그릴 때 읽는 값은 대화 결과에도 모두 같은 값으로 있다
         shared = set(card) - {"proposed_goal", "action", "cooldown_choice", "exclude_until", "suppressed_until_manual"}
         assert {key: item[key] for key in shared} == {key: card[key] for key in shared}
-        assert item["reason"] and item["evidence_card_ids"] == ["C43"]
+        assert item["challenge_code"] == DELAY and item["reason"] == reason_for("first_cig", "yes")
+        assert len(item["evidence_card_ids"]) == 1
         assert started.status_code == 201
 
 
