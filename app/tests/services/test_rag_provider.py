@@ -131,25 +131,6 @@ async def test_judge_without_logprobs_or_labels_cannot_be_used(response: httpx.R
 
 
 @pytest.mark.asyncio
-async def test_chat_is_free_text_with_the_conversation() -> None:
-    sent: dict[str, Any] = {}
-
-    def handle(request: httpx.Request) -> httpx.Response:
-        sent.update(json.loads(request.content))
-        return _completed("보통 몇 시에 일어나세요?")
-
-    provider = OpenAISelectionProvider("test-key", "gpt-4o", httpx.MockTransport(handle))
-    messages = [
-        {"role": "user", "content": "아침 담배"},
-        {"role": "assistant", "content": "네"},
-        {"role": "user", "content": "응"},
-    ]
-    assert await provider.chat({"candidates": []}, messages) == "보통 몇 시에 일어나세요?"
-    assert "text" not in sent and sent["temperature"] == 0.5
-    assert [m["role"] for m in sent["input"]] == ["system", "system", "user", "assistant", "user"]
-
-
-@pytest.mark.asyncio
 async def test_rejected_key_never_reaches_errors_or_repr() -> None:
     sent: dict[str, Any] = {}
 
@@ -159,7 +140,7 @@ async def test_rejected_key_never_reaches_errors_or_repr() -> None:
 
     provider = OpenAISelectionProvider("sk-test-secret", "gpt-4o", httpx.MockTransport(handle))
     with pytest.raises(httpx.HTTPStatusError) as caught:
-        await provider.chat({"candidates": []}, [{"role": "user", "content": "식후 걷기"}])
+        await provider.judge({"candidates": []}, ["A", "B"])
     assert sent == {"model": "gpt-4o", "auth": "Bearer sk-test-secret"}
     assert failure_label(caught.value) == "HTTPStatusError 401"
     assert "sk-test-secret" not in str(caught.value) and "sk-test-secret" not in repr(provider)

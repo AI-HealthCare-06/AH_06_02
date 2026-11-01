@@ -4,13 +4,13 @@
     uv run python -m scripts.rag.check_openai --base-url http://localhost:8000  # 3단계까지
 
 1. 설정: 저장소 루트 .env 에서 OPENAI_API_KEY · OPENAI_MODEL · CHALLENGE_CHAT_ENABLED 를 읽는다. 키 값은 출력하지 않는다
-2. 직접 호출: 개인정보가 없는 고정 예시 문맥으로 대화(자유 문장) 한 번, 판단(라벨 1토큰 logprobs) 한 번을 부르고
+2. 직접 호출: 개인정보가 없는 고정 예시 문맥으로 판단(라벨 1토큰 logprobs) 한 번을 부르고
    판단 출력이 후보 라벨의 확률로 나오는지 본다. 모델·API 가 logprobs 를 주지 않으면 여기서 FAIL 이다
-3. 서버 흐름: 띄워 둔 API 에 새 계정으로 가입 → 건강정보 → 예측 → 선택형 질문(/challenge-chat/select)에 차례로 답하고
-   → 대화(/challenge-chat) → 다시 선택을 불러 mode=conversation 이고 서빙 JSON 에 규칙 값이 채워졌는지 본다.
+3. 서버 흐름: 띄워 둔 API 에 새 계정으로 가입 → 건강정보 → 예측 → 선택형 질문(/challenge-chat/select)에 차례로 답해
+   mode=conversation 이고 서빙 JSON 에 규칙 값이 채워졌는지 본다.
    서버·워커·시드가 준비돼 있어야 한다(scripts/smoke.py 와 같은 전제). 서버는 .env 를 고친 뒤 다시 띄운다
 
-2단계는 실제 요금이 드는 호출을 두 번 보낸다. 3단계는 실행할 때마다 로컬 DB 에 계정을 하나 만든다.
+2단계는 실제 요금이 드는 호출을 한 번 보낸다. 3단계는 실행할 때마다 로컬 DB 에 계정을 하나 만든다.
 """
 
 import argparse
@@ -41,12 +41,8 @@ HTTP_HINTS = {
 #: 예시 문맥. 실제 사용자 값이 아니다
 WALK = "CH_WALK_AFTER_MEAL"
 STAIRS = "CH_STAIRS"
-SAMPLE_MESSAGES = [
-    {"role": "user", "content": "점심 먹고 사무실 근처를 걸을 시간이 있어요. 뭘 해 보면 좋을까요?"},
-]
 #: 3단계에서 질문에 줄 답. 선택지 중 챌린지를 남기는 첫 값(yes·both·three)을 골라 후보가 넓게 남게 한다
 KEEP_VALUES = ("yes", "both", "three")
-QUERY = "점심 저녁 식후 걷기나 계단 오르기처럼 부담 없이 시작할 수 있는 걸 추천해 주세요"
 
 
 def check_settings() -> str | None:
@@ -78,7 +74,6 @@ def sample_context() -> tuple[dict[str, Any], dict[str, str]]:
         STAIRS: ("계단 이용하기", "이동", "normal", {"target_value": None, "unit": None, "daily_target_count": 1}),
     }
     context = {
-        "conversation": SAMPLE_MESSAGES,
         "answers": {"meal_walk": "both", "stairs": "yes"},
         "cohort": {"monster": "viscera", "state": "normal", "is_target": True, "active": [], "history": []},
         "candidates": [
@@ -118,16 +113,6 @@ async def check_direct_call(key: str) -> bool:
     print(f"\n=== 2. 직접 호출 ({config.OPENAI_MODEL}, 예시 문맥 · 개인정보 없음)")
     provider = OpenAISelectionProvider(key, config.OPENAI_MODEL, base_url=config.OPENAI_BASE_URL)
     context, labels = sample_context()
-    started = time.monotonic()
-    try:
-        reply = await provider.chat(
-            {"candidates": context["candidates"], "pages": [{"body": c["guidance"]} for c in context["cards"]]},
-            SAMPLE_MESSAGES,
-        )
-    except (httpx.HTTPError, ValueError) as exc:
-        print(f"  [대화] → FAIL  {http_failure(exc)}")
-        return False
-    print(f"  [대화] {time.monotonic() - started:.1f}초 · {reply!r}")
     started = time.monotonic()
     try:
         raw = await provider.judge(context, list(labels))
@@ -191,12 +176,6 @@ def check_server_flow(base_url: str) -> bool:
             answers[question["key"]] = value
             asked.append(question["key"])
             data = call("POST", "/challenge-chat/select", json={"answers": answers, "asked": asked})
-        messages = [{"role": "user", "content": QUERY}]
-        chat = call("POST", "/challenge-chat", json={"messages": messages})
-        print(f"  [대화] mode={chat['mode']} reply={chat['reply']!r}")
-        messages.append({"role": "assistant", "content": chat["reply"][:400]})
-        body = {"messages": messages, "answers": answers, "asked": asked}
-        data = call("POST", "/challenge-chat/select", json=body)
     except (RuntimeError, httpx.HTTPError, KeyError) as exc:
         print(f"  → FAIL  {exc}")
         return False

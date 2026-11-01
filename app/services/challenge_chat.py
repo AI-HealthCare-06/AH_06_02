@@ -1,21 +1,17 @@
-"""질의 챗봇. 선택형 질문을 먼저 하고, 자유 대화는 질문 뒤에 덧붙일 수 있다.
+"""질의 챗봇. 답은 선택지를 눌러서만 받는다(자유 입력 없음).
 
-1. 선택(select): Page Index 의 질문 페이지를 열린 요인 가지에서 사용자·주기로 고정한 시드로 한 장씩 랜덤으로 고른다.
-   사용자는 선택지를 눌러 답한다(최대 3개). 모두 답하면 '할 수 있어요'로 남은 챌린지만 후보가 되고,
-   판단 모델이 후보 라벨에 대한 확률(logprobs)만 내서 서버가 확률 순으로 최대 3개를 고른다. 문장은 만들지 않는다.
-   이유 문장은 답한 질문 페이지의 문장, 근거 카드는 그 챌린지의 승인 카드다.
-   고른 챌린지의 목표 값은 규칙(지난 주기 수행률로 정한 단계, 없으면 마스터)이 채워 추천 행으로 저장·서빙한다.
-2. 대화(reply): 질문 뒤 사용자가 자유롭게 묻고 GPT 가 Page Index 페이지 안에서 답한다. 아무것도 저장하지 않는다.
-   대화는 다시 고를 때 판단 모델 입력과 카드 검색에 함께 들어간다.
+Page Index 의 질문 페이지를 열린 요인 가지에서 사용자·주기로 고정한 시드로 한 장씩 랜덤으로 고른다(최대 3개).
+모두 답하면 '할 수 있어요'로 남은 챌린지만 후보가 되고, 판단 모델이 후보 라벨에 대한 확률(logprobs)만 내서
+서버가 확률 순으로 최대 3개를 고른다. 문장은 만들지 않는다. 이유 문장은 답한 질문 페이지의 문장, 근거 카드는
+그 챌린지의 승인 카드다. 고른 챌린지의 목표 값은 규칙(지난 주기 수행률로 정한 단계, 없으면 마스터)이 채워
+추천 행으로 저장·서빙한다.
 
-질문·대화는 이메일·전화번호·긴 숫자를 가린 뒤 보낸다. 건강 수치·확률·진단 여부·이름은 보내지 않는다.
-실패하면 규칙 추천(mode=rules)으로 돌아간다.
+건강 수치·확률·진단 여부·이름은 보내지 않는다. 실패하면 규칙 추천(mode=rules)으로 돌아간다.
 """
 
 import hashlib
 import json
 import logging
-import re
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
@@ -31,29 +27,26 @@ from app.models.users import User
 from app.services.attack_cycles import lock_user, today_kst
 from app.services.challenge_goals import display_goal
 from app.services.challenge_selections import (
-    MAX_REPLY_LENGTH,
     ValidatedSelection,
     candidate_labels,
     goal_numbers,
-    has_unsafe_claim,
     rank_selections,
     validate_judgment,
 )
 from app.services.conversation_recommendations import ConversationRecommendationService
 from app.services.monster_cohorts import MonsterCohortService
-from app.services.page_index import MAX_QUERY_LENGTH, Page, PageIndex
+from app.services.page_index import PageIndex
 from app.services.rag_cards import ANSWER_FIELDS, SUPPORTED_CODES, EvidenceCard, QuestionPage, SituationAnswers
 from app.services.rag_provider import ChatProvider, failure_label
 from app.services.recommendations import EligibleChallenges, GeneratedRecommendations, RecommendationService
 
 logger = logging.getLogger(__name__)
 
-CHAT_POLICY_VERSION = "RAG-CHAT-20261101-v3"
+CHAT_POLICY_VERSION = "RAG-CHAT-20261101-v4"
 #: 선택 단계에 넘길 근거 카드 수. 후보마다 한 장은 먼저 넣는다
 MAX_CONTEXT_CARDS = 12
 
 ChatMode = Literal["conversation", "rules", "ask", "hold"]
-ReplyMode = Literal["chat", "off"]
 
 FALLBACK_ANSWERS: dict[str, str] = {
     "conversation": "답해 주신 내용에 맞춰 챌린지를 골랐어요.",
@@ -61,38 +54,6 @@ FALLBACK_ANSWERS: dict[str, str] = {
     "ask": "하나만 골라 주세요.",
     "hold": "지금은 새 추천을 잠시 미룰게요. 진행 중인 챌린지를 무리 없이 이어가 주세요.",
 }
-FALLBACK_REPLIES: dict[str, str] = {
-    "off": "지금은 대화 기능을 쓸 수 없어요. 추천 목록에서 바로 골라 주세요.",
-    "error": "지금은 답을 만들지 못했어요. 잠시 뒤 다시 물어봐 주세요.",
-    "unsafe": (
-        "건강 수치나 질환에 대한 판단은 제가 드릴 수 없어요. 그 부분은 의료진과 상의해 주세요. "
-        "하루 일과 안에서 해 볼 만한 챌린지를 함께 찾아볼까요?"
-    ),
-}
-
-REDACTIONS = (
-    re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+"),
-    re.compile(r"\d{2,3}-\d{3,4}-\d{4}"),
-    re.compile(r"\d{6,}"),
-)
-
-
-def redact(query: str) -> str:
-    text = query.strip()
-    for pattern in REDACTIONS:
-        text = pattern.sub("[생략]", text)
-    return text
-
-
-def redact_messages(messages: list[dict[str, str]]) -> list[dict[str, str]]:
-    return [{"role": message["role"], "content": redact(message["content"])} for message in messages]
-
-
-@dataclass
-class ChatReply:
-    mode: ReplyMode
-    reply: str
-    sources: list[str]
 
 
 @dataclass
@@ -121,38 +82,7 @@ class ChallengeChatService:
         # 건강기록 확인·고정 계약 확인은 대화형 추천과 같은 코드를 쓴다
         self.conversation = ConversationRecommendationService(rules, cards)
 
-    # ------------------------------------------------------------ 1. 대화
-
-    async def reply(self, user: User, messages: list[dict[str, str]]) -> ChatReply:
-        if not self.enabled or self.provider is None:
-            return ChatReply("off", FALLBACK_REPLIES["off"], [])
-        found = await self.rules.eligible(user)
-        feasible = self._feasible(found)
-        conversation = redact_messages(messages)
-        last = next(message["content"] for message in reversed(conversation) if message["role"] == "user")
-        searched = self.index.search(last[:MAX_QUERY_LENGTH], set(feasible), None)
-        pages = _unique_pages([*searched, *self.index.pages_for(set(feasible), {"challenge"})])
-        sources = [page.page_id for page in pages]
-        context = {
-            "candidates": [
-                candidate_context(challenge, found.goals.get(challenge.id)) for _, challenge in sorted(feasible.items())
-            ],
-            "pages": [{"page_id": p.page_id, "challenge_code": p.challenge_code, "body": p.body} for p in pages],
-        }
-        try:
-            text = (await self.provider.chat(context, conversation)).strip()
-        except (ValueError, OSError, TimeoutError, httpx.HTTPError) as exc:
-            logger.warning("질의 챗봇 대화 호출 실패: %s", failure_label(exc))
-            return ChatReply("chat", FALLBACK_REPLIES["error"], sources)
-        if not text or len(text) > MAX_REPLY_LENGTH or has_unsafe_claim(text, allow_numbers=True):
-            return ChatReply("chat", FALLBACK_REPLIES["unsafe"], sources)
-        return ChatReply("chat", text, sources)
-
-    # ------------------------------------------------------------ 2. 선택
-
-    async def select(
-        self, user: User, messages: list[dict[str, str]], answers: SituationAnswers, asked: list[str]
-    ) -> ChatResult:
+    async def select(self, user: User, answers: SituationAnswers, asked: list[str]) -> ChatResult:
         now = datetime.now(config.TIMEZONE)
         if not self.enabled or self.provider is None:
             return self._result("rules", await self.current_batch(user))
@@ -165,10 +95,7 @@ class ChallengeChatService:
             return self._result("ask", found.batch([]), questions=[question_body(question)])
         selectable = {code: challenge for code, challenge in feasible.items() if answers.supports(code)}
 
-        conversation = redact_messages(messages)
-        query = " ".join(m["content"] for m in conversation if m["role"] == "user")[-MAX_QUERY_LENGTH:]
-        searched = self.index.search(query, set(selectable), answers)
-        cards = self._context_cards(searched, selectable)
+        cards = self._context_cards(selectable)
         selectable = {
             code: challenge for code, challenge in selectable.items() if any(c.challenge_code == code for c in cards)
         }
@@ -177,7 +104,6 @@ class ChallengeChatService:
         labels = candidate_labels(set(selectable))
         cohort = (await self.cohorts.build(user.id)).get(found.monster.code)
         context = {
-            "conversation": conversation,
             "answers": {key: value for key, value in answers.model_dump().items() if value != "unknown"},
             "cohort": self.cohorts.llm_context(cohort) if cohort else None,
             "candidates": [
@@ -198,9 +124,7 @@ class ChallengeChatService:
             cards=[(card.card_id, card.version) for card in cards],
             goals={code: found.goals.get(challenge.id) for code, challenge in selectable.items()},
         )
-        sources = [page.page_id for page in searched] + [
-            f"card:{card.card_id}" for card in cards if f"card:{card.card_id}" not in {p.page_id for p in searched}
-        ]
+        sources = [f"card:{card.card_id}" for card in cards]
         cached = await self._cached(user, found, fingerprint)
         if cached is not None:
             return replace(cached, sources=sources)
@@ -263,19 +187,18 @@ class ChallengeChatService:
             if challenge.code in SUPPORTED_CODES and self.conversation._matches_fixed_contract(challenge)
         }
 
-    def _context_cards(self, searched: list[Page], selectable: dict[str, Challenge]) -> list[EvidenceCard]:
-        """후보마다 승인 카드 한 장을 먼저 넣고, 검색에 걸린 카드·나머지 승인 카드로 채운다."""
+    def _context_cards(self, selectable: dict[str, Challenge]) -> list[EvidenceCard]:
+        """후보마다 승인 카드 한 장을 먼저 넣고, 나머지 승인 카드로 채운다."""
         approved = [
             page.card
             for page in self.index.pages_for(set(selectable), {"card"})
             if page.card is not None and page.card.status == "approved"
         ]
-        hit = [page.card for page in searched if page.card is not None]
         first_per_code: dict[str, EvidenceCard] = {}
-        for card in [*hit, *approved]:
+        for card in approved:
             first_per_code.setdefault(card.challenge_code, card)
         ordered: dict[str, EvidenceCard] = {}
-        for card in [*first_per_code.values(), *hit, *approved]:
+        for card in [*first_per_code.values(), *approved]:
             ordered.setdefault(card.card_id, card)
         return list(ordered.values())[: max(MAX_CONTEXT_CARDS, len(first_per_code))]
 
@@ -403,10 +326,6 @@ def candidate_context(challenge: Challenge, proposed_goal: dict[str, Any] | None
             "daily_target_count": goal.daily_target_count,
         },
     }
-
-
-def _unique_pages(pages: list[Page]) -> list[Page]:
-    return list({page.page_id: page for page in pages}.values())
 
 
 def _fingerprint(**parts: Any) -> str:

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 from app.core import config
 from app.core.errors import AppError, ErrorCode
 from app.dependencies.security import get_request_user
-from app.dtos.challenges import ChallengeChatRequest, ChallengeSelectRequest
+from app.dtos.challenges import ChallengeSelectRequest
 from app.dtos.envelope import ok
 from app.models.users import User
 from app.services.challenge_chat import ChallengeChatService
@@ -46,35 +46,19 @@ async def get_challenge_chat_service() -> ChallengeChatService:
     return ChallengeChatService(RecommendationService(), await PageIndex.build(), provider, enabled=enabled)
 
 
-@challenge_chat_router.post("/challenge-chat", status_code=status.HTTP_200_OK)
-async def chat_with_challenge_bot(
-    request: ChallengeChatRequest,
-    user: Annotated[User, Depends(get_request_user)],
-    service: Annotated[ChallengeChatService, Depends(get_challenge_chat_service)],
-) -> dict[str, Any]:
-    """질의 챗봇 1단계: 자유 대화. 대화는 클라이언트가 들고 있고 서버는 저장하지 않는다.
-
-    꺼져 있으면 mode=off 로 안내 문장만 준다. 챌린지 선택은 /challenge-chat/select 가 한다.
-    """
-    result = await service.reply(user, [message.model_dump() for message in request.messages])
-    return ok({"mode": result.mode, "reply": result.reply, "sources": result.sources})
-
-
 @challenge_chat_router.post("/challenge-chat/select", status_code=status.HTTP_200_OK)
 async def select_challenges_from_chat(
     request: ChallengeSelectRequest,
     user: Annotated[User, Depends(get_request_user)],
     service: Annotated[ChallengeChatService, Depends(get_challenge_chat_service)],
 ) -> dict[str, Any]:
-    """질의 챗봇 2단계: 대화 결과로 챌린지를 고른다 (REQ-CHLG-012).
+    """질의 챗봇: 선택형 질문을 한 장씩 주고(mode=ask), 다 답하면 챌린지를 고른다 (REQ-CHLG-012).
 
-    AI 는 enum 으로 묶은 코드 중에서만 고르고, 목표 값은 서버가 규칙·마스터 값으로 채워 서빙한다.
+    답은 선택지를 눌러서만 받는다. AI 는 후보 라벨에 확률만 매기고, 목표 값은 서버가 규칙·마스터 값으로 채워 서빙한다.
     items 의 recommendation_id 로 CHLG-05 시작을 부른다. 실패하면 mode=rules 로 규칙 추천을 그대로 준다.
     """
     try:
-        result = await service.select(
-            user, [message.model_dump() for message in request.messages], request.answers, request.asked
-        )
+        result = await service.select(user, request.answers, request.asked)
     except ValueError as exc:
         # 질문 기록(asked)이 알려진 키가 아니거나 중복일 때
         raise AppError(ErrorCode.VALIDATION_ERROR, message=str(exc)) from exc

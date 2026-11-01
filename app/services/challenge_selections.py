@@ -22,14 +22,12 @@ LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 #: 판단 모델 확률 중 후보 라벨에 실린 몫이 이보다 작으면 후보 밖을 고른 것으로 보고 버린다
 MIN_LABEL_MASS = 0.5
 MAX_REASON_LENGTH = 200
-MAX_REPLY_LENGTH = 600
 
 #: 질환 치료·예방·수치 개선을 단정하거나 위험도·진단을 말하는 표현 (계약 3절 "서버가 거절하는 응답")
 CLAIM_PATTERN = re.compile(
     r"치료|완치|낫(?:는|게|습|아)|예방|막(?:아|을|는)|줄(?:여|일|어)|낮(?:춰|출|아|추)|감소|개선|효과|보장|"
     r"반드시|확실|틀림없|진단|당뇨|고혈압|혈압|혈당|위험도|위협도|질환|질병|%|퍼센트"
 )
-DIGIT_PATTERN = re.compile(r"\d")
 NUMBER_PATTERN = re.compile(r"\d+(?:\.\d+)?")
 #: 근거 카드 guidance 의 운영 기준 말투. 사용자에게 건네는 이유 문장으로는 쓰지 않는다
 OPERATOR_PATTERN = re.compile(r"답한 경우|답하면|제안한다|제안하지|않는다\.?$|원형|운영 기준")
@@ -46,12 +44,6 @@ class ValidatedSelection:
     reason_replaced: bool
     #: 판단 모델이 준 확률(후보 라벨끼리 합이 1). 후보가 하나라 모델을 부르지 않았으면 1
     probability: float
-
-
-def has_unsafe_claim(text: str, *, allow_numbers: bool) -> bool:
-    if CLAIM_PATTERN.search(text):
-        return True
-    return not allow_numbers and bool(DIGIT_PATTERN.search(text))
 
 
 def goal_numbers(goal: Goal) -> set[Decimal]:
