@@ -2074,6 +2074,23 @@ const css = document.createElement("link");
 css.rel = "stylesheet";
 css.href = new URL("./live.css", import.meta.url);
 document.head.append(css);
+// 하단 메뉴 슬라이드 탭 (2026-11-02, 병주님 지시): 기본 접힘, 탭 누르면 위로 슬라이드
+(function setupNavTab() {
+  const nav = document.querySelector("#adventure-nav");
+  if (!nav || nav.querySelector(".nav-tab")) return;
+  nav.insertAdjacentHTML(
+    "afterbegin",
+    '<button type="button" class="nav-tab" aria-label="메뉴 열기/닫기"><span class="nav-tab-grip"></span><span class="nav-tab-label">메뉴</span></button>',
+  );
+  nav.querySelector(".nav-tab").addEventListener("click", (event) => {
+    event.stopPropagation();
+    nav.classList.toggle("nav-open");
+  });
+  nav.querySelectorAll("[data-main-target]").forEach((button) => {
+    button.addEventListener("click", () => nav.classList.remove("nav-open"));
+  });
+})();
+
 $$(
   ".prototype-disclosure,.prototype-banner,.prototype-notice,.prototype-status,.prototype-proposal,.rewards>.hint,.rewards .hint,.preview-note",
 ).forEach((el) => el.remove());
