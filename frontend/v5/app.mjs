@@ -1719,7 +1719,7 @@ function renderChat() {
   if (!scene) return;
   const log = scene.querySelector(".chat-log");
   log.innerHTML =
-    '<h1>공략 도우미</h1><p class="small-copy chat-intro">질문에 눌러서 답하면 지금 시작할 만한 챌린지를 골라요.</p>' +
+    '<h1>공략 도우미</h1><p class="small-copy chat-intro">질문에 눌러서 답하면 지금 시작할 만한 챌린지를 골라요.</p><button type="button" class="secondary-action chat-restart-top" data-chat-restart>다시 받기</button>' +
     chat.view
       .map((item, index) => chatItemHtml(item, index, chat.view[index - 1]))
       .join("");
