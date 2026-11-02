@@ -1897,3 +1897,27 @@ h2 {
     color: #8a7fd4;
   }
 }
+/* ---- 하단 메뉴 탭 위치 수정 (2026-11-02, 병주님 지적) ---- */
+/* 탭이 버튼 행에 섞이지 않고 메뉴 최상단에 한 줄 전체로 오게 한다 */
+@media (max-width: 760px) {
+  .phone #adventure-nav,
+  .phone.home-map #adventure-nav {
+    flex-wrap: wrap;
+  }
+  .phone #adventure-nav .nav-tab,
+  .phone.home-map #adventure-nav .nav-tab {
+    flex: 0 0 100%;
+    order: -1;
+    min-height: 36px;
+    max-height: 36px;
+    padding: 6px 0 4px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  /* 탭 외 메뉴 버튼들은 두 번째 행에 나란히 */
+  .phone #adventure-nav button:not(.nav-tab),
+  .phone.home-map #adventure-nav button:not(.nav-tab) {
+    flex: 1 1 0;
+  }
+}
