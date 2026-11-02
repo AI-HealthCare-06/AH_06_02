@@ -55,6 +55,17 @@ async def _done(user_id: int) -> Prediction:
 
 
 class TestPredictionStatus(TestCase):
+    async def test_first_completed_prediction_is_marked_for_initial_questions(self) -> None:
+        with serving():
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                user, headers = await login(client, "read-first-assessment@example.com")
+                first = await _done(user.id)
+                first_response = await client.get(f"/api/v1/predictions/{first.id}", headers=headers)
+                second = await _done(user.id)
+                second_response = await client.get(f"/api/v1/predictions/{second.id}", headers=headers)
+        assert first_response.json()["data"]["first_completed"] is True
+        assert second_response.json()["data"]["first_completed"] is False
+
     async def test_pending_has_neither_results_nor_failure(self) -> None:
         with serving():
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

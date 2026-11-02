@@ -319,8 +319,14 @@ async function mock(page, state = {}) {
           },
         ],
       };
+    else if (p === "/challenge-chat/entry") data = { initial: state.entryInitial ?? !!state.firstCompleted };
     else if (p === "/challenge-chat/select") {
       // 실제 서버처럼 질문을 한 장씩 묻고(선택지도 서버가 준다), 다 답하면 고른 챌린지를 준다
+      if (state.activityFlow && !body.activity?.light)
+        return route.fulfill({ json: { success: true, data: {
+          mode: "ask", answer: "하나만 골라 주세요.", items: [],
+          questions: [{ key: "activity_light", question_id: "activity-light", text: "가볍게 움직일 수 있나요?", options: [{ value: "yes", label: "할 수 있어요" }, { value: "no", label: "어려워요" }] }],
+        } } });
       if (state.chatFull)
         return route.fulfill({
           status: 409,
@@ -506,6 +512,8 @@ async function mock(page, state = {}) {
     } else if (p === "/predictions" && req.method() === "POST") {
       // 응답 전에 연결이 끊기면 앱은 접수 여부를 알 수 없다
       if (state.dropPrediction) return route.abort("failed");
+      if (state.allDiagnosed)
+        return route.fulfill({ status: 409, json: { success: false, error: { code: "PRED_ALL_DIAGNOSED", message: "예측 대상이 없어요." } } });
       data = { prediction_id: 5 };
     } else if (p === "/predictions/5" && state.failPrediction) {
       state.failPrediction = false;
@@ -518,7 +526,7 @@ async function mock(page, state = {}) {
         },
       };
     } else if (p === "/predictions/5")
-      data = { status: state.predicting ? "pending" : "done" };
+      data = { status: state.predicting ? "pending" : "done", first_completed: !!state.firstCompleted };
     else if (p === "/health-records" && state.manyRecords) {
       // 최신순 101건 중 가장 오래된 1건만 체중이 99.9kg 이다
       const page = Number(url.searchParams.get("page") || 1);
@@ -1314,6 +1322,70 @@ test("허용 범위를 벗어난 값은 계정을 만들기 전에 그 단계에
       calls.some((c) => c.path === "/auth/signup"),
       false,
     );
+  }));
+
+test("첫 예측이 끝나면 운동 범위 질문으로 바로 들어간다", async () =>
+  withPage(async (page, origin) => {
+    const calls = await mock(page, { signedOut: true, firstCompleted: true });
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator('.scene[data-page="chat"]:not([hidden])').waitFor({ timeout: 5000 });
+    await page.locator(".chat-question").waitFor();
+    const select = calls.find((call) => call.path === "/challenge-chat/select");
+    assert.deepEqual(select?.body.activity, {});
+  }));
+
+test("기존 공략 이력이 있으면 첫 예측 결과도 지도로 돌아간다", async () =>
+  withPage(async (page, origin) => {
+    const calls = await mock(page, { signedOut: true, firstCompleted: true, entryInitial: false });
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator('.scene[data-page="risk"]:not([hidden])').waitFor({ timeout: 5000 });
+    assert.equal(calls.some((call) => call.path === "/challenge-chat/select"), false);
+  }));
+
+test("모두 진단된 첫 사용자도 검사 뒤 운동 범위 질문으로 들어간다", async () =>
+  withPage(async (page, origin) => {
+    const calls = await mock(page, { signedOut: true, firstCompleted: true, allDiagnosed: true });
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator('.scene[data-page="chat"]:not([hidden])').waitFor({ timeout: 5000 });
+    await page.locator(".chat-question").waitFor();
+    assert.deepEqual(calls.find((call) => call.path === "/challenge-chat/select")?.body.activity, {});
+  }));
+
+test("운동 범위 선택은 해당 답으로 서버에 전달한다", async () =>
+  withPage(async (page, origin) => {
+    const calls = await mock(page, { signedOut: true, firstCompleted: true, activityFlow: true });
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator(".chat-question", { hasText: "가볍게 움직일 수 있나요?" }).waitFor();
+    await Promise.all([
+      page.waitForResponse((response) => response.url().includes("/challenge-chat/select") && response.request().postDataJSON()?.activity?.light === "yes", { timeout: 3000 }),
+      page.locator(".chat-question").last().getByRole("button", { name: "할 수 있어요" }).click(),
+    ]);
+    const selects = calls.filter((call) => call.path === "/challenge-chat/select");
+    assert.deepEqual(selects.at(-1).body, { answers: {}, asked: [], activity: { light: "yes" } });
+  }));
+
+test("첫 질의 중 새로고침하면 운동 범위 질문을 다시 시작한다", async () =>
+  withPage(async (page, origin) => {
+    const state = { signedOut: true, firstCompleted: true, activityFlow: true };
+    const calls = await mock(page, state);
+    await page.goto(new URL(path + "#login", origin).href);
+    await fillSignup(page);
+    await page.locator('.health3 button[type="submit"]').click();
+    await page.locator(".chat-question", { hasText: "가볍게 움직일 수 있나요?" }).waitFor();
+    state.signedOut = false;
+    const before = calls.length;
+    await page.reload();
+    await page.locator(".chat-question", { hasText: "가볍게 움직일 수 있나요?" }).waitFor();
+    const select = calls.slice(before).find((call) => call.path === "/challenge-chat/select");
+    assert.deepEqual(select?.body.activity, {});
   }));
 
 test("예측 대기 중 새로고침해도 결과 확인을 이어가고 다시 확인 버튼을 보여준다", async () =>

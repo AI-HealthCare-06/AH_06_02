@@ -166,7 +166,9 @@ class PredictionService:
         prediction = await self._owned(user, prediction_id)
         results = None
         failure = None
+        first_completed = None
         if prediction.status == PredictionStatus.DONE:
+            first_completed = prediction.id == await self.predictions.first_completed_id(user.id)
             results = [
                 DiseaseProbability(disease=disease, probability=float(probability))
                 for disease, probability in self._probabilities(prediction).items()
@@ -179,6 +181,7 @@ class PredictionService:
             status=prediction.status,
             model_version=prediction.model_version,
             model_experimental=self._experimental(prediction),
+            first_completed=first_completed,
             results=results,
             failure=failure,
         )

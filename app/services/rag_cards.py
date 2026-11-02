@@ -70,6 +70,54 @@ YES_ANSWER_CODES = {
 }
 
 
+def classify_activity_range(answers: dict[str, str]) -> int | None:
+    """확인된 선택지에서 운동 가능 범위를 산정한다."""
+    if answers.get("light") == "yes" and answers.get("walk") == "yes" and answers.get("vigorous") == "yes":
+        return 3
+    if answers.get("light") == "yes" and answers.get("walk") == "yes" and answers.get("vigorous") == "no":
+        return 2
+    if answers.get("light") == "yes" and answers.get("walk") == "no" and answers.get("vigorous") in {"no", "unknown"}:
+        return 1
+    return None
+
+
+def activity_question_budget(answers: dict[str, str]) -> int:
+    """판정이 모호하면 확인 질문을 두 개까지 더 허용한다."""
+    return 3 if classify_activity_range(answers) is not None else 5
+
+
+def activity_range_allows(code: str, level: int | None) -> bool:
+    """확인된 운동 범위에서 허용되는 챌린지인지 판정한다."""
+    minimum = {
+        "CH_STAND_HOURLY": 1,
+        "CH_HOUSEWORK_15": 1,
+        "CH_SQUAT_15": 1,
+        "CH_STAND_CALL": 1,
+        "CH_SCREEN_BREAK": 1,
+        "CH_WALK_AFTER_MEAL": 2,
+        "CH_WALK_ONE_STOP": 2,
+        "CH_WALK_EVENING_20": 2,
+        "CH_STAIRS": 3,
+        "CH_STRENGTH_10": 3,
+        "CH_WALL_PUSHUP_10": 3,
+    }
+    if code not in SUPPORTED_CODES:
+        return False
+    if code not in minimum:
+        return True
+    return level in {1, 2, 3} and level >= minimum[code]
+
+
+class ActivityAnswers(BaseModel):
+    """운동 가능 범위 질문에 누른 선택지 값."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    light: Literal["yes", "no", "unknown", "unsure", "limited"] = "unknown"
+    walk: Literal["yes", "no", "unknown", "unsure", "limited"] = "unknown"
+    vigorous: Literal["yes", "no", "unknown", "unsure", "limited"] = "unknown"
+    clarifications: int = Field(default=0, ge=0, le=2, strict=True)
+
+
 class SituationAnswers(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     meal_walk: Literal["both", "both_indoor", "lunch_only", "dinner_only", "none", "unknown", "limited"] = "unknown"

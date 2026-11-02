@@ -37,6 +37,15 @@ class PredictionRepository:
         """본인 예측만 돌려준다. 남의 예측은 없는 것과 똑같이 None 이다."""
         return await self._model.get_or_none(id=prediction_id, user_id=user_id)
 
+    async def first_completed_id(self, user_id: int) -> int | None:
+        """가장 먼저 완료된 예측의 식별자."""
+        first = (
+            await self._model.filter(user_id=user_id, status=PredictionStatus.DONE)
+            .order_by("predicted_at", "id")
+            .first()
+        )
+        return first.id if first else None
+
     async def contributions(self, prediction_id: int, disease: Disease, limit: int) -> list[PredictionContribution]:
         """질환 안 rank 순으로 limit 개."""
         return (

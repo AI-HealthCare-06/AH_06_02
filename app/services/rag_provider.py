@@ -86,6 +86,62 @@ class OpenAISelectionProvider:
         )
         return await self._respond(system, content, "challenge_selection", SelectionOutput.model_json_schema(), 800)
 
+    async def choose_question(self, context: dict[str, Any]) -> object:
+        """열린 후보에서 다음으로 물을 질문의 키 하나만 요청한다."""
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["answer_key"],
+            "properties": {"answer_key": {"type": "string"}},
+        }
+        instructions = "지금까지의 선택을 참고해 candidates 중 다음으로 물을 질문 하나의 answer_key만 반환하세요."
+        return await self._respond(instructions, json.dumps(context, ensure_ascii=False), "question_order", schema, 100)
+
+    async def classify_activity(self, context: dict[str, Any]) -> object:
+        """선택된 답을 기준으로 운동 가능 범위의 단계 번호만 요청한다."""
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["level"],
+            "properties": {"level": {"type": "integer", "enum": [1, 2, 3]}},
+        }
+        instructions = (
+            "선택된 답을 보고 가능 범위를 고르세요. 가벼운 움직임은 1, 산책은 2, "
+            "조깅이나 팔굽혀펴기까지 가능하면 3입니다. 확인하지 않은 활동은 가능하다고 추정하지 마세요. "
+            "진단이나 운동 허가를 하지 말고 단계 번호만 출력하세요."
+        )
+        return await self._respond(instructions, json.dumps(context, ensure_ascii=False), "activity_range", schema, 100)
+
+    async def generate_question(self, context: dict[str, Any]) -> object:
+        """서버가 정한 질문 의도와 답 값으로 선택형 질문을 생성한다."""
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["text", "options"],
+            "properties": {
+                "text": {"type": "string"},
+                "options": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["value", "label"],
+                        "properties": {"value": {"type": "string"}, "label": {"type": "string"}},
+                    },
+                },
+            },
+        }
+        instructions = (
+            "제공된 질문 의도와 선택지 값의 의미를 유지하여 선택형 질문과 선택지 문구를 만드세요. "
+            "text는 '잠깐 여쭤볼게요. ', '한 가지만 더 확인할게요. ', '이번에는 이렇게 여쭤볼게요. ' 중 "
+            "하나를 앞에 붙이거나 생략하고 intents 중 고른 질문 원문으로 끝나야 합니다. "
+            "options의 값은 그대로 유지하고 문구는 값별 allowed_labels에서 고르며 순서를 바꿀 수 있습니다. "
+            "질환 진단, 치료, 예방이나 효과를 단정하지 마세요."
+        )
+        return await self._respond(
+            instructions, json.dumps(context, ensure_ascii=False), "challenge_question", schema, 600
+        )
+
     async def judge(self, context: dict[str, Any], labels: list[str]) -> dict[str, float]:
         """2단계 판단 모델. 첫 출력 토큰의 상위 logprobs 를 라벨별 확률로 바꾼다. 문장은 쓰지 않는다.
 

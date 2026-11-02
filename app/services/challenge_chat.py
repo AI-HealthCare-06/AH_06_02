@@ -22,11 +22,20 @@ from tortoise.transactions import in_transaction
 
 from app.core import config
 from app.core.errors import AppError
-from app.models.challenges import Challenge, ChallengeRecommendation, UserChallenge, UserChallengeStatus
+from app.models.challenges import (
+    AttackCycleStatus,
+    Challenge,
+    ChallengeRecommendation,
+    UserAttackCycle,
+    UserChallenge,
+    UserChallengeStatus,
+)
+from app.models.health_records import HealthRecord, InputMode
 from app.models.users import User
 from app.services.attack_cycles import lock_user, today_kst
 from app.services.challenge_goals import display_goal
 from app.services.challenge_selections import (
+    CLAIM_PATTERN,
     ValidatedSelection,
     candidate_labels,
     goal_numbers,
@@ -36,15 +45,27 @@ from app.services.challenge_selections import (
 from app.services.conversation_recommendations import ConversationRecommendationService
 from app.services.monster_cohorts import MonsterCohortService
 from app.services.page_index import PageIndex
-from app.services.rag_cards import ANSWER_FIELDS, SUPPORTED_CODES, EvidenceCard, QuestionPage, SituationAnswers
+from app.services.rag_cards import (
+    ANSWER_FIELDS,
+    CODE_BY_ANSWER_KEY,
+    SUPPORTED_CODES,
+    ActivityAnswers,
+    EvidenceCard,
+    QuestionPage,
+    SituationAnswers,
+    activity_range_allows,
+    classify_activity_range,
+)
 from app.services.rag_provider import ChatProvider, failure_label
 from app.services.recommendations import EligibleChallenges, GeneratedRecommendations, RecommendationService
 
 logger = logging.getLogger(__name__)
 
-CHAT_POLICY_VERSION = "RAG-CHAT-20261101-v4"
+CHAT_POLICY_VERSION = "RAG-CHAT-20261102-v5"
 #: 선택 단계에 넘길 근거 카드 수. 후보마다 한 장은 먼저 넣는다
 MAX_CONTEXT_CARDS = 12
+QUESTION_PREFIXES = ("", "잠깐 여쭤볼게요. ", "한 가지만 더 확인할게요. ", "이번에는 이렇게 여쭤볼게요. ")
+ANSWER_LABEL_VARIANTS = {"yes": {"가능해요"}, "no": {"지금은 어려워요"}}
 
 ChatMode = Literal["conversation", "rules", "ask", "hold"]
 
@@ -82,17 +103,80 @@ class ChallengeChatService:
         # 건강기록 확인·고정 계약 확인은 대화형 추천과 같은 코드를 쓴다
         self.conversation = ConversationRecommendationService(rules, cards)
 
-    async def select(self, user: User, answers: SituationAnswers, asked: list[str]) -> ChatResult:
+    async def initial_entry(self, user: User) -> bool:
+        """첫 검사 뒤 아직 추천이나 시작한 주기가 없는 사용자인지 확인한다."""
+        if await UserAttackCycle.filter(user_id=user.id).exclude(status=AttackCycleStatus.DRAFT).exists():
+            return False
+        if await ChallengeRecommendation.filter(user_id=user.id).exists():
+            return False
+        return await HealthRecord.filter(user_id=user.id).exclude(input_mode=InputMode.DAILY).count() == 1
+
+    async def select(
+        self, user: User, answers: SituationAnswers, asked: list[str], activity: ActivityAnswers | None = None
+    ) -> ChatResult:
         now = datetime.now(config.TIMEZONE)
-        if not self.enabled or self.provider is None:
+        if activity is None and (not self.enabled or self.provider is None):
             return self._result("rules", await self.current_batch(user))
         found = await self.rules.eligible(user, now)
+        activity_level = None
+        question_count = len(asked)
+        if activity is not None:
+            activity_values = activity.model_dump(exclude={"clarifications"})
+            question_count += sum(value not in {"unknown", "unsure"} for value in activity_values.values())
+            question_count += activity.clarifications
+            if question_count > 5:
+                raise ValueError("질문은 최대 다섯 개까지 답할 수 있습니다.")
+            activity_question = activity_assessment_question(activity)
+            if activity_question is not None:
+                if question_count >= 5 or ("unsure" in activity_values.values() and activity.clarifications >= 2):
+                    return self._result("hold", found.batch([]))
+                return self._result("ask", found.batch([]), questions=[activity_question])
+            activity_level = classify_activity_range(activity_values)
+            if activity_level is None:
+                return self._result("hold", found.batch([]))
+            activity_level = await self._activity_level(activity, activity_level)
         feasible = self._feasible(found)
+        if activity is not None:
+            feasible = {code: item for code, item in feasible.items() if activity_range_allows(code, activity_level)}
         if answers.activity_limited:
             return self._result("hold", found.batch([]))
-        question = self.index.next_question(set(feasible), answers, asked, f"{user.id}:{found.cycle.id}")
+        clear = activity is not None and question_count >= 3 and any(answers.supports(code) for code in feasible)
+        question = (
+            self.index.next_question(set(feasible), answers, asked, f"{user.id}:{found.cycle.id}")
+            if question_count < 5 and not clear
+            else None
+        )
         if question is not None:
-            return self._result("ask", found.batch([]), questions=[question_body(question)])
+            question = await self._choose_question(question, set(feasible), answers, asked)
+            return self._result("ask", found.batch([]), questions=[await self._question(question, answers)])
+        return await self._select_candidates(user, found, answers, asked, activity, activity_level, feasible, now)
+
+    async def _activity_level(self, activity: ActivityAnswers, confirmed: int) -> int:
+        """모델의 운동 범위는 사용자가 확인한 상한을 넘지 않는다."""
+        classify = getattr(self.provider, "classify_activity", None) if self.enabled else None
+        if classify is None:
+            return confirmed
+        try:
+            result = await classify(activity.model_dump(exclude={"clarifications"}))
+            level = result.get("level") if isinstance(result, dict) else None
+            if type(level) is not int or level not in {1, 2, 3}:
+                raise ValueError("운동 범위 응답이 올바르지 않습니다.")
+            return min(confirmed, level)
+        except (ValueError, TypeError, AppError, OSError, TimeoutError, httpx.HTTPError) as exc:
+            logger.warning("운동 범위 판단 호출·검증 실패, 확인된 답을 쓴다: %s", failure_label(exc))
+            return confirmed
+
+    async def _select_candidates(
+        self,
+        user: User,
+        found: EligibleChallenges,
+        answers: SituationAnswers,
+        asked: list[str],
+        activity: ActivityAnswers | None,
+        activity_level: int | None,
+        feasible: dict[str, Challenge],
+        now: datetime,
+    ) -> ChatResult:
         selectable = {code: challenge for code, challenge in feasible.items() if answers.supports(code)}
 
         cards = self._context_cards(selectable)
@@ -100,10 +184,12 @@ class ChallengeChatService:
             code: challenge for code, challenge in selectable.items() if any(c.challenge_code == code for c in cards)
         }
         if not selectable:
+            if activity is not None:
+                return self._result("hold", found.batch([]))
             return self._result("rules", await self.current_batch(user))
         labels = candidate_labels(set(selectable))
         cohort = (await self.cohorts.build(user.id)).get(found.monster.code)
-        context = {
+        context: dict[str, Any] = {
             "answers": {key: value for key, value in answers.model_dump().items() if value != "unknown"},
             "cohort": self.cohorts.llm_context(cohort) if cohort else None,
             "candidates": [
@@ -114,13 +200,17 @@ class ChallengeChatService:
                 {"card_id": c.card_id, "challenge_code": c.challenge_code, "guidance": c.guidance} for c in cards
             ],
         }
+        if activity is not None:
+            context["activity_level"] = activity_level
+            context["activity_answers"] = activity.model_dump()
+        provider = self.provider if self.enabled else None
         record_id = await self.conversation._record_id(user.id)
         fingerprint = _fingerprint(
             context=context,
             cycle_id=found.cycle.id,
             record_id=record_id,
             model_version=found.model_version,
-            provider=self.provider.model_version,
+            provider=provider.model_version if provider else "fixed-questions",
             cards=[(card.card_id, card.version) for card in cards],
             goals={code: found.goals.get(challenge.id) for code, challenge in selectable.items()},
         )
@@ -128,27 +218,51 @@ class ChallengeChatService:
         cached = await self._cached(user, found, fingerprint)
         if cached is not None:
             return replace(cached, sources=sources)
+        served = {code: goal_numbers(display_goal(c, found.goals.get(c.id))) for code, c in selectable.items()}
+        given = answers.model_dump()
+        reasons = {
+            code: self.index.question_page(ANSWER_FIELDS[code]).reason_for(given[ANSWER_FIELDS[code]])
+            for code in selectable
+        }
         try:
-            served = {code: goal_numbers(display_goal(c, found.goals.get(c.id))) for code, c in selectable.items()}
             # 후보가 하나면 고를 것이 없어 판단 모델을 부르지 않는다
-            if len(labels) == 1:
+            if provider is None:
+                probabilities = {code: 1.0 / len(labels) for code in labels.values()}
+            elif len(labels) == 1:
                 probabilities = {code: 1.0 for code in labels.values()}
             else:
-                probabilities = validate_judgment(await self.provider.judge(context, list(labels)), labels)
-            given = answers.model_dump()
-            reasons = {
-                code: self.index.question_page(ANSWER_FIELDS[code]).reason_for(given[ANSWER_FIELDS[code]])
-                for code in selectable
-            }
+                probabilities = validate_judgment(await provider.judge(context, list(labels)), labels)
             decided = rank_selections(probabilities, selectable, cards, answers, reasons, served)
         except (ValueError, AppError, OSError, TimeoutError, httpx.HTTPError) as exc:
             # 모델 실패 내용·대화 원문·토큰을 로그에 남기지 않는다.
             # 키 오류(401)·모델 이름 오류(404)를 알 수 있게 예외 종류와 상태만 남긴다
             logger.warning("질의 챗봇 선택 호출·검증 실패, 규칙 추천으로 돌린다: %s", failure_label(exc))
-            decided = []
+            provider = None
+            decided = (
+                rank_selections(
+                    {code: 1.0 / len(labels) for code in labels.values()}, selectable, cards, answers, reasons, served
+                )
+                if activity is not None
+                else []
+            )
         if not decided:
+            if activity is not None:
+                return self._result("hold", found.batch([]), sources=sources)
             return self._result("rules", await self.current_batch(user), sources=sources)
-        return await self._commit(user, found, decided, now, record_id, fingerprint, answers, asked, sources)
+        return await self._commit(
+            user,
+            found,
+            decided,
+            now,
+            record_id,
+            fingerprint,
+            answers,
+            asked,
+            sources,
+            provider.model_version if provider else None,
+            activity,
+            activity_level,
+        )
 
     async def current_batch(self, user: User) -> GeneratedRecommendations:
         """지금 주기에서 아직 응답하지 않은 마지막 추천 묶음. 없으면 규칙 추천을 새로 만든다 (CHLG-01)."""
@@ -186,6 +300,93 @@ class ChallengeChatService:
             for challenge, _ in found.scored
             if challenge.code in SUPPORTED_CODES and self.conversation._matches_fixed_contract(challenge)
         }
+
+    async def _choose_question(
+        self, fallback: QuestionPage, codes: set[str], answers: SituationAnswers, asked: list[str]
+    ) -> QuestionPage:
+        """열린 후보의 질문만 모델이 고르게 하고 잘못 고르면 고정 질문을 쓴다."""
+        choose = getattr(self.provider, "choose_question", None) if self.enabled else None
+        values = answers.model_dump()
+        candidates = {
+            ANSWER_FIELDS[code]: code
+            for code in codes & SUPPORTED_CODES
+            if values[ANSWER_FIELDS[code]] == "unknown" and ANSWER_FIELDS[code] not in asked
+        }
+        if choose is None or len(candidates) < 2:
+            return fallback
+        context = {
+            "answers": {key: value for key, value in values.items() if value != "unknown"},
+            "candidates": [
+                {"answer_key": key, "challenge_code": code, "intent": self.index.question_page(key).text}
+                for key, code in sorted(candidates.items())
+            ],
+        }
+        try:
+            result = await choose(context)
+            key = result.get("answer_key") if isinstance(result, dict) else None
+            if not isinstance(key, str) or key not in candidates:
+                raise ValueError("질문 키가 현재 후보에 없습니다.")
+            return self.index.question_page(key)
+        except (ValueError, TypeError, KeyError, AppError, OSError, TimeoutError, httpx.HTTPError) as exc:
+            logger.warning("질문 순서 판단 실패, 고정 질문으로 돌린다: %s", failure_label(exc))
+            return fallback
+
+    async def _question(self, question: QuestionPage, answers: SituationAnswers) -> dict[str, Any]:
+        """생성 결과를 검사하고 실패하면 승인된 질문 페이지를 사용한다."""
+        fallback = question_body(question)
+        generate = getattr(self.provider, "generate_question", None)
+        if generate is None:
+            return fallback
+
+        code = CODE_BY_ANSWER_KEY[question.answer_key]
+        intents = [
+            page.question.text
+            for page in self.index.pages
+            if page.question is not None and page.question.answer_key == question.answer_key
+        ]
+        allowed_labels = {
+            option["value"]: sorted({option["label"]} | ANSWER_LABEL_VARIANTS.get(option["value"], set()))
+            for option in fallback["options"]
+        }
+        context = {
+            "answer_key": question.answer_key,
+            "challenge_code": code,
+            "intent": question.text,
+            "intents": intents,
+            "options": fallback["options"],
+            "allowed_labels": allowed_labels,
+            "answers": {key: value for key, value in answers.model_dump().items() if value != "unknown"},
+        }
+        try:
+            result = await generate(context)
+            if not isinstance(result, dict) or set(result) != {"text", "options"}:
+                raise ValueError("질문 형식이 올바르지 않습니다.")
+            text = result["text"]
+            options = result["options"]
+            if (
+                code not in SUPPORTED_CODES
+                or not isinstance(text, str)
+                or len(text) > 200
+                or text not in {prefix + intent for prefix in QUESTION_PREFIXES for intent in intents}
+                or CLAIM_PATTERN.search(text)
+                or not isinstance(options, list)
+                or any(not isinstance(option, dict) or set(option) != {"value", "label"} for option in options)
+                or len(options) != len(fallback["options"])
+                or {option["value"] for option in options} != set(allowed_labels)
+                or any(option["label"] not in allowed_labels[option["value"]] for option in options)
+            ):
+                raise ValueError("질문이 승인된 값과 일치하지 않습니다.")
+            rendered = next(
+                page.question
+                for page in self.index.pages
+                if page.question is not None
+                and page.question.answer_key == question.answer_key
+                and text in {prefix + page.question.text for prefix in QUESTION_PREFIXES}
+            )
+            return {**fallback, "question_id": rendered.question_id, "text": text, "options": options}
+        except (ValueError, TypeError, KeyError, AppError, OSError, TimeoutError, httpx.HTTPError) as exc:
+            logger.warning("질의 생성 호출·검증 실패, 고정 질문으로 돌린다: %s", failure_label(exc))
+            return fallback
 
     def _context_cards(self, selectable: dict[str, Challenge]) -> list[EvidenceCard]:
         """후보마다 승인 카드 한 장을 먼저 넣고, 나머지 승인 카드로 채운다."""
@@ -237,9 +438,11 @@ class ChallengeChatService:
         answers: SituationAnswers,
         asked: list[str],
         sources: list[str],
+        llm_model_version: str | None,
+        activity: ActivityAnswers | None,
+        activity_level: int | None,
     ) -> ChatResult:
         """모델 호출 사이에 주기·건강기록·후보가 바뀌지 않았는지 잠금 안에서 다시 보고 추천 행을 만든다."""
-        assert self.provider is not None
         async with in_transaction():
             await lock_user(user.id)
             try:
@@ -270,7 +473,7 @@ class ChallengeChatService:
                     # 목표 값은 AI 가 아니라 규칙이 정한 단계(없으면 마스터)다
                     proposed_goal=fresh.goals.get(challenge.id),
                     evidence_card_ids=[card.card_id for card in selection.cards],
-                    llm_model_version=self.provider.model_version,
+                    llm_model_version=llm_model_version,
                     conversation_snapshot={
                         "policy_version": CHAT_POLICY_VERSION,
                         "fingerprint": fingerprint,
@@ -281,7 +484,9 @@ class ChallengeChatService:
                         "health_record_id": record_id,
                         "reason": selection.reason,
                         "reason_replaced": selection.reason_replaced,
-                        "probability": round(selection.probability, 4),
+                        "probability": round(selection.probability, 4) if llm_model_version else None,
+                        "activity_answers": activity.model_dump() if activity else None,
+                        "activity_level": activity_level,
                     },
                 )
                 rows.append(row)
@@ -331,3 +536,26 @@ def candidate_context(challenge: Challenge, proposed_goal: dict[str, Any] | None
 def _fingerprint(**parts: Any) -> str:
     raw = json.dumps({**parts, "policy": CHAT_POLICY_VERSION}, sort_keys=True, ensure_ascii=False, default=str)
     return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def activity_assessment_question(activity: ActivityAnswers) -> dict[str, Any] | None:
+    """답하지 않은 운동 범위 질문 한 개를 반환한다."""
+    if activity.light in {"unknown", "unsure"}:
+        key, text = "light", "작은 공간에서 가볍게 몸을 움직일 수 있나요?"
+    elif activity.light == "yes" and activity.walk in {"unknown", "unsure"}:
+        key, text = "walk", "밖에 나가 산책할 수 있나요?"
+    elif activity.light == "yes" and activity.walk == "yes" and activity.vigorous in {"unknown", "unsure"}:
+        key, text = "vigorous", "조깅이나 팔굽혀펴기를 할 공간과 여유가 있나요?"
+    else:
+        return None
+    return {
+        "key": f"activity_{key}",
+        "question_id": f"activity-{key}",
+        "text": f"다시 확인할게요. {text}" if getattr(activity, key) == "unsure" else text,
+        "options": [
+            {"value": "yes", "label": "할 수 있어요"},
+            {"value": "no", "label": "어려워요"},
+            {"value": "unsure", "label": "잘 모르겠어요"},
+            {"value": "limited", "label": "몸 상태 때문에 어려워요"},
+        ],
+    }

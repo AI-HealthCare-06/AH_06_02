@@ -90,6 +90,56 @@ def _completed(text: str) -> httpx.Response:
     )
 
 
+@pytest.mark.asyncio
+async def test_question_generator_requests_a_structured_response_with_fixed_intent() -> None:
+    sent: dict[str, Any] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent.update(json.loads(request.content))
+        return _completed('{"text":"가능한가요?","options":[{"value":"yes","label":"할 수 있어요"}]}')
+
+    provider = OpenAISelectionProvider("test-key", "fixture-model", httpx.MockTransport(handle))
+    generate = getattr(provider, "generate_question", None)
+    assert generate is not None
+    result = await generate({"answer_key": "stairs", "challenge_code": "CH_STAIRS", "values": ["yes", "no"]})
+    assert result["options"][0]["value"] == "yes"
+    assert sent["store"] is False and sent["text"]["format"]["strict"] is True
+    context = json.loads(sent["input"][1]["content"])
+    assert context["challenge_code"] == "CH_STAIRS"
+    assert "질문 원문으로 끝" in sent["input"][0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_activity_classifier_returns_only_a_structured_level() -> None:
+    sent: dict[str, Any] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent.update(json.loads(request.content))
+        return _completed('{"level":2}')
+
+    provider = OpenAISelectionProvider("test-key", "fixture-model", httpx.MockTransport(handle))
+    classify = getattr(provider, "classify_activity", None)
+    assert classify is not None
+    assert await classify({"light": "yes", "walk": "yes", "vigorous": "no"}) == {"level": 2}
+    assert sent["text"]["format"]["strict"] is True and sent["store"] is False
+
+
+@pytest.mark.asyncio
+async def test_question_order_model_receives_only_candidate_keys() -> None:
+    sent: dict[str, Any] = {}
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        sent.update(json.loads(request.content))
+        return _completed('{"answer_key":"stairs"}')
+
+    provider = OpenAISelectionProvider("test-key", "fixture-model", httpx.MockTransport(handle))
+    choose = getattr(provider, "choose_question", None)
+    assert choose is not None
+    context = {"answers": {}, "candidates": [{"answer_key": "stairs", "challenge_code": "CH_STAIRS"}]}
+    assert await choose(context) == {"answer_key": "stairs"}
+    assert json.loads(sent["input"][1]["content"]) == context
+
+
 def _judged(top: list[tuple[str, float]]) -> httpx.Response:
     first = {"token": top[0][0], "logprob": top[0][1], "top_logprobs": [{"token": t, "logprob": lp} for t, lp in top]}
     content = {"type": "output_text", "text": top[0][0], "logprobs": [first]}
