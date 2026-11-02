@@ -319,26 +319,7 @@ async function mock(page, state = {}) {
           },
         ],
       };
-    else if (p === "/challenge-chat") {
-      if (state.chatFull)
-        return route.fulfill({
-          status: 409,
-          json: {
-            success: false,
-            error: {
-              code: "CHLG_RECOMMENDATION_UNAVAILABLE",
-              message:
-                "현재 주기에 추가로 시작할 수 있는 챌린지가 없어요. 진행 중인 챌린지를 이어가세요.",
-              reason: "slots_unavailable",
-            },
-          },
-        });
-      data = {
-        mode: "chat",
-        reply: "식후에 잠깐 걷는 걸로 시작해 볼까요?",
-        sources: [],
-      };
-    } else if (p === "/challenge-chat/select") {
+    else if (p === "/challenge-chat/select") {
       // 실제 서버처럼 질문을 한 장씩 묻고(선택지도 서버가 준다), 다 답하면 고른 챌린지를 준다
       if (state.chatFull)
         return route.fulfill({
@@ -1005,7 +986,7 @@ const card = (overrides) => ({
   ...overrides,
 });
 
-test("공략 도우미는 열자마자 질문을 한 장씩 묻고, 눌러서 다 답하면 고른 챌린지 → 전투 카드와 같은 상세로 이어진다", async () =>
+test("공략 도우미는 열자마자 질문을 한 장씩 묻고, 선택지를 눌러 다 답하면 고른 챌린지 → 전투 카드와 같은 상세로 이어진다", async () =>
   withPage(async (page, base) => {
     const calls = await mock(page, {
       chatPicks: [
@@ -1021,10 +1002,10 @@ test("공략 도우미는 열자마자 질문을 한 장씩 묻고, 눌러서 �
     await page.goto(new URL(path + "#reco", base).href);
     await page.locator(".quest-chat-open").click();
     await page.locator('.scene[data-page="chat"]:not([hidden])').waitFor();
-    // 대화 화면은 하단 메뉴를 숨긴다. 입력 없이 첫 질문이 바로 뜨고, 자유 입력은 아직 닫혀 있다
+    // 대화 화면은 하단 메뉴를 숨긴다. 첫 질문이 바로 뜨고, 자유 입력창은 어디에도 없다
     assert.equal(await page.locator("#adventure-nav").isVisible(), false);
     await page.locator(".chat-question", { hasText: "잠깐씩 걸을 시간" }).waitFor();
-    assert.equal(await page.locator(".chat-form").isVisible(), false);
+    assert.equal(await page.locator('.scene[data-page="chat"] textarea, .scene[data-page="chat"] input[type="text"]').count(), 0);
     // 선택지 문구는 서버 질문 페이지 그대로다
     assert.deepEqual(
       await page.locator(".chat-question").last().locator(".chat-chip").allTextContents(),
@@ -1042,18 +1023,11 @@ test("공략 도우미는 열자마자 질문을 한 장씩 묻고, 눌러서 �
       selects.map((c) => c.body.asked),
       [[], ["meal_walk"], ["meal_walk", "stairs"]],
     );
-    assert.deepEqual(selects.at(-1).body.answers, { meal_walk: "both", stairs: "yes" });
-    assert.deepEqual(selects.at(-1).body.messages, []);
-    // 결과를 본 뒤에 자유 입력이 열린다. 대화하면 대화까지 반영해 다시 고를 수 있다
-    assert.equal(await page.locator(".chat-form").isVisible(), true);
-    await page.locator("#chat-input").fill("회사 계단이 좁아요");
-    await page.locator(".chat-send").click();
-    await page.locator(".chat-bubble.ai", { hasText: "식후에 잠깐" }).waitFor();
-    await page.locator(".chat-select").click();
-    await page.locator(".chat-results").nth(1).waitFor();
-    const again = calls.filter((c) => c.path === "/challenge-chat/select").at(-1);
-    assert.deepEqual(again.body.messages.map((m) => m.role), ["user", "assistant"]);
-    assert.deepEqual(again.body.asked, ["meal_walk", "stairs"]);
+    // 서버에는 누른 답과 물은 질문 키만 보낸다. 자유 입력(messages)은 없다
+    assert.deepEqual(selects.at(-1).body, { answers: { meal_walk: "both", stairs: "yes" }, asked: ["meal_walk", "stairs"] });
+    // 결과 뒤에도 입력창은 열리지 않는다
+    assert.equal(await page.locator('.scene[data-page="chat"] textarea').count(), 0);
+    assert.equal(calls.some((c) => c.path === "/challenge-chat"), false);
     await page.locator(".chat-pick", { hasText: "식후 걷기" }).first().click();
     await page.locator(".today h1", { hasText: "식후 걷기" }).waitFor();
     assert.equal(await page.locator("[data-live-start]").count(), 1);
@@ -1073,8 +1047,7 @@ test("슬롯이 다 찬 계정은 공략 도우미에서 오류색 없이 진행
       await page.locator('.chat-log [data-main-target="home"]').isVisible(),
       true,
     );
-    assert.equal(await page.locator(".chat-form").isVisible(), false);
-    assert.equal(await page.locator(".chat-select").isVisible(), false);
+    assert.equal(await page.locator(".chat-chip").count(), 0);
   }));
 
 test("공략 대상이 정해지기 전에 전투 화면으로 바로 들어와도 첫 추천이 정한 대상의 카드를 보여 준다", async () =>

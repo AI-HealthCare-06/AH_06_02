@@ -1,7 +1,6 @@
 """Page Index. 승인 근거 카드·챌린지 마스터·단계표·질문 페이지를 페이지 단위로 묶는다.
 
 트리로 본다: 공략 대상 캐릭터 → 요인(factor_key) → 챌린지 → 페이지(질문·카드·단계표).
-카드는 임베딩 없이 태그 부분 일치로 점수를 매긴다. 카드 48장·마스터 33개 규모에서는 이걸로 충분하다.
 질문은 열린 요인 가지 안에서 사용자·주기로 고정한 시드로 랜덤하게 고른다(같은 입력이면 같은 질문).
 """
 
@@ -23,7 +22,6 @@ from app.services.rag_cards import (
 )
 
 CARD_CORPUS = Path(__file__).resolve().parents[2] / "docs/01_planning/chatbot/cards-20261026.json"
-MAX_QUERY_LENGTH = 400
 #: 한 번의 추천에서 묻는 선택형 질문 수
 MAX_QUESTIONS = 3
 
@@ -70,37 +68,6 @@ class PageIndex:
                 pages.append(steps)
         pages += [question_page(question, factors) for question in questions]
         return cls(pages)
-
-    def search(
-        self,
-        query: str,
-        allowed_codes: set[str],
-        answers: SituationAnswers | None,
-        *,
-        limit: int = 6,
-    ) -> list[Page]:
-        """질의와 겹치는 태그 길이 합으로 점수를 낸다. 겹치는 태그가 없으면 돌려주지 않는다.
-
-        카드는 승인된 것과 사용자가 "가능하다"고 답한 챌린지 것만 고른다 (rag_cards.search_cards 와 같은 규칙).
-        answers 가 None 이면(자유 대화 단계) 답 확인 없이 승인 카드를 고른다. 선택 단계는 항상 답을 넘긴다.
-        마스터·단계표 페이지는 후보 코드의 것만 고른다.
-        """
-        if len(query) > MAX_QUERY_LENGTH:
-            raise ValueError("검색 표현은 400자 이하여야 합니다.")
-        text = query.casefold()
-        scored: list[tuple[int, Page]] = []
-        for page in self.pages:
-            if page.challenge_code not in allowed_codes:
-                continue
-            if page.card is not None and (
-                page.card.status != "approved" or (answers is not None and not answers.supports(page.challenge_code))
-            ):
-                continue
-            score = sum(len(tag) for tag in page.tags if tag.casefold() in text)
-            if score > 0:
-                scored.append((score, page))
-        scored.sort(key=lambda pair: (-pair[0], pair[1].page_id))
-        return [page for _, page in scored[:limit]]
 
     def next_question(
         self, codes: set[str], answers: SituationAnswers, asked: list[str], seed: str

@@ -1,4 +1,4 @@
-"""질의 챗봇: 선택형 질문 · 판단 모델(확률) 선택 · 자유 대화 · 저장 · 서빙 값. 실제 LLM 은 부르지 않는다."""
+"""질의 챗봇: 선택형 질문(누른 답만) · 판단 모델(확률) 선택 · 저장 · 서빙 값. 실제 LLM 은 부르지 않는다."""
 
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -30,15 +30,12 @@ from app.models.users import User
 from app.services.attack_cycles import CYCLE_POLICY_VERSION
 from app.services.challenge_chat import (
     CHAT_POLICY_VERSION,
-    FALLBACK_REPLIES,
     ChallengeChatService,
-    redact,
 )
 from app.services.challenge_goals import goal_policy
 from app.services.challenge_selections import (
     FALLBACK_REASON,
     candidate_labels,
-    has_unsafe_claim,
     reason_is_safe,
     validate_judgment,
 )
@@ -54,11 +51,6 @@ DELAY = "CH_DELAY_FIRST_CIG"
 NO_SMOKE = "CH_NO_SMOKE_TODAY"
 YES = SituationAnswers(first_cig="yes", no_smoke="yes")
 ARTIFACT = fake_artifact({"hypertension": {"smoking_current": 70.0}}, p95={"diabetes": {"smoking_current": 0.0128}})
-CONVERSATION = [
-    {"role": "user", "content": "아침에 일어나자마자 담배를 피워요. 메일 a@b.com"},
-    {"role": "assistant", "content": "아침 첫 담배를 조금 미뤄 보는 건 어떨까요?"},
-    {"role": "user", "content": "아침 담배 미루기 해 볼게요"},
-]
 
 
 #: 후보 라벨은 코드 순이다: A = 미뤄 피우기, B = 오늘 안 피우기
@@ -68,16 +60,9 @@ PREFER_DELAY = {"A": 0.8, "B": 0.2}
 class FixtureProvider:
     model_version = "fixture-chat"
 
-    def __init__(self, judgment: Any = None, reply: str = "", error: Exception | None = None) -> None:
-        self.judgment, self.reply, self.error = judgment, reply, error
+    def __init__(self, judgment: Any = None, error: Exception | None = None) -> None:
+        self.judgment, self.error = judgment, error
         self.judge_calls: list[tuple[dict[str, Any], list[str]]] = []
-        self.chat_calls: list[tuple[dict[str, Any], list[dict[str, str]]]] = []
-
-    async def chat(self, context: dict[str, Any], messages: list[dict[str, str]]) -> str:
-        self.chat_calls.append((context, messages))
-        if self.error:
-            raise self.error
-        return self.reply
 
     async def judge(self, context: dict[str, Any], labels: list[str]) -> Any:
         self.judge_calls.append((context, labels))
@@ -91,26 +76,6 @@ def reason_for(key: str, value: str) -> str | None:
 
 
 # ---------------------------------------------------------------- 순수 함수
-
-
-def test_redact_hides_contacts_and_long_numbers() -> None:
-    text = redact("제 메일은 a.b@example.com 이고 010-1234-5678, 주민 9001011234567 입니다")
-    assert "example" not in text and "1234" not in text and "9001011234567" not in text
-
-
-@pytest.mark.parametrize(
-    ("text", "allow_numbers", "unsafe"),
-    [
-        ("첫 담배를 늦추는 것부터 해 봐요.", False, False),
-        ("혈압을 낮춰 줍니다.", False, True),
-        ("당뇨를 예방할 수 있어요.", True, True),
-        ("30분 미루기부터 해 봐요.", False, True),
-        ("30분 미루기부터 해 봐요.", True, False),
-        ("성공률 80% 입니다.", True, True),
-    ],
-)
-def test_unsafe_claims(text: str, allow_numbers: bool, unsafe: bool) -> None:
-    assert has_unsafe_claim(text, allow_numbers=allow_numbers) is unsafe
 
 
 @pytest.mark.parametrize(
@@ -226,15 +191,6 @@ class TestChallengeChat(TestCase):
         assert kinds.count("question") == len(question_bank()) == 42
         assert index.by_id["steps:CH_DELAY_FIRST_CIG"].body.startswith("1단계: 아침 첫 담배 15분 미루기")
 
-    async def test_search_returns_only_approved_cards_the_user_can_do(self) -> None:
-        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
-        index = await PageIndex.build()
-        hits = index.search("아침 담배 미루기", {DELAY}, YES)
-        assert hits and all(page.challenge_code == DELAY for page in hits)
-        # 못 한다고 답한 챌린지의 카드는 나오지 않는다
-        assert not [p for p in index.search("아침 담배", {DELAY}, SituationAnswers(first_cig="no")) if p.card]
-        assert index.search("전혀 관계없는 질문", {DELAY}, YES) == []
-
     # -------------------------------------------------------- 코호트
 
     async def test_cohort_groups_missions_by_monster_without_raw_values(self) -> None:
@@ -250,47 +206,18 @@ class TestChallengeChat(TestCase):
         assert context["history"] == [{"challenge_code": DELAY, "level": 2, "completion": "high"}]
         assert "150" not in str(context) and "0.85" not in str(context)
 
-    # -------------------------------------------------------- 1단계 대화
-
-    async def test_reply_talks_inside_the_candidates_without_saving(self) -> None:
-        user, _ = await self._ready("chat-reply@example.com")
-        provider = FixtureProvider(reply="아침 첫 담배를 조금 미뤄 보는 건 어떨까요? 보통 몇 시에 일어나세요?")
-        result = await (await self._service(provider)).reply(user, CONVERSATION)
-
-        assert result.mode == "chat" and result.reply.startswith("아침 첫 담배")
-        [(context, messages)] = provider.chat_calls
-        assert set(context) == {"candidates", "pages"}
-        assert {c["challenge_code"] for c in context["candidates"]} == {DELAY, NO_SMOKE}
-        # 대화에서도 목표 숫자는 서빙할 값만 쓰도록 읽기 전용으로 넘긴다
-        assert all("served_goal" in c for c in context["candidates"])
-        assert "a@b.com" not in str(messages) and "150" not in str(context)
-        assert "challenge:CH_DELAY_FIRST_CIG" in result.sources
-        assert not await self._chat_rows(user)
-
-    async def test_reply_with_health_claims_or_errors_uses_a_fixed_sentence(self) -> None:
-        user, _ = await self._ready("chat-reply-bad@example.com")
-        unsafe = await (await self._service(FixtureProvider(reply="혈압을 확실히 낮춰 줘요."))).reply(
-            user, CONVERSATION
-        )
-        failed = await (await self._service(FixtureProvider(error=TimeoutError()))).reply(user, CONVERSATION)
-        off = await (await self._service(FixtureProvider(), enabled=False)).reply(user, CONVERSATION)
-        assert unsafe.reply == FALLBACK_REPLIES["unsafe"]
-        assert failed.reply == FALLBACK_REPLIES["error"]
-        assert (off.mode, off.reply) == ("off", FALLBACK_REPLIES["off"])
-
-    # -------------------------------------------------------- 2단계 선택
+    # -------------------------------------------------------- 질문·선택
 
     async def test_disabled_selection_returns_the_rule_cards(self) -> None:
         user, _ = await self._ready("chat-off@example.com")
         provider = FixtureProvider()
-        result = await (await self._service(provider, enabled=False)).select(user, CONVERSATION, YES, [])
+        result = await (await self._service(provider, enabled=False)).select(user, YES, [])
         assert result.mode == "rules" and result.recommendations.items and provider.judge_calls == []
 
     async def test_questions_come_one_by_one_from_pages_with_a_fixed_seed(self) -> None:
         user, _ = await self._ready("chat-ask@example.com")
         service = await self._service(FixtureProvider())
-        # 대화 없이 바로 질문부터 시작한다
-        first = await service.select(user, [], SituationAnswers(), [])
+        first = await service.select(user, SituationAnswers(), [])
         assert first.mode == "ask" and len(first.questions) == 1
         [question] = first.questions
         assert question["key"] in {"first_cig", "no_smoke"}
@@ -299,19 +226,17 @@ class TestChallengeChat(TestCase):
         # 선택지 문구도 질문 페이지에서 온다. 이유 문장은 화면에 보내지 않는다
         assert question["options"] == [{"value": o.value, "label": o.label} for o in page.options]
         # 같은 사람·같은 주기·같은 답이면 같은 질문
-        assert (await service.select(user, [], SituationAnswers(), [])).questions == first.questions
+        assert (await service.select(user, SituationAnswers(), [])).questions == first.questions
         # 답하면 남은 답 키를 묻고, 더 물을 게 없으면 질문을 멈춘다
         answered = SituationAnswers.model_validate({question["key"]: "yes"})
-        second = await service.select(user, [], answered, [question["key"]])
+        second = await service.select(user, answered, [question["key"]])
         assert (
             second.mode == "ask" and second.questions[0]["key"] == ({"first_cig", "no_smoke"} - {question["key"]}).pop()
         )
         # 활동 제한·알 수 없는 질문 기록
-        assert (
-            await service.select(user, [], SituationAnswers(first_cig="no"), ["first_cig", "no_smoke"])
-        ).mode != "ask"
+        assert (await service.select(user, SituationAnswers(first_cig="no"), ["first_cig", "no_smoke"])).mode != "ask"
         with pytest.raises(ValueError):
-            await service.select(user, [], SituationAnswers(), ["unknown_key"])
+            await service.select(user, SituationAnswers(), ["unknown_key"])
 
     async def test_random_questions_spread_over_branches_and_stop_at_three(self) -> None:
         await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
@@ -336,7 +261,7 @@ class TestChallengeChat(TestCase):
         provider = FixtureProvider(PREFER_DELAY)
         service = await self._service(provider)
 
-        result = await service.select(user, CONVERSATION, YES, ["first_cig", "no_smoke"])
+        result = await service.select(user, YES, ["first_cig", "no_smoke"])
 
         assert result.mode == "conversation"
         first, second = result.recommendations.items
@@ -353,20 +278,19 @@ class TestChallengeChat(TestCase):
         # 이유 문장은 답한 질문 페이지의 문장이다(모델이 만들지 않는다)
         assert result.reasons[first.id] == snapshot["reason"] == reason_for("first_cig", "yes")
         assert result.reasons[second.id] == reason_for("no_smoke", "yes")
-        assert "a@b.com" not in str(snapshot)
         served = challenge_goal_body(challenge, first.proposed_goal)
         assert served["goal_level"] == 3 and served["safety_check_required"] is True
 
-        # 보낸 입력: 가린 대화·답·범주 요약·라벨 붙은 후보·카드. 건강 수치·이메일은 없다
+        # 보낸 입력: 누른 답·범주 요약·라벨 붙은 후보·카드. 자유 입력·건강 수치·이메일은 없다
         [(context, labels)] = provider.judge_calls
-        assert set(context) == {"conversation", "answers", "cohort", "candidates", "cards"}
+        assert set(context) == {"answers", "cohort", "candidates", "cards"}
         assert labels == ["A", "B"] and [c["label"] for c in context["candidates"]] == labels
-        assert "a@b.com" not in str(context) and "150" not in str(context)
+        assert "150" not in str(context)
         [delay_context] = [c for c in context["candidates"] if c["challenge_code"] == DELAY]
         assert delay_context["served_goal"]["target_value"] == served["target_value"]
 
         # 같은 입력은 저장한 결과를 돌려주고 판단 모델을 다시 부르지 않는다
-        again = await service.select(user, CONVERSATION, YES, ["first_cig", "no_smoke"])
+        again = await service.select(user, YES, ["first_cig", "no_smoke"])
         assert again.mode == "conversation" and [r.id for r in again.recommendations.items] == [first.id, second.id]
         assert len(provider.judge_calls) == 1
         # 시작은 클라이언트가 CHLG-05 로 한다
@@ -376,7 +300,7 @@ class TestChallengeChat(TestCase):
         user, _ = await self._ready("chat-single@example.com")
         provider = FixtureProvider(error=TimeoutError())
         answers = SituationAnswers(first_cig="yes", no_smoke="no")
-        result = await (await self._service(provider)).select(user, [], answers, ["first_cig", "no_smoke"])
+        result = await (await self._service(provider)).select(user, answers, ["first_cig", "no_smoke"])
         [row] = result.recommendations.items
         assert result.mode == "conversation" and provider.judge_calls == []
         assert (row.conversation_snapshot or {})["probability"] == 1.0
@@ -385,7 +309,7 @@ class TestChallengeChat(TestCase):
     async def test_unusable_judgments_fall_back_to_rules_without_saving(self) -> None:
         for number, judgment in enumerate([{"Z": 0.9}, {"A": 0.3}, ["A"], None]):
             user, _ = await self._ready(f"chat-bad{number}@example.com")
-            result = await (await self._service(FixtureProvider(judgment))).select(user, CONVERSATION, YES, [])
+            result = await (await self._service(FixtureProvider(judgment))).select(user, YES, [])
             assert result.mode == "rules" and result.recommendations.items, judgment
             assert not await self._chat_rows(user)
 
@@ -393,7 +317,7 @@ class TestChallengeChat(TestCase):
         user, _ = await self._ready("chat-none@example.com")
         answers = SituationAnswers(first_cig="no", no_smoke="no")
         provider = FixtureProvider(PREFER_DELAY)
-        result = await (await self._service(provider)).select(user, [], answers, ["first_cig", "no_smoke"])
+        result = await (await self._service(provider)).select(user, answers, ["first_cig", "no_smoke"])
         assert result.mode == "rules" and result.recommendations.items and provider.judge_calls == []
 
     async def test_wrong_key_falls_back_and_logs_only_the_status(self) -> None:
@@ -401,7 +325,7 @@ class TestChallengeChat(TestCase):
         request = httpx.Request("POST", "https://api.openai.com/v1/responses", headers={"Authorization": "Bearer sk-x"})
         error = httpx.HTTPStatusError("401", request=request, response=httpx.Response(401, request=request))
         with self.assertLogs("app.services.challenge_chat", "WARNING") as logs:
-            result = await (await self._service(FixtureProvider(error=error))).select(user, CONVERSATION, YES, [])
+            result = await (await self._service(FixtureProvider(error=error))).select(user, YES, [])
         assert result.mode == "rules"
         assert logs.output == [
             "WARNING:app.services.challenge_chat:질의 챗봇 선택 호출·검증 실패, 규칙 추천으로 돌린다: HTTPStatusError 401"
@@ -419,7 +343,7 @@ class TestChallengeChat(TestCase):
             }
         )
         with patch.object(service.index, "question_page", lambda key: unsafe if key == "first_cig" else page):
-            result = await service.select(user, CONVERSATION, YES, [])
+            result = await service.select(user, YES, [])
         first = result.recommendations.items[0]
         assert result.reasons[first.id] == FALLBACK_REASON
         assert (first.conversation_snapshot or {})["reason_replaced"] is True
@@ -432,7 +356,7 @@ class TestChallengeChat(TestCase):
         app.dependency_overrides[get_request_user] = lambda: user
         try:
             async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-                body = {"messages": CONVERSATION, "answers": YES.model_dump(), "asked": ["first_cig", "no_smoke"]}
+                body = {"answers": YES.model_dump(), "asked": ["first_cig", "no_smoke"]}
                 selected = (await client.post("/api/v1/challenge-chat/select", json=body)).json()["data"]
                 listed = (await client.get("/api/v1/challenge-recommendations")).json()["data"]["items"]
                 started = await client.post(
@@ -454,24 +378,18 @@ class TestChallengeChat(TestCase):
 
 
 class TestChallengeChatApi(TestCase):
-    async def test_chat_endpoints_require_login_and_follow_the_rule_path(self) -> None:
+    async def test_chat_endpoints_require_login_and_take_no_free_text(self) -> None:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            anonymous = await client.post(
-                "/api/v1/challenge-chat", json={"messages": [{"role": "user", "content": "a"}]}
-            )
+            anonymous = await client.post("/api/v1/challenge-chat/select", json={})
             _, headers = await login(client, "chat-api@example.com")
-            empty = await client.post("/api/v1/challenge-chat", json={"messages": []}, headers=headers)
-            last_assistant = await client.post(
-                "/api/v1/challenge-chat", json={"messages": [{"role": "assistant", "content": "a"}]}, headers=headers
-            )
-            off = await client.post(
+            # 자유 대화 API 는 없다. 답은 선택지를 눌러서만 받는다
+            free_text = await client.post(
                 "/api/v1/challenge-chat", json={"messages": [{"role": "user", "content": "a"}]}, headers=headers
             )
             # 예측 전이라 규칙 추천(CHLG-01)과 같은 이유로 막힌다
             blocked = await client.post("/api/v1/challenge-chat/select", json={}, headers=headers)
         assert anonymous.status_code == 401
-        assert empty.json()["error"]["code"] == last_assistant.json()["error"]["code"] == "VALIDATION_ERROR"
-        assert off.json()["data"]["mode"] == "off"
+        assert free_text.status_code in (404, 405)
         assert blocked.json()["error"]["code"] == "CHLG_RECOMMENDATION_UNAVAILABLE"
 
     async def test_chat_runs_on_rules_without_a_key(self) -> None:

@@ -400,7 +400,7 @@ async function go(id, push = true) {
     // 열자마자 첫 질문을 받는다. 대화 없이 선택형 질문부터 시작한다
     if (!chat.started && !chat.closed) {
       chat.started = true;
-      askChat("select");
+      askChat();
     }
   }
   $$(".user-name").forEach(
@@ -1641,18 +1641,15 @@ function renderDrawReceipt(receipt) {
   const panel = $("#live-bag-panel");
   panel.innerHTML = `<h2>보상을 받았어요!</h2><div class="reward-results">${receipt.results.map((i) => `<article class="draw-result ${i.rarity.toLowerCase()}"><span class="rarity">${i.rarity}</span>${i.asset ? `<div class="equipment-thumbnail"><img src="${asset(i.asset)}" alt=""></div>` : "✦"}<h3>${escape(i.name)}</h3><p>${i.duplicate ? "중복 → " : ""}${i.materials ? "성장의 조각 +" + i.materials : "새 보상 획득"}</p></article>`).join("")}</div>${remaining ? button(`다음 보상 고르기 · ${remaining}회`, 'data-live-bag="draw"') : ""}${button("바로 꾸미기", 'data-live-bag="adventurer"')}`;
 }
-// ---- 질의 챗봇(공략 도우미) 화면(design.md 13절). 하루 일과를 대화로 듣고 /challenge-chat/select 로
-// 챌린지를 고른다. 고른 챌린지는 전투 카드와 같은 상세·시작 흐름(오늘의 공략)으로 연다.
-// 대화는 메모리에만 둔다(localStorage·sessionStorage 금지). 새로고침·로그아웃하면 사라진다
-const CHAT_LIMIT = 12; // 서버 MAX_CHAT_MESSAGES
-const CHAT_MAX_LENGTH = 400;
+// ---- 질의 챗봇(공략 도우미) 화면(design.md 13절). /challenge-chat/select 가 주는 질문에 선택지를 눌러 답하면
+// 챌린지를 고른다. 자유 입력은 없다. 고른 챌린지는 전투 카드와 같은 상세·시작 흐름(오늘의 공략)으로 연다.
+// 답은 메모리에만 둔다(localStorage·sessionStorage 금지). 새로고침·로그아웃하면 사라진다
 // 질문·선택지는 서버 질문 페이지(docs/01_planning/chatbot/questions-*.json)에서 온다. 화면은 받은 대로 그린다
 const CHAT_WELCOME =
-  "몇 가지만 눌러서 답해 주세요. 답에 맞는 챌린지를 골라 드릴게요. 이 대화는 저장하지 않아서 화면을 새로 열면 사라져요.";
+  "몇 가지만 눌러서 답해 주세요. 답에 맞는 챌린지를 골라 드릴게요. 답은 저장하지 않아서 화면을 새로 열면 사라져요.";
 const chat = {};
 function resetChat() {
   Object.assign(chat, {
-    messages: [],
     asked: [],
     answers: {},
     view: [{ kind: "ai", tone: "notice", text: CHAT_WELCOME }],
@@ -1667,8 +1664,6 @@ function chatItemHtml(item, index, previous) {
   const turn = !previous || (previous.kind !== "me") !== ai;
   const label = ai && turn ? '<p class="chat-label">공략 도우미</p>' : "";
   const gap = turn ? " turn" : "";
-  if (item.kind === "me")
-    return `<p class="chat-bubble me${gap}"><span class="sr-only">나: </span>${escape(item.text)}</p>`;
   if (item.kind === "typing")
     return `${label}<p class="chat-bubble ai chat-typing">답을 만들고 있어요<span aria-hidden="true"><i></i><i></i><i></i></span></p>`;
   if (item.kind === "questions")
@@ -1696,12 +1691,10 @@ function chatItemHtml(item, index, previous) {
   const tone = item.tone ? ` ${item.tone}` : "";
   const after =
     item.kind === "error"
-      ? `<button type="button" class="secondary-action chat-retry" data-chat-retry="${item.retry}">다시 보내기</button>`
+      ? `<button type="button" class="secondary-action chat-retry" data-chat-retry>다시 받기</button>`
       : item.kind === "hold"
         ? button("모험 지도로 가기", 'data-main-target="home"')
-        : item.kind === "off"
-          ? button("추천 목록 보기", "data-live-quests")
-          : "";
+        : "";
   return `${label}<p class="chat-bubble ai${tone}">${escape(item.text)}</p>${after}`;
 }
 function renderChat() {
@@ -1713,72 +1706,36 @@ function renderChat() {
     chat.view
       .map((item, index) => chatItemHtml(item, index, chat.view[index - 1]))
       .join("");
-  const last = chat.view.at(-1)?.kind;
-  const replied = chat.messages.some((m) => m.role === "assistant");
-  const full = chat.messages.length >= CHAT_LIMIT - 1;
-  scene.querySelector(".chat-select").hidden =
-    !replied ||
-    chat.pending ||
-    chat.closed ||
-    ["results", "questions", "hold"].includes(last);
-  scene.querySelector(".chat-full").hidden = !full || chat.closed;
-  // 자유 입력은 질문에 다 답하고 결과를 본 뒤에 연다
-  scene.querySelector(".chat-form").hidden = !chat.view.some(
-    (item) => item.kind === "results",
-  );
-  const input = scene.querySelector(".chat-form textarea");
-  input.disabled = chat.pending || chat.closed || full;
-  scene.querySelector(".chat-send").disabled =
-    input.disabled || !input.value.trim();
   log.scrollTop = log.scrollHeight;
 }
-async function askChat(kind) {
+async function askChat() {
   chat.pending = true;
   chat.view.push({ kind: "typing" });
   renderChat();
   const dropTyping = () =>
     (chat.view = chat.view.filter((item) => item.kind !== "typing"));
   try {
-    if (kind === "chat") {
-      const data = await api("/challenge-chat", {
-        method: "POST",
-        body: { messages: chat.messages },
+    const data = await api("/challenge-chat/select", {
+      method: "POST",
+      body: { answers: chat.answers, asked: chat.asked },
+    });
+    dropTyping();
+    if (data.mode === "ask") {
+      chat.asked.push(...data.questions.map((q) => q.key));
+      chat.view.push({
+        kind: "questions",
+        answer: data.answer,
+        questions: data.questions,
       });
-      dropTyping();
-      if (data.mode === "off") {
-        chat.closed = true;
-        chat.view.push({ kind: "off", tone: "notice", text: data.reply });
-      } else {
-        chat.messages.push({ role: "assistant", content: data.reply });
-        chat.view.push({ kind: "ai", text: data.reply });
-      }
-    } else {
-      const data = await api("/challenge-chat/select", {
-        method: "POST",
-        body: {
-          messages: chat.messages,
-          answers: chat.answers,
-          asked: chat.asked,
-        },
+    } else if (data.mode === "hold")
+      chat.view.push({ kind: "hold", tone: "notice", text: data.answer });
+    else
+      chat.view.push({
+        kind: "results",
+        mode: data.mode,
+        answer: data.answer,
+        items: data.items,
       });
-      dropTyping();
-      if (data.mode === "ask") {
-        chat.asked.push(...data.questions.map((q) => q.key));
-        chat.view.push({
-          kind: "questions",
-          answer: data.answer,
-          questions: data.questions,
-        });
-      } else if (data.mode === "hold")
-        chat.view.push({ kind: "hold", tone: "notice", text: data.answer });
-      else
-        chat.view.push({
-          kind: "results",
-          mode: data.mode,
-          answer: data.answer,
-          items: data.items,
-        });
-    }
   } catch (error) {
     dropTyping();
     // 슬롯이 다 찼으면 새 챌린지를 고를 수 없다. 사용자의 잘못이 아니므로 오류색 없이 안내만 한다
@@ -1790,7 +1747,6 @@ async function askChat(kind) {
         kind: "error",
         tone: "notice",
         text: error.message || "답을 받지 못했어요.",
-        retry: kind,
       });
   } finally {
     chat.pending = false;
@@ -1805,7 +1761,7 @@ async function chatClick(button) {
     // 마지막으로 물은 질문에 모두 답하면 바로 다시 고른다
     if (ask && ask.questions.every((q) => chat.answers[q.key])) {
       ask.done = true;
-      await askChat("select");
+      await askChat();
     }
     return true;
   }
@@ -1815,34 +1771,12 @@ async function chatClick(button) {
     await go("today");
     return true;
   }
-  if (button.dataset.chatRetry) {
+  if (button.hasAttribute("data-chat-retry")) {
     chat.view = chat.view.filter((item) => item.kind !== "error");
-    await askChat(button.dataset.chatRetry);
-    return true;
-  }
-  if (button.hasAttribute("data-chat-select")) {
-    await askChat("select");
+    await askChat();
     return true;
   }
   return false;
-}
-async function sendChat(form) {
-  const input = form.querySelector("textarea");
-  const text = input.value.trim().slice(0, CHAT_MAX_LENGTH);
-  if (!text || chat.pending || chat.closed) return;
-  input.value = "";
-  sizeChatInput(input);
-  chat.messages.push({ role: "user", content: text });
-  chat.view.push({ kind: "me", text });
-  await askChat("chat");
-}
-function sizeChatInput(input) {
-  input.style.height = "auto";
-  input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
-  const count = $(".chat-count");
-  count.hidden = input.value.length < 350;
-  count.textContent = `${input.value.length} / ${CHAT_MAX_LENGTH}`;
-  $(".chat-send").disabled = input.disabled || !input.value.trim();
 }
 document.addEventListener("click", (event) => {
   const target = event.target.closest("button");
@@ -1859,10 +1793,6 @@ document.addEventListener("submit", (event) => {
   event.preventDefault();
   const form = event.target;
   run(async () => {
-    if (form.classList.contains("chat-form")) {
-      await sendChat(form);
-      return;
-    }
     if (form.classList.contains("login-form")) {
       const accepted = await auth.login({
         email: form.querySelector('[type="email"]').value.trim(),
@@ -2133,20 +2063,11 @@ $(".waiting .waiting-bottom")?.insertAdjacentHTML(
 $(".health h1")?.nextElementSibling?.replaceChildren(
   document.createTextNode("현재 건강정보를 입력해 주세요."),
 );
-// 공략 도우미 화면(대화). 하단 메뉴는 숨기고 입력창을 맨 아래에 둔다(design.md 13절)
+// 공략 도우미 화면(선택형 질문). 하단 메뉴는 숨긴다(design.md 13절). 자유 입력창은 두지 않는다
 $("#screen").insertAdjacentHTML(
   "beforeend",
-  `<section class="scene chat" data-page="chat" hidden><div class="chat-shell"><div class="chat-log" role="log" aria-live="polite"></div><p class="chat-medical">건강 수치·질환 판단은 하지 않아요. 진단·치료는 의료진과 상의해 주세요.</p><p class="chat-full small-copy" hidden>대화가 길어졌어요. 지금까지 내용으로 골라 볼까요?</p><button type="button" class="primary chat-select" data-chat-select hidden>이 대화까지 반영해 다시 고르기</button><form class="chat-form" novalidate><label class="sr-only" for="chat-input">공략 도우미에게 보낼 말</label><textarea id="chat-input" rows="1" maxlength="${CHAT_MAX_LENGTH}" placeholder="궁금한 점을 적어 주세요. 이름·연락처는 빼 주세요."></textarea><span class="chat-count" hidden></span><button type="submit" class="chat-send" aria-label="보내기" disabled>↑</button></form></div></section>`,
+  `<section class="scene chat" data-page="chat" hidden><div class="chat-shell"><div class="chat-log" role="log" aria-live="polite"></div><p class="chat-medical">건강 수치·질환 판단은 하지 않아요. 진단·치료는 의료진과 상의해 주세요.</p></div></section>`,
 );
-$("#chat-input").addEventListener("input", (event) =>
-  sizeChatInput(event.target),
-);
-// Enter 로 보내고 Shift+Enter 는 줄바꿈. 한글 조합 중 Enter 는 글자 확정이라 보내지 않는다
-$("#chat-input").addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
-  event.preventDefault();
-  event.target.form.requestSubmit();
-});
 $(".quest-map-return")?.insertAdjacentHTML(
   "afterend",
   '<button type="button" class="quest-chat-open" data-route="chat">공략 도우미</button>',
