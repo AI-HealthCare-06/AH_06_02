@@ -84,6 +84,11 @@ def test_default_model_is_gpt_4o_and_key_is_masked() -> None:
         Config(_env_file=None, OPENAI_MODEL="m" * 33)  # type: ignore[call-arg]
 
 
+def test_common_model_name_case_is_normalized() -> None:
+    settings = Config(_env_file=None, OPENAI_MODEL="GPT-4o")  # type: ignore[call-arg]
+    assert settings.OPENAI_MODEL == "gpt-4o"
+
+
 def _completed(text: str) -> httpx.Response:
     return httpx.Response(
         200, json={"status": "completed", "output": [{"content": [{"type": "output_text", "text": text}]}]}
@@ -106,7 +111,7 @@ async def test_question_generator_requests_a_structured_response_with_fixed_inte
     assert sent["store"] is False and sent["text"]["format"]["strict"] is True
     context = json.loads(sent["input"][1]["content"])
     assert context["challenge_code"] == "CH_STAIRS"
-    assert "질문 원문으로 끝" in sent["input"][0]["content"]
+    assert "새로운 한 문장" in sent["input"][0]["content"]
 
 
 @pytest.mark.asyncio

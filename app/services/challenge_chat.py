@@ -1,17 +1,16 @@
 """질의 챗봇. 답은 선택지를 눌러서만 받는다(자유 입력 없음).
 
-Page Index 의 질문 페이지를 열린 요인 가지에서 사용자·주기로 고정한 시드로 한 장씩 랜덤으로 고른다(최대 3개).
-모두 답하면 '할 수 있어요'로 남은 챌린지만 후보가 되고, 판단 모델이 후보 라벨에 대한 확률(logprobs)만 내서
-서버가 확률 순으로 최대 3개를 고른다. 문장은 만들지 않는다. 이유 문장은 답한 질문 페이지의 문장, 근거 카드는
-그 챌린지의 승인 카드다. 고른 챌린지의 목표 값은 규칙(지난 주기 수행률로 정한 단계, 없으면 마스터)이 채워
-추천 행으로 저장·서빙한다.
+열린 요인에 맞는 질문 의도를 고르고, 생성된 질문과 선택지의 의미 및 값을 검사한다.
+운동 범위와 수행 가능 답으로 남은 챌린지만 후보가 되고 판단 모델은 후보 라벨의 확률을 낸다.
+이유 문장은 답한 질문 페이지에서, 근거 카드는 승인 카드에서 가져온다. 목표 값은 주기 규칙이 채운다.
 
-건강 수치·확률·진단 여부·이름은 보내지 않는다. 실패하면 규칙 추천(mode=rules)으로 돌아간다.
+건강 수치·확률·진단 여부·이름은 보내지 않는다. 생성이나 검토가 실패하면 고정 질문을 쓴다.
 """
 
 import hashlib
 import json
 import logging
+import re
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
@@ -66,6 +65,7 @@ CHAT_POLICY_VERSION = "RAG-CHAT-20261102-v5"
 MAX_CONTEXT_CARDS = 12
 QUESTION_PREFIXES = ("", "잠깐 여쭤볼게요. ", "한 가지만 더 확인할게요. ", "이번에는 이렇게 여쭤볼게요. ")
 ANSWER_LABEL_VARIANTS = {"yes": {"가능해요"}, "no": {"지금은 어려워요"}}
+PERIOD_WORDS = ("오늘", "내일", "모레", "이번 주", "다음 주", "매일", "매주", "이번 달", "다음 달")
 
 ChatMode = Literal["conversation", "rules", "ask", "hold"]
 
@@ -366,22 +366,49 @@ class ChallengeChatService:
             if (
                 code not in SUPPORTED_CODES
                 or not isinstance(text, str)
+                or not text.strip()
                 or len(text) > 200
-                or text not in {prefix + intent for prefix in QUESTION_PREFIXES for intent in intents}
+                or any(word in text and word not in question.text for word in PERIOD_WORDS)
+                or set(re.findall(r"\d+", text)) != set(re.findall(r"\d+", question.text))
+                or text.count("?") > 1
                 or CLAIM_PATTERN.search(text)
                 or not isinstance(options, list)
                 or any(not isinstance(option, dict) or set(option) != {"value", "label"} for option in options)
                 or len(options) != len(fallback["options"])
                 or {option["value"] for option in options} != set(allowed_labels)
-                or any(option["label"] not in allowed_labels[option["value"]] for option in options)
+                or any(
+                    not isinstance(option["label"], str)
+                    or not option["label"].strip()
+                    or len(option["label"]) > 80
+                    or CLAIM_PATTERN.search(option["label"])
+                    for option in options
+                )
+                or len({option["label"] for option in options}) != len(options)
             ):
                 raise ValueError("질문이 승인된 값과 일치하지 않습니다.")
+            approved = text in {prefix + intent for prefix in QUESTION_PREFIXES for intent in intents} and all(
+                option["label"] in allowed_labels[option["value"]] for option in options
+            )
+            if not approved:
+                verify = getattr(self.provider, "verify_question", None)
+                if verify is None:
+                    raise ValueError("새 질문을 검토할 수 없습니다.")
+                review = await verify({"intent": question.text, "options": fallback["options"], "generated": result})
+                if (
+                    not isinstance(review, dict)
+                    or set(review) != {"safe_and_equivalent"}
+                    or review["safe_and_equivalent"] is not True
+                ):
+                    raise ValueError("생성 질문의 의미를 확인하지 못했습니다.")
             rendered = next(
-                page.question
-                for page in self.index.pages
-                if page.question is not None
-                and page.question.answer_key == question.answer_key
-                and text in {prefix + page.question.text for prefix in QUESTION_PREFIXES}
+                (
+                    page.question
+                    for page in self.index.pages
+                    if page.question is not None
+                    and page.question.answer_key == question.answer_key
+                    and text in {prefix + page.question.text for prefix in QUESTION_PREFIXES}
+                ),
+                question,
             )
             return {**fallback, "question_id": rendered.question_id, "text": text, "options": options}
         except (ValueError, TypeError, KeyError, AppError, OSError, TimeoutError, httpx.HTTPError) as exc:

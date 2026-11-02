@@ -457,6 +457,46 @@ class TestChallengeChat(TestCase):
             next(option["label"] for option in result.questions[0]["options"] if option["value"] == "yes") == "가능해요"
         )
 
+    async def test_verified_novel_generated_question_is_served(self) -> None:
+        class NovelProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                return {"text": "확인하고 싶어요. " + context["intent"], "options": context["options"]}
+
+            async def verify_question(self, context: dict[str, Any]) -> object:
+                return {"safe_and_equivalent": True}
+
+        user, _ = await self._ready("chat-novel-question@example.com")
+        result = await (await self._service(NovelProvider())).select(user, SituationAnswers(), [])
+        assert result.questions[0]["text"].startswith("확인하고 싶어요. ")
+
+    async def test_novel_question_cannot_add_a_time_period_even_if_review_accepts(self) -> None:
+        class ChangedPeriodProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                return {"text": "내일 " + context["intent"], "options": context["options"]}
+
+            async def verify_question(self, context: dict[str, Any]) -> object:
+                return {"safe_and_equivalent": True}
+
+        user, _ = await self._ready("chat-changed-period@example.com")
+        result = await (await self._service(ChangedPeriodProvider())).select(user, SituationAnswers(), [])
+        [question] = result.questions
+        original = next(page for page in question_bank() if page.question_id == question["question_id"])
+        assert question["text"] == original.text
+
+    async def test_novel_question_rejected_by_semantic_review_falls_back(self) -> None:
+        class RejectedProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                return {"text": "오늘 이 행동을 안 하실 건가요?", "options": context["options"]}
+
+            async def verify_question(self, context: dict[str, Any]) -> object:
+                return {"safe_and_equivalent": False}
+
+        user, _ = await self._ready("chat-rejected-question@example.com")
+        result = await (await self._service(RejectedProvider())).select(user, SituationAnswers(), [])
+        [question] = result.questions
+        original = next(page for page in question_bank() if page.question_id == question["question_id"])
+        assert question["text"] == original.text
+
     async def test_generated_question_with_changed_answer_meaning_falls_back(self) -> None:
         class InvalidProvider(FixtureProvider):
             async def generate_question(self, context: dict[str, Any]) -> object:

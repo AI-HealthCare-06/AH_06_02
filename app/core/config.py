@@ -5,7 +5,7 @@ from dataclasses import field
 from enum import StrEnum
 from pathlib import Path
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -65,3 +65,11 @@ class Config(BaseSettings):
     # 임시 테스트 도구(/api/v1/test-tools, frontend/test-tools/)를 쓸 수 있는 계정 이메일. 쉼표로 구분한다.
     # 비어 있으면(기본) 모든 계정에 404 다. 발표가 끝나면 별도 PR 로 이 설정과 도구를 함께 지운다
     TEST_TOOL_EMAILS: str = ""
+
+    @field_validator("OPENAI_MODEL", mode="before")
+    @classmethod
+    def normalize_openai_model(cls, value: object) -> object:
+        """운영에 입력된 알려진 모델명의 대소문자를 API 식별자로 맞춘다."""
+        if isinstance(value, str) and value.casefold() == "gpt-4o":
+            return "gpt-4o"
+        return value

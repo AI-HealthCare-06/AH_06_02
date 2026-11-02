@@ -133,13 +133,31 @@ class OpenAISelectionProvider:
         }
         instructions = (
             "제공된 질문 의도와 선택지 값의 의미를 유지하여 선택형 질문과 선택지 문구를 만드세요. "
-            "text는 '잠깐 여쭤볼게요. ', '한 가지만 더 확인할게요. ', '이번에는 이렇게 여쭤볼게요. ' 중 "
-            "하나를 앞에 붙이거나 생략하고 intents 중 고른 질문 원문으로 끝나야 합니다. "
-            "options의 값은 그대로 유지하고 문구는 값별 allowed_labels에서 고르며 순서를 바꿀 수 있습니다. "
+            "text는 사용자가 앞 문맥 없이도 구체적인 행동을 이해할 수 있는 새로운 한 문장으로 작성하세요. "
+            "원본에 없는 오늘·내일 등의 기간이나 횟수를 추가하지 말고 원본의 숫자를 그대로 유지하세요. "
+            "options의 값은 그대로 유지하고 값에 맞는 문구를 작성하며 순서를 바꿀 수 있습니다. "
             "질환 진단, 치료, 예방이나 효과를 단정하지 마세요."
         )
         return await self._respond(
             instructions, json.dumps(context, ensure_ascii=False), "challenge_question", schema, 600
+        )
+
+    async def verify_question(self, context: dict[str, Any]) -> object:
+        """생성된 질문과 선택지가 원래 의도와 의미를 유지하는지 별도 검토한다."""
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["safe_and_equivalent"],
+            "properties": {"safe_and_equivalent": {"type": "boolean"}},
+        }
+        instructions = (
+            "원본 질문과 생성 질문을 비교하세요. 행동과 시점, 가능 여부, 각 선택지 값의 의미가 "
+            "모두 같고, 원본에 없는 오늘·내일 등의 기간이나 횟수가 추가되지 않았으며, "
+            "앞 문맥 없이 이해되고 진단·치료·예방·안전성 단정이 없을 때만 true입니다. "
+            "하나라도 불명확하거나 다르면 false를 반환하세요."
+        )
+        return await self._respond(
+            instructions, json.dumps(context, ensure_ascii=False), "question_review", schema, 100
         )
 
     async def judge(self, context: dict[str, Any], labels: list[str]) -> dict[str, float]:
