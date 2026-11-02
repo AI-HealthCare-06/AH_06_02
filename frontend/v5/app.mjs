@@ -396,6 +396,8 @@ async function go(id, push = true) {
     scene.classList.remove("live-loading");
   } else if (id === "health") fillProfile();
   else if (id === "chat") {
+    if (!chat.started && chat.activity === null && (await api("/challenge-chat/entry")).initial)
+      chat.activity = {};
     renderChat();
     // 열자마자 첫 질문을 받는다. 대화 없이 선택형 질문부터 시작한다
     if (!chat.started && !chat.closed) {
@@ -960,8 +962,13 @@ async function submitPrediction() {
       );
     } catch (error) {
       if (error.code === "PRED_ALL_DIAGNOSED") {
+        const entry = await api("/challenge-chat/entry");
         healthRecordId = null;
-        await go("risk");
+        if (entry.initial) {
+          resetChat();
+          chat.activity = {};
+          await go("chat");
+        } else await go("risk");
         return;
       }
       // 응답 전에 연결이 끊기면 접수됐는지 알 수 없다. 다시 보내면 예측이 하나 더 생길 수 있다
@@ -986,9 +993,14 @@ async function pollPrediction() {
   ) {
     const result = await api(`/predictions/${predictionId}`);
     if (result.status === "done") {
+      const initial = result.first_completed && (await api("/challenge-chat/entry")).initial;
       healthRecordId = null;
       rememberPrediction(null);
-      await go("risk");
+      if (initial) {
+        resetChat();
+        chat.activity = {};
+        await go("chat");
+      } else await go("risk");
       return;
     }
     if (result.status === "failed") {
@@ -1652,6 +1664,7 @@ function resetChat() {
   Object.assign(chat, {
     asked: [],
     answers: {},
+    activity: null,
     view: [{ kind: "ai", tone: "notice", text: CHAT_WELCOME }],
     pending: false,
     closed: false,
@@ -1659,6 +1672,9 @@ function resetChat() {
   });
 }
 resetChat();
+function chatAnswer(key) {
+  return key.startsWith("activity_") ? chat.activity?.[key.slice(9)] : chat.answers[key];
+}
 function chatItemHtml(item, index, previous) {
   const ai = item.kind !== "me";
   const turn = !previous || (previous.kind !== "me") !== ai;
@@ -1673,7 +1689,7 @@ function chatItemHtml(item, index, previous) {
           `<fieldset class="chat-question"><legend>${escape(q.text)}</legend><div class="chat-chips">${q.options
             .map(
               (option) =>
-                `<button type="button" class="chat-chip" data-chat-answer="${escape(q.key)}" data-value="${escape(option.value)}" aria-pressed="${chat.answers[q.key] === option.value}"${item.done ? " disabled" : ""}>${escape(option.label)}</button>`,
+                `<button type="button" class="chat-chip" data-chat-answer="${escape(q.key)}" data-value="${escape(option.value)}" aria-pressed="${chatAnswer(q.key) === option.value}"${item.done ? " disabled" : ""}>${escape(option.label)}</button>`,
             )
             .join("")}</div></fieldset>`,
       )
@@ -1717,11 +1733,11 @@ async function askChat() {
   try {
     const data = await api("/challenge-chat/select", {
       method: "POST",
-      body: { answers: chat.answers, asked: chat.asked },
+      body: { answers: chat.answers, asked: chat.asked, ...(chat.activity ? { activity: chat.activity } : {}) },
     });
     dropTyping();
     if (data.mode === "ask") {
-      chat.asked.push(...data.questions.map((q) => q.key));
+      chat.asked.push(...data.questions.map((q) => q.key).filter((key) => !key.startsWith("activity_")));
       chat.view.push({
         kind: "questions",
         answer: data.answer,
@@ -1755,11 +1771,16 @@ async function askChat() {
 }
 async function chatClick(button) {
   if (button.dataset.chatAnswer) {
-    chat.answers[button.dataset.chatAnswer] = button.dataset.value;
+    const key = button.dataset.chatAnswer;
+    if (key.startsWith("activity_") && chat.activity) {
+      chat.activity[key.slice(9)] = button.dataset.value;
+      if (button.dataset.value === "unsure") chat.activity.clarifications = (chat.activity.clarifications || 0) + 1;
+    }
+    else chat.answers[key] = button.dataset.value;
     const ask = chat.view.findLast((item) => item.kind === "questions");
     renderChat();
     // 마지막으로 물은 질문에 모두 답하면 바로 다시 고른다
-    if (ask && ask.questions.every((q) => chat.answers[q.key])) {
+    if (ask && ask.questions.every((q) => chatAnswer(q.key))) {
       ask.done = true;
       await askChat();
     }

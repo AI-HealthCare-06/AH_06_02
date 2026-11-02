@@ -8,12 +8,14 @@ from unittest.mock import patch
 import httpx
 import pytest
 from httpx import ASGITransport, AsyncClient
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 from tortoise.contrib.test import TestCase
 
+import app.services.rag_cards as rag_cards
 from app.apis.v1.challenge_chat_routers import chat_setup_issue, get_challenge_chat_service
 from app.core import config
 from app.dependencies.security import get_request_user
+from app.dtos.challenges import ChallengeSelectRequest
 from app.main import app
 from app.models.challenges import (
     AttackCycleStatus,
@@ -76,6 +78,64 @@ def reason_for(key: str, value: str) -> str | None:
 
 
 # ---------------------------------------------------------------- 순수 함수
+
+
+def test_activity_question_policy_has_its_own_version() -> None:
+    assert CHAT_POLICY_VERSION == "RAG-CHAT-20261102-v5"
+
+
+def test_activity_range_uses_confirmed_walking_level() -> None:
+    assert rag_cards.classify_activity_range({"light": "yes", "walk": "yes", "vigorous": "no"}) == 2
+
+
+def test_activity_range_uses_confirmed_vigorous_level() -> None:
+    assert rag_cards.classify_activity_range({"light": "yes", "walk": "yes", "vigorous": "yes"}) == 3
+
+
+def test_activity_range_uses_confirmed_light_level() -> None:
+    assert rag_cards.classify_activity_range({"light": "yes", "walk": "no", "vigorous": "no"}) == 1
+
+
+def test_activity_range_does_not_require_vigorous_answer_when_walking_is_unavailable() -> None:
+    assert rag_cards.classify_activity_range({"light": "yes", "walk": "no", "vigorous": "unknown"}) == 1
+
+
+def test_activity_range_allows_standing_break_at_first_level() -> None:
+    assert rag_cards.activity_range_allows("CH_STAND_CALL", 1)
+
+
+def test_activity_range_enforces_minimum_for_each_supported_challenge() -> None:
+    first = {"CH_STAND_HOURLY", "CH_HOUSEWORK_15", "CH_SQUAT_15", "CH_STAND_CALL", "CH_SCREEN_BREAK"}
+    second = {"CH_WALK_AFTER_MEAL", "CH_WALK_ONE_STOP", "CH_WALK_EVENING_20"}
+    third = {"CH_STAIRS", "CH_STRENGTH_10", "CH_WALL_PUSHUP_10"}
+    other = rag_cards.SUPPORTED_CODES - first - second - third
+    for code in first | second | third:
+        minimum = 1 if code in first else 2 if code in second else 3
+        for level in range(1, 4):
+            assert rag_cards.activity_range_allows(code, level) == (level >= minimum)
+        assert not rag_cards.activity_range_allows(code, None)
+    for code in other:
+        assert rag_cards.activity_range_allows(code, None)
+    assert not rag_cards.activity_range_allows("CH_UNKNOWN", 3)
+
+
+def test_ambiguous_activity_answers_extend_question_budget_to_five() -> None:
+    budget = getattr(rag_cards, "activity_question_budget", lambda _answers: 3)
+    assert budget({"light": "yes", "walk": "unknown", "vigorous": "no"}) == 5
+
+
+def test_activity_answers_reject_values_outside_the_choice_contract() -> None:
+    answers_type = getattr(rag_cards, "ActivityAnswers", None)
+    assert answers_type is not None
+    assert answers_type(light="yes").light == "yes"
+    with pytest.raises(ValidationError):
+        answers_type(light="자유 입력")
+
+
+def test_chat_request_accepts_valid_activity_choices() -> None:
+    request = ChallengeSelectRequest.model_validate({"activity": {"light": "yes", "walk": "no"}})
+    activity = getattr(request, "activity", None)
+    assert activity is not None and activity.light == "yes" and activity.walk == "no"
 
 
 @pytest.mark.parametrize(
@@ -213,6 +273,306 @@ class TestChallengeChat(TestCase):
         provider = FixtureProvider()
         result = await (await self._service(provider, enabled=False)).select(user, YES, [])
         assert result.mode == "rules" and result.recommendations.items and provider.judge_calls == []
+
+    async def test_api_starts_activity_assessment_with_light_activity_question(self) -> None:
+        user, _ = await self._ready("chat-activity-api@example.com")
+        service = await self._service(FixtureProvider())
+        app.dependency_overrides[get_challenge_chat_service] = lambda: service
+        app.dependency_overrides[get_request_user] = lambda: user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                response = await client.post("/api/v1/challenge-chat/select", json={"activity": {}})
+        finally:
+            app.dependency_overrides.clear()
+        assert response.status_code == 200
+        result = response.json()["data"]
+        assert result["mode"] == "ask" and result["questions"][0]["key"] == "activity_light"
+
+    async def test_entry_remains_initial_until_a_recommendation_is_created(self) -> None:
+        user, _ = await self._ready("chat-entry@example.com")
+        service = await self._service(FixtureProvider())
+        app.dependency_overrides[get_challenge_chat_service] = lambda: service
+        app.dependency_overrides[get_request_user] = lambda: user
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                first = await client.get("/api/v1/challenge-chat/entry")
+                await service.rules.eligible(user)
+                after_cycle = await client.get("/api/v1/challenge-chat/entry")
+                await service.rules.generate(user)
+                after_recommendation = await client.get("/api/v1/challenge-chat/entry")
+        finally:
+            app.dependency_overrides.clear()
+        assert first.json()["data"]["initial"] is True
+        assert after_cycle.json()["data"]["initial"] is True
+        assert after_recommendation.json()["data"]["initial"] is False
+
+    async def test_activity_assessment_asks_about_walking_after_light_activity(self) -> None:
+        user, _ = await self._ready("chat-activity-walk@example.com")
+        service = await self._service(FixtureProvider())
+        result = await service.select(user, SituationAnswers(), [], rag_cards.ActivityAnswers(light="yes"))
+        assert result.mode == "ask" and result.questions[0]["key"] == "activity_walk"
+
+    async def test_uncertain_activity_answer_gets_a_clarifying_question(self) -> None:
+        user, _ = await self._ready("chat-activity-uncertain@example.com")
+        service = await self._service(FixtureProvider())
+        activity = rag_cards.ActivityAnswers.model_validate({"light": "unsure", "clarifications": 1})
+        result = await service.select(user, SituationAnswers(), [], activity)
+        assert result.mode == "ask" and result.questions[0]["key"] == "activity_light"
+        assert "확인" in result.questions[0]["text"]
+
+    async def test_activity_assessment_asks_about_vigorous_activity_after_walking(self) -> None:
+        user, _ = await self._ready("chat-activity-vigorous@example.com")
+        service = await self._service(FixtureProvider())
+        result = await service.select(user, SituationAnswers(), [], rag_cards.ActivityAnswers(light="yes", walk="yes"))
+        assert result.mode == "ask" and result.questions[0]["key"] == "activity_vigorous"
+
+    async def test_confirmed_activity_level_keeps_nonexercise_candidates_available(self) -> None:
+        user, _ = await self._ready("chat-activity-nonexercise@example.com")
+        service = await self._service(FixtureProvider(PREFER_DELAY))
+        activity = rag_cards.ActivityAnswers(light="yes", walk="no")
+        result = await service.select(user, YES, ["first_cig", "no_smoke"], activity)
+        assert result.mode == "conversation" and len(result.recommendations.items) == 2
+
+    async def test_ai_activity_level_cannot_exceed_explicitly_confirmed_range(self) -> None:
+        class RangeProvider(FixtureProvider):
+            async def classify_activity(self, context: dict[str, Any]) -> object:
+                return {"level": 3}
+
+        user, _ = await self._ready("chat-activity-ai-limit@example.com")
+        provider = RangeProvider(PREFER_DELAY)
+        service = await self._service(provider)
+        activity = rag_cards.ActivityAnswers(light="yes", walk="no")
+        result = await service.select(user, YES, ["first_cig", "no_smoke"], activity)
+        assert result.mode == "conversation"
+        assert provider.judge_calls[0][0]["activity_level"] == 1
+
+    async def test_activity_assessment_does_not_fall_back_to_unfiltered_recommendations(self) -> None:
+        user, _ = await self._ready("chat-activity-empty@example.com")
+        service = await self._service(FixtureProvider(PREFER_DELAY))
+        activity = rag_cards.ActivityAnswers(light="yes", walk="no")
+        answers = SituationAnswers(first_cig="no", no_smoke="no")
+        result = await service.select(user, answers, ["first_cig", "no_smoke"], activity)
+        assert result.mode == "hold" and not result.recommendations.items
+
+    async def test_activity_and_challenge_questions_cannot_exceed_five(self) -> None:
+        user, _ = await self._ready("chat-activity-limit@example.com")
+        service = await self._service(FixtureProvider())
+        activity = rag_cards.ActivityAnswers(light="yes", walk="yes", vigorous="yes")
+        with pytest.raises(ValueError):
+            await service.select(user, YES, ["first_cig", "no_smoke", "stairs"], activity)
+
+    async def test_ambiguous_range_at_five_questions_is_held(self) -> None:
+        user, _ = await self._ready("chat-activity-at-limit@example.com")
+        service = await self._service(FixtureProvider())
+        activity = rag_cards.ActivityAnswers(light="yes", walk="yes")
+        result = await service.select(user, YES, ["first_cig", "no_smoke", "stairs"], activity)
+        assert result.mode == "hold" and not result.questions
+
+    async def test_clear_answer_finishes_after_three_total_questions(self) -> None:
+        user, _ = await self._ready("chat-activity-clear@example.com")
+        service = await self._service(FixtureProvider())
+        activity = rag_cards.ActivityAnswers(light="yes", walk="no")
+        result = await service.select(user, SituationAnswers(first_cig="yes"), ["first_cig"], activity)
+        assert result.mode == "conversation" and len(result.recommendations.items) == 1
+
+    async def test_recommendation_records_confirmed_activity_range_and_answers(self) -> None:
+        user, _ = await self._ready("chat-activity-snapshot@example.com")
+        service = await self._service(FixtureProvider())
+        activity = rag_cards.ActivityAnswers(light="yes", walk="no")
+        result = await service.select(user, SituationAnswers(first_cig="yes"), ["first_cig"], activity)
+        snapshot = result.recommendations.items[0].conversation_snapshot or {}
+        assert snapshot["activity_level"] == 1
+        activity_answers = snapshot["activity_answers"]
+        assert isinstance(activity_answers, dict)
+        assert activity_answers["light"] == "yes"
+        assert activity_answers["walk"] == "no"
+
+    async def test_fixed_questions_can_select_without_an_ai_provider(self) -> None:
+        user, _ = await self._ready("chat-activity-fallback@example.com")
+        service = await self._service(None, enabled=False)
+        activity = rag_cards.ActivityAnswers(light="yes", walk="no")
+        result = await service.select(user, SituationAnswers(first_cig="yes"), ["first_cig"], activity)
+        assert result.mode == "conversation" and len(result.recommendations.items) == 1
+        assert result.recommendations.items[0].llm_model_version is None
+
+    async def test_judgment_failure_keeps_only_confirmed_fixed_question_candidates(self) -> None:
+        user, _ = await self._ready("chat-activity-judge-failure@example.com")
+        service = await self._service(FixtureProvider(error=TimeoutError()))
+        activity = rag_cards.ActivityAnswers(light="yes", walk="no")
+        result = await service.select(user, YES, ["first_cig", "no_smoke"], activity)
+        assert result.mode == "conversation" and len(result.recommendations.items) == 2
+        assert all(row.llm_model_version is None for row in result.recommendations.items)
+
+    async def test_first_activity_level_excludes_confirmed_stairs_from_recommendations(self) -> None:
+        await upsert_challenges(parse_rows(read_csv(DEFAULT_CSV)))
+        user = await User.create(email="chat-range-filter@example.com", password_hash="x", nickname="t")
+        await make_target(user.id, ["physical_activity_low"])
+        now = datetime.now(config.TIMEZONE)
+        record = await HealthRecord.create(user_id=user.id, recorded_at=now)
+        prediction = await Prediction.create(
+            user_id=user.id,
+            health_record_id=record.id,
+            job_id=f"range-{user.id}",
+            model_version=TEST_MODEL_VERSION,
+            status=PredictionStatus.DONE,
+            dm_probability=Decimal("0.3"),
+            predicted_at=now,
+        )
+        await PredictionContribution.create(
+            prediction_id=prediction.id,
+            disease="diabetes",
+            factor_key="physical_activity_low",
+            contribution=Decimal("0.01"),
+            direction="increase",
+            rank=1,
+        )
+        artifact = fake_artifact(p95={"diabetes": {"physical_activity_low": 0.01}})
+        service = ChallengeChatService(
+            RecommendationService(lambda: artifact), await PageIndex.build(), FixtureProvider(), enabled=True
+        )
+        answers = SituationAnswers(stairs="yes", housework="yes")
+        result = await service.select(
+            user, answers, ["stairs", "housework"], rag_cards.ActivityAnswers(light="yes", walk="no")
+        )
+        assert result.mode == "conversation"
+        assert [result.recommendations.challenges[row.challenge_id].code for row in result.recommendations.items] == [
+            "CH_HOUSEWORK_15"
+        ]
+
+    async def test_generated_question_is_served_with_canonical_answer_values(self) -> None:
+        class GeneratedProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                options = [
+                    {**option, "label": "가능해요"} if option["value"] == "yes" else option
+                    for option in context["options"]
+                ]
+                return {"text": f"잠깐 여쭤볼게요. {context['intent']}", "options": options}
+
+        user, _ = await self._ready("chat-generated@example.com")
+        result = await (await self._service(GeneratedProvider())).select(user, SituationAnswers(), [])
+        assert result.mode == "ask"
+        assert result.questions[0]["text"].startswith("잠깐 여쭤볼게요.")
+        assert {option["value"] for option in result.questions[0]["options"]} == {"yes", "no"}
+        assert (
+            next(option["label"] for option in result.questions[0]["options"] if option["value"] == "yes") == "가능해요"
+        )
+
+    async def test_verified_novel_generated_question_is_served(self) -> None:
+        class NovelProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                return {"text": "확인하고 싶어요. " + context["intent"], "options": context["options"]}
+
+            async def verify_question(self, context: dict[str, Any]) -> object:
+                return {"safe_and_equivalent": True}
+
+        user, _ = await self._ready("chat-novel-question@example.com")
+        result = await (await self._service(NovelProvider())).select(user, SituationAnswers(), [])
+        assert result.questions[0]["text"].startswith("확인하고 싶어요. ")
+
+    async def test_novel_question_cannot_add_a_time_period_even_if_review_accepts(self) -> None:
+        class ChangedPeriodProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                return {"text": "내일 " + context["intent"], "options": context["options"]}
+
+            async def verify_question(self, context: dict[str, Any]) -> object:
+                return {"safe_and_equivalent": True}
+
+        user, _ = await self._ready("chat-changed-period@example.com")
+        result = await (await self._service(ChangedPeriodProvider())).select(user, SituationAnswers(), [])
+        [question] = result.questions
+        original = next(page for page in question_bank() if page.question_id == question["question_id"])
+        assert question["text"] == original.text
+
+    async def test_novel_question_rejected_by_semantic_review_falls_back(self) -> None:
+        class RejectedProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                return {"text": "오늘 이 행동을 안 하실 건가요?", "options": context["options"]}
+
+            async def verify_question(self, context: dict[str, Any]) -> object:
+                return {"safe_and_equivalent": False}
+
+        user, _ = await self._ready("chat-rejected-question@example.com")
+        result = await (await self._service(RejectedProvider())).select(user, SituationAnswers(), [])
+        [question] = result.questions
+        original = next(page for page in question_bank() if page.question_id == question["question_id"])
+        assert question["text"] == original.text
+
+    async def test_generated_question_with_changed_answer_meaning_falls_back(self) -> None:
+        class InvalidProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                options = list(context["options"])
+                options[0] = {**options[0], "label": "다른 의미"}
+                return {"text": context["intent"], "options": options}
+
+        user, _ = await self._ready("chat-invalid-question@example.com")
+        result = await (await self._service(InvalidProvider())).select(user, SituationAnswers(), [])
+        [question] = result.questions
+        original = next(page for page in question_bank() if page.question_id == question["question_id"])
+        assert question["text"] == original.text
+        assert question["options"] == [{"value": option.value, "label": option.label} for option in original.options]
+
+    async def test_generated_question_can_use_another_approved_intent_expression(self) -> None:
+        class VariantProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                self.original = context["intent"]
+                return {
+                    "text": next(text for text in context["intents"] if text != context["intent"]),
+                    "options": context["options"],
+                }
+
+        user, _ = await self._ready("chat-variant-question@example.com")
+        provider = VariantProvider()
+        result = await (await self._service(provider)).select(user, SituationAnswers(), [])
+        [question] = result.questions
+        rendered = next(page for page in question_bank() if page.question_id == question["question_id"])
+        expressions = [page.text for page in question_bank() if page.answer_key == question["key"]]
+        assert question["text"] in expressions and question["text"] != provider.original
+        assert question["text"] == rendered.text
+
+    async def test_ai_chooses_next_question_only_among_eligible_candidates(self) -> None:
+        class ChoosingProvider(FixtureProvider):
+            chosen: str = ""
+
+            async def choose_question(self, context: dict[str, Any]) -> object:
+                return {"answer_key": self.chosen}
+
+        user, _ = await self._ready("chat-question-order@example.com")
+        provider = ChoosingProvider()
+        service = await self._service(provider)
+        found = await service.rules.eligible(user)
+        fallback = service.index.next_question(
+            set(service._feasible(found)), SituationAnswers(), [], f"{user.id}:{found.cycle.id}"
+        )
+        assert fallback is not None
+        provider.chosen = ({"first_cig", "no_smoke"} - {fallback.answer_key}).pop()
+        result = await service.select(user, SituationAnswers(), [])
+        assert result.questions[0]["key"] == provider.chosen
+
+    async def test_ai_question_outside_eligible_candidates_falls_back_to_fixed_question(self) -> None:
+        class InvalidOrderProvider(FixtureProvider):
+            async def choose_question(self, context: dict[str, Any]) -> object:
+                return {"answer_key": "stairs"}
+
+        user, _ = await self._ready("chat-invalid-order@example.com")
+        service = await self._service(InvalidOrderProvider())
+        found = await service.rules.eligible(user)
+        fallback = service.index.next_question(
+            set(service._feasible(found)), SituationAnswers(), [], f"{user.id}:{found.cycle.id}"
+        )
+        assert fallback is not None
+        result = await service.select(user, SituationAnswers(), [])
+        assert result.questions[0]["key"] == fallback.answer_key
+
+    async def test_generated_question_with_unsafe_prefix_falls_back(self) -> None:
+        class InvalidProvider(FixtureProvider):
+            async def generate_question(self, context: dict[str, Any]) -> object:
+                return {"text": f"이 행동은 누구에게나 안전해요. {context['intent']}", "options": context["options"]}
+
+        user, _ = await self._ready("chat-unsafe-question@example.com")
+        result = await (await self._service(InvalidProvider())).select(user, SituationAnswers(), [])
+        [question] = result.questions
+        original = next(page for page in question_bank() if page.question_id == question["question_id"])
+        assert question["text"] == original.text
 
     async def test_questions_come_one_by_one_from_pages_with_a_fixed_seed(self) -> None:
         user, _ = await self._ready("chat-ask@example.com")

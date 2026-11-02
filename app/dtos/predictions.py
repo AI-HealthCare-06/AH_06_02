@@ -45,6 +45,7 @@ class PredictionStatusResponse(BaseModel):
     model_version: str
     #: 저장된 모델 버전이 활성 아티팩트와 같을 때만 안다. 다르면 뺀다
     model_experimental: bool | None = None
+    first_completed: bool | None = None
     results: list[DiseaseProbability] | None = None
     failure: PredictionFailure | None = None
 

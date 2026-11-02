@@ -46,6 +46,15 @@ async def get_challenge_chat_service() -> ChallengeChatService:
     return ChallengeChatService(RecommendationService(), await PageIndex.build(), provider, enabled=enabled)
 
 
+@challenge_chat_router.get("/challenge-chat/entry", status_code=status.HTTP_200_OK)
+async def challenge_chat_entry(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ChallengeChatService, Depends(get_challenge_chat_service)],
+) -> dict[str, Any]:
+    """첫 검사 뒤 질의 화면으로 바로 들어갈 수 있는지 확인한다."""
+    return ok({"initial": await service.initial_entry(user)})
+
+
 @challenge_chat_router.post("/challenge-chat/select", status_code=status.HTTP_200_OK)
 async def select_challenges_from_chat(
     request: ChallengeSelectRequest,
@@ -58,7 +67,7 @@ async def select_challenges_from_chat(
     items 의 recommendation_id 로 CHLG-05 시작을 부른다. 실패하면 mode=rules 로 규칙 추천을 그대로 준다.
     """
     try:
-        result = await service.select(user, request.answers, request.asked)
+        result = await service.select(user, request.answers, request.asked, request.activity)
     except ValueError as exc:
         # 질문 기록(asked)이 알려진 키가 아니거나 중복일 때
         raise AppError(ErrorCode.VALIDATION_ERROR, message=str(exc)) from exc

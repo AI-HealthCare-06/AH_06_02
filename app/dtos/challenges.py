@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.models.challenges import ContextSlot, VerificationMethod
-from app.services.rag_cards import SituationAnswers
+from app.services.rag_cards import ActivityAnswers, SituationAnswers
 
 
 class ChallengeStartRequest(BaseModel):
@@ -57,3 +57,4 @@ class ChallengeSelectRequest(BaseModel):
 
     answers: SituationAnswers = Field(default_factory=SituationAnswers)
     asked: list[str] = Field(default_factory=list, max_length=3)
+    activity: ActivityAnswers | None = None
