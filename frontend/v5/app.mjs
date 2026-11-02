@@ -1709,7 +1709,8 @@ function chatItemHtml(item, index, previous) {
     item.kind === "error"
       ? `<button type="button" class="secondary-action chat-retry" data-chat-retry>다시 받기</button>`
       : item.kind === "hold"
-        ? button("모험 지도로 가기", 'data-main-target="home"')
+        ? button("모험 지도로 가기", 'data-main-target="home"') +
+          button("다시 받기", "data-chat-restart")
         : "";
   return `${label}<p class="chat-bubble ai${tone}">${escape(item.text)}</p>${after}`;
 }
@@ -1794,6 +1795,16 @@ async function chatClick(button) {
   }
   if (button.hasAttribute("data-chat-retry")) {
     chat.view = chat.view.filter((item) => item.kind !== "error");
+    await askChat();
+    return true;
+  }
+  if (button.hasAttribute("data-chat-restart")) {
+    resetChat();
+    try {
+      const entry = await api("/challenge-chat/entry");
+      if (entry.initial) chat.activity = {};
+    } catch {
+    }
     await askChat();
     return true;
   }

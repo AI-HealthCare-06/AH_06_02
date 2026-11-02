@@ -1921,3 +1921,15 @@ h2 {
     flex: 1 1 0;
   }
 }
+/* ---- 신발 정렬 수정 (2026-11-02, 병주님 지적) ---- */
+/* 베이스 발 위치 실측: 가로 25.2-84.7%, 세로 하단 5-20%. 기존 박스(18%/69%/17%)는
+   contain letterboxing으로 부츠가 축소·중앙 집중돼 발과 어긋남.
+   박스를 발 영역에 맞추고 cover로 부츠 밀집 영역(중앙)을 표시한다. */
+.avatar-rig .gear-feet {
+  left: 25% !important;
+  bottom: 5% !important;
+  width: 60% !important;
+  height: 15% !important;
+  object-fit: cover !important;
+  object-position: center 50% !important;
+}
