@@ -1933,3 +1933,39 @@ h2 {
   object-fit: cover !important;
   object-position: center 50% !important;
 }
+
+/* ---- 하단 메뉴바·공격 화면 겹침 수정 (2026-11-03) ---- */
+/* 메뉴바를 하단 가장자리에 붙이고(6px 간격 제거), 화면 하단 여백을 늘려
+   접힌 메뉴바(탭 36px)가 공격(전투) 화면 하단의 챌린지 스트립을 가리지 않게 한다.
+   모바일 폭만 대상. 데스크톱·태블릿은 건드리지 않는다. */
+@media (max-width: 760px) {
+  .phone #adventure-nav,
+  .phone.home-map #adventure-nav {
+    bottom: env(safe-area-inset-bottom);
+  }
+  .phone #screen {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+  /* 공격 화면: 챌린지 스트립이 메뉴바 위로 여유 있게 올라오게 */
+  .phone .reco .battle-challenges {
+    margin-bottom: 8px;
+  }
+}
+
+/* ---- 하단 메뉴바·공격 화면 겹침 수정 (2026-11-03) ---- */
+/* 메뉴바를 하단 가장자리에 붙이고(6px 간격 제거), 화면 하단 여백을 늘려
+   접힌 메뉴바(탭 36px)가 공격(전투) 화면 하단의 챌린지 스트립을 가리지 않게 한다.
+   모바일 폭만 대상. 데스크톱·태블릿은 건드리지 않는다. */
+@media (max-width: 760px) {
+  .phone #adventure-nav,
+  .phone.home-map #adventure-nav {
+    bottom: env(safe-area-inset-bottom);
+  }
+  .phone #screen {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+  /* 공격 화면: 챌린지 스트립이 메뉴바 위로 여유 있게 올라오게 */
+  .phone .reco .battle-challenges {
+    margin-bottom: 8px;
+  }
+}
