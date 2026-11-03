@@ -565,7 +565,10 @@ async function renderBattle(ticket) {
   $(".battle-round").textContent = missions[0]?.cycle_week
     ? `28일의 모험 · ${missions[0].cycle_week}주차`
     : "28일의 모험 · 시작 전";
-  $("#battle-caption").textContent = "챌린지 내용을 확인한 뒤 시작해요.";
+  // 생성 실패로 안내가 뜬 상태에서는 시작 안내가 모순되므로 이어가기 안내로 바꾼다
+  $("#battle-caption").textContent = notice
+    ? "진행 중인 챌린지를 이어가세요."
+    : "챌린지 내용을 확인한 뒤 시작해요.";
   const entries = [
     ...missions
       .filter((row) => row.target_monster?.code === m.code)
@@ -2096,6 +2099,11 @@ document.head.append(css);
   nav.querySelector(".nav-tab").addEventListener("click", (event) => {
     event.stopPropagation();
     nav.classList.toggle("nav-open");
+    // 메뉴를 펼치면 열린 메뉴에 가려지던 하단 콘텐츠(공격 스트립)가 위로 올라오게 화면 하단으로 스크롤
+    if (nav.classList.contains("nav-open")) {
+      const screen = document.querySelector("#screen");
+      if (screen) screen.scrollTo({ top: screen.scrollHeight });
+    }
   });
   nav.querySelectorAll("[data-main-target]").forEach((button) => {
     button.addEventListener("click", () => nav.classList.remove("nav-open"));

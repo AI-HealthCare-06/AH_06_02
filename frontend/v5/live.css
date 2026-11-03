@@ -1969,3 +1969,12 @@ h2 {
     margin-bottom: 8px;
   }
 }
+
+/* ---- 메뉴 펼침 상태 공격 버튼 상향 (2026-11-03 최종 수정) ---- */
+/* 메뉴가 펼쳐지면 열린 메뉴 높이만큼 화면 하단 여백을 늘려
+   공격(챌린지) 스트립이 열린 메뉴 위로 올라오게 한다. */
+@media (max-width: 760px) {
+  .phone:has(#adventure-nav.nav-open) #screen {
+    padding-bottom: calc(150px + env(safe-area-inset-bottom));
+  }
+}
