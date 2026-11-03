@@ -1822,3 +1822,114 @@ body.reduce-motion .chat-typing i {
     top: 106px;
   }
 }
+/* ---- 유동 텍스트 + 하단 메뉴 슬라이드 탭 (2026-11-02, 병주님 지시 정정) ---- */
+/* 텍스트: 화면이 좁아지면 작아지고 넓어지면 커진다 (clamp 유동 크기) */
+body {
+  font-size: clamp(13px, 3.5vw, 16px);
+}
+.section-copy,
+.small-copy,
+.live-monster p,
+.live-monster details,
+.live-details,
+.growth-header p:not(.section-caption) {
+  font-size: clamp(12px, 3.4vw, 14px);
+}
+.section-caption,
+.menu-section {
+  font-size: clamp(11px, 3vw, 13px);
+}
+h1 {
+  font-size: clamp(22px, 6vw, 32px);
+}
+h2 {
+  font-size: clamp(17px, 4.5vw, 23px);
+}
+
+/* 하단 메뉴: 기본은 접혀서 하단 탭만 보이고, 탭을 누르면 위로 슬라이드 (모바일) */
+@media (max-width: 760px) {
+  .phone:not(.onboarding) {
+    grid-template-rows: 56px auto minmax(0, 1fr);
+  }
+  .phone #screen {
+    padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  }
+  .phone #adventure-nav,
+  .phone.home-map #adventure-nav {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(6px + env(safe-area-inset-bottom));
+    z-index: 60;
+    margin: 0;
+    padding: 0 4px 3px;
+    transform: translateY(calc(100% - 36px));
+    transition: transform 0.3s ease;
+  }
+  .phone #adventure-nav.nav-open,
+  .phone.home-map #adventure-nav.nav-open {
+    transform: translateY(0);
+  }
+  .phone #adventure-nav .nav-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    min-height: 36px;
+    padding: 6px 0 4px;
+    background: transparent;
+    color: #5542b5;
+    font-size: 11px;
+    font-weight: 700;
+    border: 0;
+  }
+  .phone #adventure-nav .nav-tab-grip {
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: 4px;
+    background: #c9bff5;
+  }
+  .phone #adventure-nav .nav-tab-label {
+    font-size: 10px;
+    color: #8a7fd4;
+  }
+}
+/* ---- 하단 메뉴 탭 위치 수정 (2026-11-02, 병주님 지적) ---- */
+/* 탭이 버튼 행에 섞이지 않고 메뉴 최상단에 한 줄 전체로 오게 한다 */
+@media (max-width: 760px) {
+  .phone #adventure-nav,
+  .phone.home-map #adventure-nav {
+    flex-wrap: wrap;
+  }
+  .phone #adventure-nav .nav-tab,
+  .phone.home-map #adventure-nav .nav-tab {
+    flex: 0 0 100%;
+    order: -1;
+    min-height: 36px;
+    max-height: 36px;
+    padding: 6px 0 4px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  /* 탭 외 메뉴 버튼들은 두 번째 행에 나란히 */
+  .phone #adventure-nav button:not(.nav-tab),
+  .phone.home-map #adventure-nav button:not(.nav-tab) {
+    flex: 1 1 0;
+  }
+}
+/* ---- 신발 정렬 수정 (2026-11-02, 병주님 지적) ---- */
+/* 베이스 발 위치 실측: 가로 25.2-84.7%, 세로 하단 5-20%. 기존 박스(18%/69%/17%)는
+   contain letterboxing으로 부츠가 축소·중앙 집중돼 발과 어긋남.
+   박스를 발 영역에 맞추고 cover로 부츠 밀집 영역(중앙)을 표시한다. */
+.avatar-rig .gear-feet {
+  left: 25% !important;
+  bottom: 5% !important;
+  width: 60% !important;
+  height: 15% !important;
+  object-fit: cover !important;
+  object-position: center 50% !important;
+}

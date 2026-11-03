@@ -1709,7 +1709,8 @@ function chatItemHtml(item, index, previous) {
     item.kind === "error"
       ? `<button type="button" class="secondary-action chat-retry" data-chat-retry>다시 받기</button>`
       : item.kind === "hold"
-        ? button("모험 지도로 가기", 'data-main-target="home"')
+        ? button("모험 지도로 가기", 'data-main-target="home"') +
+          button("다시 받기", "data-chat-restart")
         : "";
   return `${label}<p class="chat-bubble ai${tone}">${escape(item.text)}</p>${after}`;
 }
@@ -1718,7 +1719,7 @@ function renderChat() {
   if (!scene) return;
   const log = scene.querySelector(".chat-log");
   log.innerHTML =
-    '<h1>공략 도우미</h1><p class="small-copy chat-intro">질문에 눌러서 답하면 지금 시작할 만한 챌린지를 골라요.</p>' +
+    '<h1>공략 도우미</h1><p class="small-copy chat-intro">질문에 눌러서 답하면 지금 시작할 만한 챌린지를 골라요.</p><button type="button" class="secondary-action chat-restart-top" data-chat-restart>다시 받기</button>' +
     chat.view
       .map((item, index) => chatItemHtml(item, index, chat.view[index - 1]))
       .join("");
@@ -1794,6 +1795,16 @@ async function chatClick(button) {
   }
   if (button.hasAttribute("data-chat-retry")) {
     chat.view = chat.view.filter((item) => item.kind !== "error");
+    await askChat();
+    return true;
+  }
+  if (button.hasAttribute("data-chat-restart")) {
+    resetChat();
+    try {
+      const entry = await api("/challenge-chat/entry");
+      if (entry.initial) chat.activity = {};
+    } catch {
+    }
     await askChat();
     return true;
   }
@@ -2074,6 +2085,23 @@ const css = document.createElement("link");
 css.rel = "stylesheet";
 css.href = new URL("./live.css", import.meta.url);
 document.head.append(css);
+// 하단 메뉴 슬라이드 탭 (2026-11-02, 병주님 지시): 기본 접힘, 탭 누르면 위로 슬라이드
+(function setupNavTab() {
+  const nav = document.querySelector("#adventure-nav");
+  if (!nav || nav.querySelector(".nav-tab")) return;
+  nav.insertAdjacentHTML(
+    "afterbegin",
+    '<button type="button" class="nav-tab" aria-label="메뉴 열기/닫기"><span class="nav-tab-grip"></span><span class="nav-tab-label">메뉴</span></button>',
+  );
+  nav.querySelector(".nav-tab").addEventListener("click", (event) => {
+    event.stopPropagation();
+    nav.classList.toggle("nav-open");
+  });
+  nav.querySelectorAll("[data-main-target]").forEach((button) => {
+    button.addEventListener("click", () => nav.classList.remove("nav-open"));
+  });
+})();
+
 $$(
   ".prototype-disclosure,.prototype-banner,.prototype-notice,.prototype-status,.prototype-proposal,.rewards>.hint,.rewards .hint,.preview-note",
 ).forEach((el) => el.remove());
